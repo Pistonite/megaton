@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+members = [
+    "buildcommon",
+    "buildtool",
+]
+exclude = [
+    "megaton-hammer",
+]

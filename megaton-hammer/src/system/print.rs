@@ -6,6 +6,11 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, StandardStreamLoc
 static mut VERBOSE: bool = false;
 static mut COLOR: bool = true;
 
+static RED: &str = "\x1b[1;31m";
+static GREEN: &str = "\x1b[1;32m";
+static YELLOW: &str = "\x1b[1;33m";
+static CYAN: &str = "\x1b[1;36m";
+
 pub fn is_verbose() -> bool {
     unsafe { VERBOSE }
 }

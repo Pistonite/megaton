@@ -1,0 +1,26 @@
+[package]
+name = "megaton-buildtool"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies.buildcommon]
+path = "../buildcommon"
+
+[dependencies]
+clap = { version = "4.5.20", features = ["derive", "cargo"] }
+derivative = "2.2.0"
+dunce = "1.0.5"
+error-stack = "0.5.0"
+num_cpus = "1.16.0"
+oneshot = { version = "0.1.8", default-features = false, features = ["std"] }
+pathdiff = "0.2.2"
+regex = "1.11.1"
+rustc-hash = "2.0.0"
+serde = { version = "1.0.214", features = ["derive"] }
+serde_json = "1.0.132"
+serde_yaml_ng = "0.10.0"
+thiserror = "1.0.66"
+threadpool = "1.8.1"
+toml = "0.8.19"
+walkdir = "2.5.0"
+which = "7.0.0"
