@@ -5,145 +5,57 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::ChildStderr;
 
-use filetime::FileTime;
-use itertools::Itertools;
+use buildcommon::flags::Flags;
+use buildcommon::system::PathExt;
+use buildcommon::{system, verboseln};
+use error_stack::Result;
 use rustc_hash::{FxHashMap, FxHasher};
 use serde::{Deserialize, Serialize};
 
 use crate::build::config::Build;
 use crate::build::Paths;
-use crate::system::{self, ChildBuilder, ChildProcess, Error, PathExt};
+use crate::system::{ChildBuilder, ChildProcess};
 
 pub struct Builder<'a> {
     paths: &'a Paths,
-    c_flags: Vec<String>,
-    cpp_flags: Vec<String>,
-    s_flags: Vec<String>,
-    ld_flags: Vec<String>,
-}
-
-const DEFAULT_COMMON: &[&str] = &[
-    "-march=armv8-a+crc+crypto",
-    "-mtune=cortex-a57",
-    "-mtp=soft",
-    "-fPIC",
-    "-fvisibility=hidden",
-];
-
-const DEFAULT_C: &[&str] = &[
-    "-g",
-    "-Wall",
-    "-Werror",
-    "-fdiagnostics-color=always",
-    "-ffunction-sections",
-    "-fdata-sections",
-    "-O3",
-];
-
-const DEFAULT_CPP: &[&str] = &[
-    "-fno-rtti",
-    "-fno-exceptions",
-    "-fno-asynchronous-unwind-tables",
-    "-fno-unwind-tables",
-    "-fpermissive",
-    "-std=c++20",
-];
-
-const DEFAULT_S: &[&str] = &["-g"];
-
-const DEFAULT_LD: &[&str] = &[
-    "-g",
-    "-nostartfiles",
-    "-nodefaultlibs",
-    "-Wl,--shared",
-    "-Wl,--export-dynamic",
-    "-Wl,-z,nodynamic-undefined-weak",
-    "-Wl,--gc-sections",
-    "-Wl,--build-id=sha1",
-    "-Wl,--nx-module-name",
-    "-Wl,--exclude-libs=ALL",
-];
-
-macro_rules! create_flags {
-    ($field: expr, $default: expr) => {
-        match $field {
-            None => $default.iter().map(|x| x.to_string()).collect_vec(),
-            Some(flags) => {
-                let mut v = vec![];
-                for flag in flags {
-                    if flag == "<default>" {
-                        v.extend($default.iter().map(|x| x.to_string()));
-                    } else {
-                        v.push(flag.clone());
-                    }
-                }
-                v
-            }
-        }
-    };
-    ($field: expr, $default: ident extends $base: expr) => {
-        match $field {
-            None => $base
-                .iter()
-                .cloned()
-                .chain($default.iter().map(|x| x.to_string()))
-                .collect_vec(),
-            Some(flags) => {
-                let mut v = $base.clone();
-                for flag in flags {
-                    if flag == "<default>" {
-                        v.extend($default.iter().map(|x| x.to_string()));
-                    } else {
-                        v.push(flag.clone());
-                    }
-                }
-                v
-            }
-        }
-    };
+    flags: Flags,
 }
 
 impl<'a> Builder<'a> {
-    pub fn new(paths: &'a Paths, entry: &str, build: &Build) -> Result<Self, Error> {
-        let flags = &build.flags;
-        let common = create_flags!(&flags.common, DEFAULT_COMMON);
+    pub fn new(paths: &'a Paths, entry: &str, build: &Build) -> Result<Self, system::Error> {
+        let mut flags = Flags::from_config(&build.flags);
+
         let mut includes = Vec::with_capacity(build.includes.len() + 1);
         includes.push(format!("-I{}", paths.libnx_include.display()));
         for dir in &build.includes {
-            let path = paths.root.join(dir).canonicalize2()?;
+            let path = paths.root.join(dir).to_abs()?;
             includes.push(format!("-I{}", path.display()));
         }
-        let mut c_flags = create_flags!(&flags.c, DEFAULT_C extends common);
-        let mut cpp_flags = create_flags!(&flags.cxx, DEFAULT_CPP extends c_flags);
-        let s_flags = create_flags!(&flags.as_, DEFAULT_S extends cpp_flags);
-        c_flags.extend(includes.iter().cloned());
-        cpp_flags.extend(includes);
 
-        let mut ld_flags = create_flags!(&flags.ld, DEFAULT_LD extends common);
+        flags.add_includes(includes);
+        flags.set_init(entry);
+        flags.set_version_script(paths.verfile.display());
+        flags.add_libpaths(
+            build
+                .libpaths
+                .iter()
+                .map(|libpath| paths.root.join(libpath).to_abs())
+                .collect::<Result<Vec<_>, _>>()?
+                .iter()
+                .map(|path| path.display()),
+        );
+        flags.add_libraries(&build.libraries);
+        flags.add_ldscripts(
+            build
+                .ldscripts
+                .iter()
+                .map(|ldscript| paths.root.join(ldscript).to_abs())
+                .collect::<Result<Vec<_>, _>>()?
+                .iter()
+                .map(|path| path.display()),
+        );
 
-        ld_flags.push(format!("-Wl,-init={}", entry));
-        ld_flags.push(format!("-Wl,--version-script={}", paths.verfile.display()));
-        for libpath in &build.libpaths {
-            ld_flags.push(format!(
-                "-L{}",
-                paths.root.join(libpath).canonicalize2()?.display()
-            ));
-        }
-        for lib in &build.libraries {
-            ld_flags.push(format!("-l{}", lib));
-        }
-        for ldscript in &build.ldscripts {
-            let path = paths.root.join(ldscript).canonicalize2()?;
-            ld_flags.push(format!("-Wl,-T,{}", path.display()));
-        }
-
-        Ok(Self {
-            paths,
-            c_flags,
-            cpp_flags,
-            s_flags,
-            ld_flags,
-        })
+        Ok(Self { paths, flags })
     }
 
     fn create_command(
@@ -153,7 +65,7 @@ impl<'a> Builder<'a> {
         d_file: String,
         o_file: String,
     ) -> CompileCommand {
-        let arguments = match s_type {
+        let arguments: Vec<_> = match s_type {
             SourceType::C => std::iter::once(self.paths.make_c.display().to_string())
                 .chain([
                     "-MMD".to_string(),
@@ -161,14 +73,14 @@ impl<'a> Builder<'a> {
                     "-MF".to_string(),
                     d_file,
                 ])
-                .chain(self.c_flags.iter().cloned())
+                .chain(self.flags.cflags.iter().cloned())
                 .chain([
                     "-c".to_string(),
                     "-o".to_string(),
                     o_file.clone(),
                     source.clone(),
                 ])
-                .collect_vec(),
+                .collect(),
             SourceType::Cpp => std::iter::once(self.paths.make_cpp.display().to_string())
                 .chain([
                     "-MMD".to_string(),
@@ -176,14 +88,14 @@ impl<'a> Builder<'a> {
                     "-MF".to_string(),
                     d_file,
                 ])
-                .chain(self.cpp_flags.iter().cloned())
+                .chain(self.flags.cxxflags.iter().cloned())
                 .chain([
                     "-c".to_string(),
                     "-o".to_string(),
                     o_file.clone(),
                     source.clone(),
                 ])
-                .collect_vec(),
+                .collect(),
             SourceType::S => std::iter::once(self.paths.make_cpp.display().to_string())
                 .chain([
                     "-MMD".to_string(),
@@ -193,14 +105,14 @@ impl<'a> Builder<'a> {
                     "-x".to_string(),
                     "assembler-with-cpp".to_string(),
                 ])
-                .chain(self.s_flags.iter().cloned())
+                .chain(self.flags.sflags.iter().cloned())
                 .chain([
                     "-c".to_string(),
                     "-o".to_string(),
                     o_file.clone(),
                     source.clone(),
                 ])
-                .collect_vec(),
+                .collect(),
         };
 
         CompileCommand {
@@ -216,7 +128,7 @@ impl<'a> Builder<'a> {
         source_path: &Path,
         cc_possibly_changed: bool,
         compile_commands: &mut FxHashMap<String, CompileCommand>,
-    ) -> Result<SourceResult, Error> {
+    ) -> Result<SourceResult, system::Error> {
         let source = source_path.display().to_string();
         let (source_type, base, ext) = match get_source_type(&source) {
             Some(x) => x,
@@ -234,9 +146,8 @@ impl<'a> Builder<'a> {
             let cc = self.create_command(source_type, source, d_file, o_file);
             return Ok(SourceResult::NeedCompile(cc));
         }
-        let o_mtime = system::get_modified_time(&o_path)?;
         // d file changed? (source included in d_file)
-        if !are_deps_up_to_date(&d_path, o_mtime)? {
+        if !are_deps_up_to_date(&d_path, &o_path)? {
             let cc = self.create_command(source_type, source, d_file, o_file);
             return Ok(SourceResult::NeedCompile(cc));
         }
@@ -260,11 +171,12 @@ impl<'a> Builder<'a> {
         }
     }
 
-    pub fn link_start(&self, objects: &[String], elf: &Path) -> Result<BuildTask, Error> {
+    pub fn link_start(&self, objects: &[String], elf: &Path) -> std::result::Result<BuildTask, crate::system::Error> {
         // use CXX for linking
         let child = ChildBuilder::new(&self.paths.make_cpp)
             .args(
-                self.ld_flags
+                self.flags
+                    .ldflags
                     .iter()
                     .chain(objects.iter())
                     .chain(["-o".to_string(), elf.display().to_string()].iter()),
@@ -272,7 +184,7 @@ impl<'a> Builder<'a> {
             .silence_stdout()
             .pipe_stderr()
             .spawn()?;
-        system::verboseln!("Running", "{}", child.command());
+        verboseln!("running {}", child.command());
         Ok(BuildTask { child })
     }
 }
@@ -312,10 +224,10 @@ pub struct BuildTask {
 
 impl BuildTask {
     pub fn new(child: ChildProcess) -> Self {
-        system::verboseln!("Running", "{}", child.command());
+        verboseln!("running {}", child.command());
         Self { child }
     }
-    pub fn wait(self) -> Result<BuildResult, Error> {
+    pub fn wait(self) -> std::result::Result<BuildResult, crate::system::Error> {
         let mut child = self.child;
         let error = child.take_stderr();
         let status = child.wait()?;
@@ -332,13 +244,13 @@ pub struct BuildResult {
 }
 
 pub fn load_compile_commands(cc_json: &Path, map: &mut FxHashMap<String, CompileCommand>) {
-    system::verboseln!("Loading", "{}", cc_json.display());
+    verboseln!("loading '{}'", cc_json.display());
     if !cc_json.exists() {
         return;
     }
-    let file = match system::open(cc_json) {
-        Ok(file) => BufReader::new(file),
-        Err(_) => {
+    let file = match system::buf_reader(cc_json) {
+        Ok(file) => file,
+        _ => {
             return;
         }
     };
@@ -388,14 +300,16 @@ fn source_hashed(source: &str, base: &str, ext: &str) -> String {
     // format!("{}{}", base, ext)
 }
 
-fn are_deps_up_to_date(d_path: &Path, o_mtime: FileTime) -> Result<bool, Error> {
-    // (very strong) assumptions of the depfiles:
-    // - the first rule is what we care about (the target)
-    // - the first line is just the target
+fn are_deps_up_to_date(d_path: &Path, o_path: &Path) -> Result<bool, system::Error> {
     if !d_path.exists() {
         return Ok(false);
     }
-    let lines = BufReader::new(system::open(d_path)?).lines();
+    // (very strong) assumptions of the depfiles:
+    // - the first rule is what we care about (the target)
+    // - the first line is just the target
+    let o_mtime = system::get_mtime(o_path)?;
+    let file = system::buf_reader(d_path)?;
+    let lines = file.lines();
     for line in lines.skip(1) {
         // skip the <target>: \ line
         let line = match line {
@@ -406,11 +320,8 @@ fn are_deps_up_to_date(d_path: &Path, o_mtime: FileTime) -> Result<bool, Error> 
         if part.ends_with(':') {
             break;
         }
-        let d_mtime = match system::get_modified_time(part) {
-            Ok(x) => x,
-            Err(_) => return Ok(false),
-        };
-        if d_mtime > o_mtime {
+        let d_mtime = system::get_mtime(part)?;
+        if !system::up_to_date(d_mtime, o_mtime) {
             return Ok(false);
         }
     }

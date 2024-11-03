@@ -3,9 +3,11 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use buildcommon::flags::FlagConfig;
+use buildcommon::system;
 use serde::{Deserialize, Serialize};
 
-use crate::system::{self, Error};
+use crate::system::Error;
 
 /// Config data read from Megaton.toml
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -26,7 +28,7 @@ impl Config {
     where
         S: AsRef<Path>,
     {
-        let config = system::read_file(path)?;
+        let config = system::read_file(path).map_err(Error::Interop)?;
         let config = toml::from_str(&config).map_err(|e| Error::ParseConfig(e.to_string()))?;
         Ok(config)
     }
@@ -105,7 +107,7 @@ pub struct Build {
     #[serde(default)]
     pub ldscripts: Vec<String>,
 
-    pub flags: BuildFlags,
+    pub flags: FlagConfig,
 }
 
 impl Profilable for Build {
@@ -122,23 +124,7 @@ impl Profilable for Build {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct BuildFlags {
-    /// Common flags for source files and linker
-    pub common: Option<Vec<String>>,
-    /// Flags for C and C++ source files
-    pub c: Option<Vec<String>>,
-    /// Flags for C++ source files
-    pub cxx: Option<Vec<String>>,
-    /// Flags for assembly source files
-    #[serde(rename = "as")]
-    pub as_: Option<Vec<String>>,
-    /// Flags for the linker
-    pub ld: Option<Vec<String>>,
-}
-
-impl Profilable for BuildFlags {
+impl Profilable for FlagConfig {
     fn extend(&mut self, other: &Self) {
         extend_flags(&mut self.common, &other.common);
         extend_flags(&mut self.c, &other.c);

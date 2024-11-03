@@ -1,7 +1,9 @@
 //! Macros for performing environment checks
 use std::path::{Path, PathBuf};
 
-use crate::system::{Error, PathExt};
+use error_stack::{Result, ResultExt};
+use buildcommon::system::{self, PathExt};
+use crate::system::Error;
 
 /// Check if a binary exists, or return an error
 macro_rules! check_tool {
@@ -71,10 +73,15 @@ pub fn check_os() -> Result<(), Error> {
 
 /// Find the directory that contains Megaton.toml
 pub fn find_root(dir: &str) -> Result<PathBuf, Error> {
-    let cwd = Path::new(dir).canonicalize2()?;
+    let cwd = Path::new(dir).to_abs()
+        .change_context(Error::FindProject)?;
     let mut root: &Path = cwd.as_path();
     while !root.join("Megaton.toml").exists() {
-        root = root.parent().ok_or(Error::NotProject)?;
+        // for some reason borrow analysis is not working here
+        // root = root.parent_or_err()
+        //     .change_context(Error::FindProject)?;
+        root = root.parent().ok_or(system::Error::ParentPath)
+            .change_context(Error::FindProject)?;
     }
     Ok(root.to_path_buf())
 }

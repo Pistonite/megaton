@@ -1,9 +1,10 @@
 use std::process::ExitCode;
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use error_stack::Result;
 
-use buildcommon::{env::Env, system};
+use buildcommon::env::Env;
+use buildcommon::{print, system};
 
 
 
@@ -30,22 +31,43 @@ struct Cli {
 #[derive(Debug, Clone, PartialEq, Subcommand)]
 enum Command {
     /// Create a new project
-    Init,
+    Init(CommonOptions),
     /// Build a project
-    Build,
+    Build(CommonOptions),
     /// Clean project outputs
-    Clean,
+    Clean(CommonOptions),
     /// Check the environment and installation status of 
     /// megaton, dependent tools and toolchain/libraries
     ///
     /// The paths found will be cached for faster lookup in the future
-    Checkenv,
+    Checkenv(CommonOptions),
     /// Pull the latest version of the megaton repo and update the build tool
-    Update,
-    /// Library options
-    Library,
+    Update(CommonOptions),
     /// Rustc options
-    Rustc,
+    Rustc(CommonOptions),
+}
+
+impl std::ops::Deref for Command {
+    type Target = CommonOptions;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Command::Init(x) => x,
+            Command::Build(x) => x,
+            Command::Clean(x) => x,
+            Command::Checkenv(x) => x,
+            Command::Update(x) => x,
+            Command::Rustc(x) => x,
+        }
+    }
+}
+
+/// Common options for all commands
+#[derive(Debug, Clone, PartialEq, Args)]
+struct CommonOptions {
+    /// Enable verbose output
+    #[clap(short = 'v', long)]
+    pub verbose: bool,
 }
 
 fn main() -> ExitCode {
@@ -58,9 +80,13 @@ fn main() -> ExitCode {
 }
 
 fn main_internal() -> Result<(), system::Error> {
+    print::auto_color();
     let arg = Cli::parse();
+    if arg.command.verbose {
+        print::verbose_on();
+    }
     match arg.command {
-        Command::Checkenv => {
+        Command::Checkenv(_) => {
             let env = Env::check(arg.home)?;
             env.save()?;
         }

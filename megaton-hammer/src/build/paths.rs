@@ -2,7 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::system::{self, Error, PathExt};
+use buildcommon::system::PathExt;
+
+use crate::system::{self, Error};
 
 /// Paths used by the program. All paths are absolute
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -120,14 +122,17 @@ impl Paths {
     }
 
     /// Get the path as relative from root
-    pub fn from_root<P>(&self, path: P) -> Result<PathBuf, Error>
+    pub fn from_root<P>(&self, path: P) -> PathBuf
     where
         P: AsRef<Path>,
     {
-        path.with_base(&self.root)
+        path.as_ref().rebase(&self.root)
     }
 }
 
 fn get_devkitpro_path() -> Result<PathBuf, Error> {
-    system::check_env!("DEVKITPRO", "Please refer to https://devkitpro.org/wiki/devkitPro_pacman#customising-existing-pacman-install to configure the environment variables.")?.canonicalize2()
+    let path = system::check_env!("DEVKITPRO", 
+        "Please refer to https://devkitpro.org/wiki/devkitPro_pacman#customising-existing-pacman-install to configure the environment variables."
+    )?;
+    Path::new(&path).to_abs().map_err(Error::Interop)
 }

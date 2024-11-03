@@ -1,21 +1,23 @@
 use std::collections::BTreeSet;
-use std::io::{BufRead, BufReader};
+use std::io::BufRead;
 use std::path::PathBuf;
 use std::sync::mpsc;
 
+use buildcommon::system::PathExt;
+use buildcommon::{system, verboseln};
 use regex::Regex;
 
 use crate::build::config::Check;
 use crate::build::Paths;
-use crate::system::{self, ChildBuilder, Error, Executer, PathExt, Task};
+use crate::system::{ChildBuilder, Error, Executer, Task};
 
 pub fn load_checker(paths: &Paths, config: Check, executer: &Executer) -> Result<Checker, Error> {
     let mut tasks = Vec::with_capacity(config.symbols.len());
     let (send, recv) = mpsc::channel();
     for path in &config.symbols {
-        let path = paths.root.join(path).canonicalize2()?;
-        let file = BufReader::new(system::open(&path)?);
-        let id = paths.from_root(&path)?.display().to_string();
+        let path = paths.root.join(path).to_abs().map_err(Error::Interop)?;
+        let file = system::buf_reader(&path).map_err(Error::Interop)?;
+        let id = paths.from_root(&path).display().to_string();
         let send = send.clone();
         let task = executer.execute(move || {
             process_objdump_syms(&id, file.lines().map_while(Result::ok), send)?;
@@ -41,7 +43,7 @@ impl Checker {
     pub fn check_symbols(&mut self, executer: &Executer) -> Result<CheckSymbolTask, Error> {
         // run objdump -T
         let mut child = ChildBuilder::new(&self.data.objdump)
-            .args(system::args!["-T", self.data.elf])
+            .args(crate::system::args!["-T", self.data.elf])
             .piped()
             .spawn()?;
         let elf_symbols = child.take_stdout().ok_or(Error::ObjdumpFailed)?;
@@ -90,7 +92,7 @@ impl Checker {
 
     pub fn check_instructions(&self, executer: &Executer) -> Result<CheckInstructionTask, Error> {
         let mut child = ChildBuilder::new(&self.data.objdump)
-            .args(system::args!["-d", self.data.elf])
+            .args(crate::system::args!["-d", self.data.elf])
             .piped()
             .spawn()?;
         let elf_instructions = child.take_stdout().ok_or(Error::ObjdumpFailed)?;
@@ -205,7 +207,7 @@ where
     Iter: IntoIterator<Item = Str>,
     Str: AsRef<str>,
 {
-    system::verboseln!("Loading", "{}", id);
+    verboseln!("loading {}", id);
     let mut iter = raw_symbols.into_iter();
     for line in iter.by_ref() {
         if line.as_ref() == "DYNAMIC SYMBOL TABLE:" {
@@ -234,7 +236,7 @@ where
         send.send(symbol.to_string()).unwrap();
     }
 
-    system::verboseln!("Loaded", "{}", id);
+    verboseln!("loaded '{}'", id);
     Ok(())
 }
 

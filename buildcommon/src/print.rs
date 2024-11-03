@@ -1,4 +1,5 @@
 //! Printing system
+use std::io::IsTerminal;
 
 static mut VERBOSE: bool = false;
 static mut COLOR: bool = true;
@@ -13,6 +14,19 @@ pub fn color_off() {
     unsafe { COLOR = false }
 }
 
+/// Automatically enable colored printing if stderr is a terminal
+pub fn auto_color() {
+    if !std::io::stderr().is_terminal() {
+        color_off();
+    }
+}
+
+/// Check if colored printing is enabled
+#[inline]
+pub fn is_colored() -> bool {
+    unsafe { COLOR }
+}
+
 #[doc(hidden)]
 pub mod __priv {
     pub static RED: &str = "\x1b[1;31m";
@@ -25,11 +39,6 @@ pub mod __priv {
     pub fn is_verbose() -> bool {
         unsafe { super::VERBOSE }
     }
-
-    #[inline]
-    pub fn is_colored() -> bool {
-        unsafe { super::COLOR }
-    }
 }
 
 
@@ -39,14 +48,14 @@ macro_rules! infoln {
     ($status:expr, $($args:tt)*) => {
         {
             use ::std::io::Write;
-            let mut stdout = ::std::io::stdout().lock();
+            let mut s = ::std::io::stderr().lock();
             let status = { $status };
-            if $crate::print::__priv::is_colored() {
-                let _ = write!(&mut stdout, "{}{:>12}{} ", $crate::print::__priv::GREEN, status, $crate::print::__priv::RESET);
+            if $crate::print::is_colored() {
+                let _ = write!(&mut s, "{}{:>12}{} ", $crate::print::__priv::GREEN, status, $crate::print::__priv::RESET);
             } else {
-                let _ = write!(&mut stdout, "{:>12} ", status);
+                let _ = write!(&mut s, "{:>12} ", status);
             }
-            let _ = writeln!(&mut stdout, $($args)*);
+            let _ = writeln!(&mut s, $($args)*);
         }
     };
 }
@@ -57,14 +66,14 @@ macro_rules! errorln {
     ($status:expr, $($args:tt)*) => {
         {
             use ::std::io::Write;
-            let mut stdout = ::std::io::stdout().lock();
+            let mut s = ::std::io::stderr().lock();
             let status = { $status };
-            if $crate::print::__priv::is_colored() {
-                let _ = write!(&mut stdout, "{}{:>12}{} ", $crate::print::__priv::RED, status, $crate::print::__priv::RESET);
+            if $crate::print::is_colored() {
+                let _ = write!(&mut s, "{}{:>12}{} ", $crate::print::__priv::RED, status, $crate::print::__priv::RESET);
             } else {
-                let _ = write!(&mut stdout, "{:>12} ", status);
+                let _ = write!(&mut s, "{:>12} ", status);
             }
-            let _ = writeln!(&mut stdout, $($args)*);
+            let _ = writeln!(&mut s, $($args)*);
         }
     };
 }
@@ -75,14 +84,14 @@ macro_rules! hintln {
     ($status:expr, $($args:tt)*) => {
         {
             use ::std::io::Write;
-            let mut stdout = ::std::io::stdout().lock();
+            let mut s = ::std::io::stderr().lock();
             let status = { $status };
-            if $crate::print::__priv::is_colored() {
-                let _ = write!(&mut stdout, "{}{:>12}{} ", $crate::print::__priv::YELLOW, status, $crate::print::__priv::RESET);
+            if $crate::print::is_colored() {
+                let _ = write!(&mut s, "{}{:>12}{} ", $crate::print::__priv::YELLOW, status, $crate::print::__priv::RESET);
             } else {
-                let _ = write!(&mut stdout, "{:>12} ", status);
+                let _ = write!(&mut s, "{:>12} ", status);
             }
-            let _ = writeln!(&mut stdout, $($args)*);
+            let _ = writeln!(&mut s, $($args)*);
         }
     };
 }
@@ -94,13 +103,13 @@ macro_rules! verboseln {
         {
             if $crate::print::__priv::is_verbose() {
                 use ::std::io::Write;
-                let mut stdout = ::std::io::stdout().lock();
-                if $crate::print::__priv::is_colored() {
-                    let _ = write!(&mut stdout, "{}     VERBOSE{} ", $crate::print::__priv::CYAN, $crate::print::__priv::RESET);
+                let mut s = ::std::io::stderr().lock();
+                if $crate::print::is_colored() {
+                    let _ = write!(&mut s, "{}     VERBOSE{} ", $crate::print::__priv::CYAN, $crate::print::__priv::RESET);
                 } else {
-                    let _ = write!(&mut stdout, "     VERBOSE ");
+                    let _ = write!(&mut s, "     VERBOSE ");
                 }
-                let _ = writeln!(&mut stdout, $($args)*);
+                let _ = writeln!(&mut s, $($args)*);
             }
         }
     };

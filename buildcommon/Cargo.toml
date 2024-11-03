@@ -12,3 +12,5 @@ serde_yaml_ng = "0.10.0"
 derive_more = { version = "1.0.0", features = ["full"] }
 which = "7.0.0"
 dunce = "1.0.5"
+filetime = "0.2.25"
+pathdiff = "0.2.2"
