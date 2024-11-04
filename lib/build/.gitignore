@@ -1,0 +1,4 @@
+/out
+/build.ninja
+/.ninja*
+/compile_commands.json

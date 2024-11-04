@@ -37,8 +37,9 @@ fn main() -> ExitCode {
 fn main_internal(cli: &Cli) -> Result<(), Error> {
     match &cli.command {
         Command::Checkenv(_) => cmd_checkenv::run(&cli.top)?,
-        Command::Build(build) => cmd_build::run(&cli.top, &build)?,
-        Command::Clean(clean) => cmd_clean::run(&cli.top, &clean)?,
+        Command::Build(options) => cmd_build::run(&cli.top, &options)?,
+        Command::Clean(options) => cmd_clean::run(&cli.top, &options)?,
+        Command::Install(options) => cmd_install::run(&cli.top, &options)?,
         _ => todo!()
     }
 

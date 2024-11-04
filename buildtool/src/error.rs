@@ -3,7 +3,16 @@ pub enum Error {
     // install
     #[error("failed to install or update build tool")]
     Install,
-
+    #[error("failed to update megaton repo")]
+    InstallUpdate,
+    #[error("failed to run cargo build while installing")]
+    InstallCargoBuild,
+    #[error("failed to replace executable while installing")]
+    ReplaceExe,
+    #[error("failed to create shim for build tool")]
+    CreateShim,
+    #[error("run `megaton install` to complete installation")]
+    NeedRerun,
 
     // checkenv
     #[error("environment check failed")]

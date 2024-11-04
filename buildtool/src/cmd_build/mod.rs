@@ -9,7 +9,6 @@ mod run_impl;
 mod builder;
 mod checker;
 mod config;
-mod executer;
 
 
 /// CLI Options for the build command

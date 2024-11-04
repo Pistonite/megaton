@@ -5,9 +5,9 @@ use ninja_writer::*;
 fn main() {
     let ninja = Ninja::new();
 
-    let src = Path::new("src").canonicalize().unwrap();
-    let include = Path::new("include").canonicalize().unwrap();
-    let build = Path::new("build");
+    let src = Path::new("../src").canonicalize().unwrap();
+    let include = Path::new("../include").canonicalize().unwrap();
+    let build = Path::new("out");
     if !build.exists() {
         std::fs::create_dir_all(build).unwrap();
     }
@@ -26,7 +26,7 @@ fn main() {
     };
     let devkitpro = Path::new(&devkitpro).canonicalize().unwrap();
 
-    ninja.comment("Megaton runtime build.ninja");
+    ninja.comment("libmegaton build.ninja");
     let common_flags = [
         "-march=armv8-a+crc+crypto",
         "-mtune=cortex-a57",
@@ -138,7 +138,7 @@ fn main() {
     let generator = ninja
         .rule(
             "configure",
-            "cargo --color always run --example configure -- $out",
+            "cargo --color always run --bin megaton-lib-configure -- $out",
         )
         .description("Configuring build.ninja")
         .generator();

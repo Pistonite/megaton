@@ -4,17 +4,16 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 
 use buildcommon::env::ProjectEnv;
-use buildcommon::system::{Command, PathExt};
+use buildcommon::system::{Command, PathExt, Executor, Task};
 use buildcommon::{args, system, verboseln};
 use error_stack::{report, Result, ResultExt};
 use regex::Regex;
 
 use super::config::Check;
-use super::executer::{Executer, Task};
 
 use crate::error::Error;
 
-pub fn load(env: &ProjectEnv, config: Check, executer: &Executer) -> Result<Checker, Error> {
+pub fn load(env: &ProjectEnv, config: Check, executer: &Executor) -> Result<Checker, Error> {
     let mut tasks = Vec::with_capacity(config.symbols.len());
     let (send, recv) = mpsc::channel();
     for path in &config.symbols {
@@ -48,7 +47,7 @@ pub struct Checker {
 }
 
 impl Checker {
-    pub fn check_symbols(&mut self, executer: &Executer) -> Result<CheckSymbolTask, Error> {
+    pub fn check_symbols(&mut self, executer: &Executor) -> Result<CheckSymbolTask, Error> {
         // run objdump -T
         let mut child = Command::new(&self.data.objdump)
             .args(args!["-T", self.data.elf])
@@ -105,7 +104,7 @@ impl Checker {
         })
     }
 
-    pub fn check_instructions(&self, executer: &Executer) -> Result<CheckInstructionTask, Error> {
+    pub fn check_instructions(&self, executer: &Executor) -> Result<CheckInstructionTask, Error> {
         let mut child = Command::new(&self.data.objdump)
             .args(args!["-d", self.data.elf])
             .piped()

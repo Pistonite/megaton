@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use buildcommon::env::ProjectEnv;
-use buildcommon::system::Command;
+use buildcommon::system::{Command, Executor};
 use buildcommon::{args, errorln, hintln, infoln, system, env, verboseln};
 use error_stack::{report, Report, Result, ResultExt};
 use filetime::FileTime;
@@ -17,7 +17,6 @@ use super::builder::{
     load_compile_commands, Builder, SourceResult,
 };
 use super::checker;
-use super::executer::Executer;
 use super::Options;
 
 use crate::error::Error;
@@ -33,7 +32,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
     let profile = config.module.select_profile(options.profile.as_str())?;
     let env = ProjectEnv::load(home, root, profile, &config.module.name).change_context(Error::Config)?;
 
-    let executer = Executer::new();
+    let executor = Executor::new();
 
     let mut main_npdm_task = None;
 
@@ -51,7 +50,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
         let target = env.target.clone();
         let npdmtool = env.npdmtool.clone();
         let title_id = config.module.title_id_hex();
-        let task = executer.execute(move || {
+        let task = executor.execute(move || {
             infoln!("Creating", "main.npdm");
             // unwrap: megaton.toml must exist
             create_npdm(target, npdmtool, title_id, megaton_toml_mtime.unwrap())?;
@@ -115,7 +114,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
             objects.push(cc.output.clone());
             let source_display = env.from_root(&source_path).display().to_string();
             let child = cc.create_child();
-            let task = executer.execute(move || {
+            let task = executor.execute(move || {
                 infoln!("Compiling", "{}", source_display);
                 let child = child.spawn()?;
                 let result = child.wait()?;
@@ -134,7 +133,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
     let verfile_task = if megaton_toml_changed {
         let verfile = env.verfile.clone();
         let entry = entry.clone();
-        Some(executer.execute(move || {
+        Some(executor.execute(move || {
             verboseln!("creating verfile");
             create_verfile(verfile, entry)?;
             infoln!("Created", "verfile");
@@ -148,7 +147,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
     let save_cc_json_task = if objects_changed || !compile_commands.is_empty() {
         let file = system::buf_writer(&env.cc_json)
             .change_context(Error::CompileDb)?;
-        Some(executer.execute(move || {
+        Some(executor.execute(move || {
             verboseln!("saving compile_commands.json");
             serde_json::to_writer_pretty(file, &new_compile_commands)
                 .change_context(Error::CompileDb)?;
@@ -272,7 +271,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
 
     // eagerly load checker if checking is needed
     let checker = match (needs_nso || needs_linking, check_config) {
-        (true, Some(check)) => Some(checker::load(&env, check, &executer)?),
+        (true, Some(check)) => Some(checker::load(&env, check, &executor)?),
         _ => None,
     };
 
@@ -313,7 +312,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
         let task = builder.link_start(&objects)
             .change_context(Error::Link)?;
         let elf_name = elf_name.clone();
-        let task = executer.execute(move || {
+        let task = executor.execute(move || {
             infoln!("Linking", "{}", elf_name);
             let result = task.wait().change_context(Error::Link)?;
             verboseln!("linked '{}'", elf_name);
@@ -339,8 +338,8 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
         let nso_name = format!("{}.nso", config.module.name);
         let mut checker = checker.expect("checker not loaded, dependency bug");
         infoln!("Checking", "{}", elf_name);
-        let missing_symbols = checker.check_symbols(&executer)?;
-        let bad_instructions = checker.check_instructions(&executer)?;
+        let missing_symbols = checker.check_symbols(&executor)?;
+        let bad_instructions = checker.check_instructions(&executor)?;
         let missing_symbols = missing_symbols.wait()?;
         let bad_instructions = bad_instructions.wait()?;
         let mut check_ok = true;

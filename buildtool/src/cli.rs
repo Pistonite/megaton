@@ -1,9 +1,15 @@
 use buildcommon::print;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-/// 
+static LOGO: &str = r#" __    __ ______ ______ ______ ______ ______ __   __  
+/\ "-./  \\  ___\\  ___\\  __ \\__  _\\  __ \\ "-.\ \ 
+\ \ \-./\ \\  __\ \ \__ \\  __ \_/\ \/ \ \/\ \\ \-.  \
+ \ \_\ \ \_\\_____\\_____\\_\ \_\\ \_\\ \_____\\_\\"\_\
+  \/_/  \/_//_____//_____//_/\/_/ \/_/ \/_____//_/ \/_/"#;
+
+/// Megaton build tool CLI
 #[derive(Debug, Clone, PartialEq, Parser)]
-#[clap(bin_name="megaton")]
+#[clap(bin_name="megaton", before_help=LOGO)]
 pub struct Cli {
     /// Top level options
     #[clap(flatten)]
@@ -80,8 +86,8 @@ pub enum Command {
     ///
     /// The paths found will be cached for faster lookup in the future
     Checkenv(CommonOptions),
-    /// Pull the latest version of the megaton repo and update the build tool
-    Update(CommonOptions),
+    /// Install or update the build tool
+    Install(crate::cmd_install::Options),
     /// Rustc options
     Rustc(CommonOptions),
 }
@@ -95,7 +101,7 @@ impl std::ops::Deref for Command {
             Command::Build(x) => x,
             Command::Clean(x) => x,
             Command::Checkenv(x) => x,
-            Command::Update(x) => x,
+            Command::Install(x) => x,
             Command::Rustc(x) => x,
         }
     }

@@ -1,0 +1,13 @@
+[package]
+name = "megaton-lib-configure"
+version = "0.0.0"
+edition = "2021"
+description = "Ninja configuration for building libmegaton"
+
+[dependencies]
+ninja-writer = "0.2.0"
+
+[[bin]]
+name = "megaton-lib-configure"
+path = "configure.rs"
+

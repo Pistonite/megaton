@@ -1,0 +1,15 @@
+version: '3'
+
+tasks:
+  configure:
+    desc: (Re)-configure ninja build.
+    dir: build
+    cmds:
+      - cargo run --bin megaton-lib-configure -- build.ninja
+      - ninja -t compdb as cc cxx > compile_commands.json
+
+  build:
+    desc: Execute incremental builds
+    cmds:
+    - ninja -C build
+
