@@ -3,11 +3,12 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use buildcommon::flags::FlagConfig;
-use buildcommon::system;
+use buildcommon::{errorln, flags::FlagConfig};
+use buildcommon::{hintln, system};
+use error_stack::{report, Result, ResultExt};
 use serde::{Deserialize, Serialize};
 
-use crate::system::Error;
+use crate::error::Error;
 
 /// Config data read from Megaton.toml
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -24,13 +25,26 @@ pub struct Config {
 
 impl Config {
     /// Load a config from a file
-    pub fn from_path<S>(path: S) -> Result<Self, Error>
-    where
-        S: AsRef<Path>,
-    {
-        let config = system::read_file(path).map_err(Error::Interop)?;
-        let config = toml::from_str(&config).map_err(|e| Error::ParseConfig(e.to_string()))?;
-        Ok(config)
+    ///
+    /// Prints formatted error message when failed
+    pub fn from_path(path: impl AsRef<Path>) -> Result<Self, Error> {
+        let config = match system::read_file(path) {
+            Err(e) => {
+                errorln!("Failed", "Reading Megaton.toml");
+                return Err(e.change_context(Error::Config));
+            }
+            Ok(config) => config,
+        };
+        // print pretty toml error
+        match toml::from_str(&config) {
+            Err(e) => {
+                for line in e.to_string().lines() {
+                    errorln!("Error", "{}", line);
+                }
+                return Err(e).change_context(Error::Config);
+            }
+            Ok(config) => Ok(config),
+        }
     }
 }
 
@@ -43,14 +57,52 @@ pub struct Module {
     /// The title ID as a 64-bit integer, used for generating the npdm file.
     pub title_id: u64,
     /// Set the profile to use when profile is "none"
+    ///
     /// If `Some("")`, a profile must be specified in command line or megaton will error
     pub default_profile: Option<String>,
+
+    /// Disable the base (`none`) profile from being used
+    #[serde(default)]
+    pub disallow_base_profile: bool,
 }
 
 impl Module {
     /// Get the title ID as a lower-case hex string (without the `0x` prefix)
     pub fn title_id_hex(&self) -> String {
         format!("{:016x}", self.title_id)
+    }
+
+    /// Select profile based on command line and config
+    ///
+    /// Prints formatted error message on failure
+    pub fn select_profile<'a, 'b>(&'a self, cli_profile: &'b str) -> Result<&'a str, Error>
+    where
+        'b: 'a, // lifetime: cli should live longer since that's parsed before config
+    {
+        let profile = match (cli_profile, &self.default_profile) {
+            ("none", Some(p)) if p.is_empty() => {
+                // default-profile = "" means to disallow no profile
+                errorln!("Error", "No profile specified");
+                hintln!("Consider", "Specify a profile with `--profile`");
+                return Err(report!(Error::NoProfile))
+                    .attach_printable("Please specify a profile with `--profile`");
+            }
+            ("none", Some(p)) => p,
+            ("none", None) => "none",
+            (profile, _) => profile,
+        };
+
+        if self.disallow_base_profile && profile == "none" {
+            errorln!("Error", "Base profile is disallowed");
+            hintln!(
+                "Consider",
+                "Set `module.default-profile` in config or specify a profile with `--profile`"
+            );
+
+            return Err(report!(Error::NoProfile));
+        }
+
+        Ok(profile)
     }
 }
 

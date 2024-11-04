@@ -3,31 +3,39 @@ use std::io::BufRead;
 use std::path::PathBuf;
 use std::sync::mpsc;
 
-use buildcommon::system::PathExt;
-use buildcommon::{system, verboseln};
+use buildcommon::env::ProjectEnv;
+use buildcommon::system::{Command, PathExt};
+use buildcommon::{args, system, verboseln};
+use error_stack::{report, Result, ResultExt};
 use regex::Regex;
 
-use crate::build::config::Check;
-use crate::build::Paths;
-use crate::system::{ChildBuilder, Error, Executer, Task};
+use super::config::Check;
+use super::executer::{Executer, Task};
 
-pub fn load_checker(paths: &Paths, config: Check, executer: &Executer) -> Result<Checker, Error> {
+use crate::error::Error;
+
+pub fn load(env: &ProjectEnv, config: Check, executer: &Executer) -> Result<Checker, Error> {
     let mut tasks = Vec::with_capacity(config.symbols.len());
     let (send, recv) = mpsc::channel();
     for path in &config.symbols {
-        let path = paths.root.join(path).to_abs().map_err(Error::Interop)?;
-        let file = system::buf_reader(&path).map_err(Error::Interop)?;
-        let id = paths.from_root(&path).display().to_string();
+        let path = env
+            .root
+            .join(path)
+            .to_abs()
+            .change_context(Error::CreateChecker)?;
+        let file = system::buf_reader(&path).change_context(Error::CreateChecker)?;
+
+        let id = env.from_root(&path).display().to_string();
         let send = send.clone();
         let task = executer.execute(move || {
-            process_objdump_syms(&id, file.lines().map_while(Result::ok), send)?;
+            process_objdump_syms(&id, file.lines().map_while(std::result::Result::ok), send)?;
             Ok(())
         });
         tasks.push(task);
     }
 
     Ok(Checker {
-        data: CheckData::new(paths, config),
+        data: CheckData::new(env, config),
         tasks,
         recv: Some(recv),
     })
@@ -42,19 +50,25 @@ pub struct Checker {
 impl Checker {
     pub fn check_symbols(&mut self, executer: &Executer) -> Result<CheckSymbolTask, Error> {
         // run objdump -T
-        let mut child = ChildBuilder::new(&self.data.objdump)
-            .args(crate::system::args!["-T", self.data.elf])
+        let mut child = Command::new(&self.data.objdump)
+            .args(args!["-T", self.data.elf])
             .piped()
-            .spawn()?;
-        let elf_symbols = child.take_stdout().ok_or(Error::ObjdumpFailed)?;
+            .spawn()
+            .change_context(Error::ObjdumpSymbols)?;
+        let elf_symbols = child
+            .take_stdout()
+            .ok_or(Error::ObjdumpSymbols)
+            .attach_printable("failed to get output of objdump -T")?;
+
         let (elf_send, elf_recv) = mpsc::channel();
         let dump_task = executer.execute(move || {
             process_objdump_syms(
                 "(output of `objdump -T`)",
-                elf_symbols.lines().map_while(Result::ok),
+                elf_symbols.lines().map_while(std::result::Result::ok),
                 elf_send,
             )
         });
+
         let ignore = std::mem::take(&mut self.data.config.ignore);
         let recv = self.recv.take().unwrap();
         let check_task = executer.execute(move || {
@@ -74,10 +88,11 @@ impl Checker {
             missing_symbols
         });
         let wait_task = executer.execute(move || {
-            child.dump_stderr("Error");
-            let status = child.wait()?;
-            if !status.success() {
-                return Err(Error::ObjdumpFailed);
+            let mut result = child.wait().change_context(Error::ObjdumpSymbols)?;
+            if !result.is_success() {
+                result.dump_stderr("Error");
+                return Err(Error::ObjdumpSymbols)
+                    .attach_printable(format!("objdump failed with status: {}", result.status));
             }
             Ok(())
         });
@@ -91,31 +106,38 @@ impl Checker {
     }
 
     pub fn check_instructions(&self, executer: &Executer) -> Result<CheckInstructionTask, Error> {
-        let mut child = ChildBuilder::new(&self.data.objdump)
-            .args(crate::system::args!["-d", self.data.elf])
+        let mut child = Command::new(&self.data.objdump)
+            .args(args!["-d", self.data.elf])
             .piped()
-            .spawn()?;
-        let elf_instructions = child.take_stdout().ok_or(Error::ObjdumpFailed)?;
+            .spawn()
+            .change_context(Error::ObjdumpInstructions)?;
+        let elf_instructions = child
+            .take_stdout()
+            .ok_or(Error::ObjdumpInstructions)
+            .attach_printable("failed to get output of objdump -d")?;
         let (elf_send, elf_recv) = mpsc::channel();
         let dump_task = executer.execute(move || {
-            process_objdump_insts(elf_instructions.lines().map_while(Result::ok), elf_send);
+            process_objdump_insts(
+                elf_instructions.lines().map_while(std::result::Result::ok),
+                elf_send,
+            );
         });
 
         // These instructions will cause console to Instruction Abort
         // (potentially due to permission or unsupported instruction?)
         let mut disallowed_regexes = vec![
-            Regex::new(r"^msr\s*spsel")?,
-            Regex::new(r"^msr\s*daifset")?,
-            Regex::new(r"^mrs\.*daif")?,
-            Regex::new(r"^mrs\.*tpidr_el1")?,
-            Regex::new(r"^msr\s*tpidr_el1")?,
-            Regex::new(r"^hlt")?,
+            Regex::new(r"^msr\s*spsel").unwrap(),
+            Regex::new(r"^msr\s*daifset").unwrap(),
+            Regex::new(r"^mrs\.*daif").unwrap(),
+            Regex::new(r"^mrs\.*tpidr_el1").unwrap(),
+            Regex::new(r"^msr\s*tpidr_el1").unwrap(),
+            Regex::new(r"^hlt").unwrap(),
         ];
         let extra = &self.data.config.disallowed_instructions;
         if !extra.is_empty() {
             disallowed_regexes.reserve_exact(extra.len());
             for s in extra {
-                disallowed_regexes.push(Regex::new(s)?);
+                disallowed_regexes.push(Regex::new(s).change_context(Error::ParseInstRegex)?);
             }
         }
         let check_task = executer.execute(move || {
@@ -131,10 +153,11 @@ impl Checker {
             output
         });
         let wait_task = executer.execute(move || {
-            child.dump_stderr("Error");
-            let status = child.wait()?;
-            if !status.success() {
-                return Err(Error::ObjdumpFailed);
+            let mut result = child.wait().change_context(Error::ObjdumpInstructions)?;
+            if !result.is_success() {
+                result.dump_stderr("Error");
+                return Err(Error::ObjdumpInstructions)
+                    .attach_printable(format!("objdump failed with status: {}", result.status));
             }
             Ok(())
         });
@@ -154,10 +177,10 @@ struct CheckData {
 }
 
 impl CheckData {
-    pub fn new(paths: &Paths, config: Check) -> Self {
+    pub fn new(env: &ProjectEnv, config: Check) -> Self {
         Self {
-            objdump: paths.objdump.clone(),
-            elf: paths.elf.clone(),
+            objdump: env.objdump.clone(),
+            elf: env.elf.clone(),
             config,
         }
     }
@@ -198,15 +221,11 @@ impl CheckInstructionTask {
 }
 
 /// Parse the output of objdump -T
-fn process_objdump_syms<Iter, Str>(
+fn process_objdump_syms(
     id: &str,
-    raw_symbols: Iter,
+    raw_symbols: impl IntoIterator<Item = impl AsRef<str>>,
     send: mpsc::Sender<String>,
-) -> Result<(), Error>
-where
-    Iter: IntoIterator<Item = Str>,
-    Str: AsRef<str>,
-{
+) -> Result<(), Error> {
     verboseln!("loading {}", id);
     let mut iter = raw_symbols.into_iter();
     for line in iter.by_ref() {
@@ -227,10 +246,9 @@ where
         let symbol = match line[25..].split_once(' ').map(|x| x.1) {
             Some(symbol) => symbol,
             None => {
-                return Err(Error::InvalidObjdump(
-                    id.to_string(),
-                    format!("invalid line: {}", line),
-                ))
+                let err = report!(Error::ParseSymbols(id.to_string(),))
+                    .attach_printable(format!("invalid line: {}", line));
+                return Err(err);
             }
         };
         send.send(symbol.to_string()).unwrap();
@@ -243,11 +261,10 @@ where
 /// Parse the output of objdump --disassemble
 ///
 /// Returns a list of (address, instructions)
-fn process_objdump_insts<Iter, Str>(raw_instructions: Iter, send: mpsc::Sender<(String, String)>)
-where
-    Iter: IntoIterator<Item = Str>,
-    Str: AsRef<str>,
-{
+fn process_objdump_insts(
+    raw_instructions: impl IntoIterator<Item = impl AsRef<str>>,
+    send: mpsc::Sender<(String, String)>,
+) {
     raw_instructions
         .into_iter()
         .flat_map(|line| {
