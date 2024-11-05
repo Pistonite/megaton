@@ -1,26 +1,22 @@
 //! The megaton build command
+use buildcommon::prelude::*;
 
 use std::path::PathBuf;
 use std::time::Instant;
 
-use buildcommon::env::ProjectEnv;
+use buildcommon::env::{self, ProjectEnv};
 use buildcommon::system::{Command, Executor};
-use buildcommon::{args, errorln, hintln, infoln, system, env, verboseln};
-use error_stack::{report, Report, Result, ResultExt};
 use filetime::FileTime;
 use rustc_hash::FxHashMap;
 use serde_json::{json, Value};
 use walkdir::WalkDir;
 
-use super::config::{Config, Check};
-use super::builder::{
-    load_compile_commands, Builder, SourceResult,
-};
+use super::builder::{load_compile_commands, Builder, SourceResult};
 use super::checker;
+use super::config::{Check, Config};
 use super::Options;
 
 use crate::error::Error;
-
 
 /// Run megaton build
 pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error> {
@@ -30,20 +26,18 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
     let megaton_toml = root.join("Megaton.toml");
     let config = Config::from_path(&megaton_toml)?;
     let profile = config.module.select_profile(options.profile.as_str())?;
-    let env = ProjectEnv::load(home, root, profile, &config.module.name).change_context(Error::Config)?;
+    let env =
+        ProjectEnv::load(home, root, profile, &config.module.name).change_context(Error::Config)?;
 
     let executor = Executor::new();
 
     let mut main_npdm_task = None;
 
     infoln!("Building", "{} (profile `{profile}`)", config.module.name);
-    system::ensure_directory(&env.target_o)
-        .change_context(Error::BuildPrep)?;
-    let megaton_toml_mtime = system::get_mtime(&megaton_toml)
-        .change_context(Error::BuildPrep)?;
+    system::ensure_directory(&env.target_o).change_context(Error::BuildPrep)?;
+    let megaton_toml_mtime = system::get_mtime(&megaton_toml).change_context(Error::BuildPrep)?;
     let npdm_json = env.target.join("main.npdm.json");
-    let npdm_mtime = system::get_mtime(&npdm_json)
-        .change_context(Error::BuildPrep)?;
+    let npdm_mtime = system::get_mtime(&npdm_json).change_context(Error::BuildPrep)?;
     let megaton_toml_changed = !system::up_to_date(megaton_toml_mtime, npdm_mtime);
 
     if megaton_toml_changed {
@@ -51,11 +45,8 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
         let npdmtool = env.npdmtool.clone();
         let title_id = config.module.title_id_hex();
         let task = executor.execute(move || {
-            infoln!("Creating", "main.npdm");
             // unwrap: megaton.toml must exist
-            create_npdm(target, npdmtool, title_id, megaton_toml_mtime.unwrap())?;
-            verboseln!("created main.npdm");
-            Ok::<(), Report<Error>>(())
+            create_npdm(target, npdmtool, title_id, megaton_toml_mtime.unwrap())
         });
 
         main_npdm_task = Some(task);
@@ -68,7 +59,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
             errorln!("Error", "No entry point specified");
             hintln!("Fix", "Please specify `build.entry` in `Megaton.toml`");
             return Err(report!(Error::NoEntryPoint))
-            .attach_printable("Please specify `build.entry` in `Megaton.toml`");
+                .attach_printable("Please specify `build.entry` in `Megaton.toml`");
         }
     };
 
@@ -92,8 +83,8 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
         let source_dir = env.root.join(source_dir);
         for entry in WalkDir::new(source_dir).into_iter().flatten() {
             let source_path = entry.path();
-            let cc =
-                builder.process_source(source_path, cc_possibly_changed, &mut compile_commands)
+            let cc = builder
+                .process_source(source_path, cc_possibly_changed, &mut compile_commands)
                 .change_context(Error::SourcePrep)?;
             let cc = match cc {
                 SourceResult::NotSource => {
@@ -101,10 +92,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
                     continue;
                 }
                 SourceResult::UpToDate(o_file) => {
-                    verboseln!(
-                        "skipped '{}'",
-                        env.from_root(&source_path).display()
-                    );
+                    verboseln!("skipped '{}'", env.from_root(&source_path).display());
                     objects.push(o_file);
                     continue;
                 }
@@ -133,20 +121,14 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
     let verfile_task = if megaton_toml_changed {
         let verfile = env.verfile.clone();
         let entry = entry.clone();
-        Some(executor.execute(move || {
-            verboseln!("creating verfile");
-            create_verfile(verfile, entry)?;
-            infoln!("Created", "verfile");
-            Ok::<_, Report<Error>>(())
-        }))
+        Some(executor.execute(move || create_verfile(verfile, entry)))
     } else {
         None
     };
 
     // if compiled, save cc_json
     let save_cc_json_task = if objects_changed || !compile_commands.is_empty() {
-        let file = system::buf_writer(&env.cc_json)
-            .change_context(Error::CompileDb)?;
+        let file = system::buf_writer(&env.cc_json).change_context(Error::CompileDb)?;
         Some(executor.execute(move || {
             verboseln!("saving compile_commands.json");
             serde_json::to_writer_pretty(file, &new_compile_commands)
@@ -176,7 +158,11 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
                     let mtime = match system::get_mtime(&ldscript) {
                         Ok(mtime) => mtime,
                         Err(e) => {
-                            errorln!("Failed", "Cannot process linker script '{}'", env.from_root(ldscript).display());
+                            errorln!(
+                                "Failed",
+                                "Cannot process linker script '{}'",
+                                env.from_root(ldscript).display()
+                            );
                             return Err(e).change_context(Error::Ldscript);
                         }
                     };
@@ -211,7 +197,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
                         break;
                     }
                 }
-            },
+            }
             Err(e) => {
                 needs_linking = true;
                 verboseln!("failed to get mtime of elf: {}", e);
@@ -231,17 +217,15 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
                     needs_nso = true;
                     verboseln!("failed to get mtime of nso: {}", e);
                 }
-                Ok(nso_mtime) => {
-                    match symbol_listing_changed(config, &env, nso_mtime) {
-                        Err(e) => {
-                            needs_nso = true;
-                            verboseln!("failed to check if symbol listing changed: {}", e);
-                        }
-                        Ok(changed) => {
-                            needs_nso = changed;
-                        }
+                Ok(nso_mtime) => match symbol_listing_changed(config, &env, nso_mtime) {
+                    Err(e) => {
+                        needs_nso = true;
+                        verboseln!("failed to check if symbol listing changed: {}", e);
                     }
-                }
+                    Ok(changed) => {
+                        needs_nso = changed;
+                    }
+                },
             }
         }
     }
@@ -294,8 +278,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
     if compile_failed {
         errorln!("Error", "One or more object files failed to compile.");
         hintln!("Hint", "Please check the errors above.");
-        let err = report!(Error::Compile)
-        .attach_printable("Please check the errors above.");
+        let err = report!(Error::Compile).attach_printable("Please check the errors above.");
         return Err(err);
     }
 
@@ -309,8 +292,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
     let elf_name = format!("{}.elf", config.module.name);
 
     let link_task = if needs_linking {
-        let task = builder.link_start(&objects)
-            .change_context(Error::Link)?;
+        let task = builder.link_start(&objects).change_context(Error::Link)?;
         let elf_name = elf_name.clone();
         let task = executor.execute(move || {
             infoln!("Linking", "{}", elf_name);
@@ -325,13 +307,12 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
 
     // nso dependency
     if let Some(task) = link_task {
-        let mut result = task.wait()?;
-        if !result.is_success() {
-            result.dump_stderr("Error");
-            let err = report!(Error::Link)
-            .attach_printable(format!("linker failed with status: {}", result.status));
-            return Err(err);
+        let mut child = task.wait()?;
+        let result = child.check();
+        if result.is_err() {
+            child.dump_stderr("Error");
         }
+        result.change_context(Error::Link)?;
     }
 
     if needs_nso {
@@ -406,9 +387,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
         }
         if !check_ok {
             errorln!("Error", "Check failed. Please fix the errors above.");
-            return Err(report!(Error::CheckError)
-                .attach_printable("Please fix the errors above.")
-            );
+            return Err(report!(Error::CheckError).attach_printable("Please fix the errors above."));
         }
         hintln!("Checked", "Looks good to me");
 
@@ -417,17 +396,18 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
         // and an immediately build with no change won't succeed
         infoln!("Creating", "{}", nso_name);
 
-        let mut result = Command::new(&env.elf2nso)
+        let mut child = Command::new(&env.elf2nso)
             .args([&env.elf, &env.nso])
             .silent()
-            .spawn().change_context(Error::Elf2Nso)?
-            .wait().change_context(Error::Elf2Nso)?;
-        if !result.is_success() {
-            result.dump_stderr("Error");
-            let err = report!(Error::Elf2Nso)
-            .attach_printable(format!("elf2nso failed with status: {}", result.status));
-            return Err(err);
+            .spawn()
+            .change_context(Error::Elf2Nso)?
+            .wait()
+            .change_context(Error::Elf2Nso)?;
+        let result = child.check();
+        if result.is_err() {
+            child.dump_stderr("Error");
         }
+        result.change_context(Error::Elf2Nso)?;
     }
 
     if let Some(task) = save_cc_json_task {
@@ -449,39 +429,36 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
     Ok(())
 }
 
+error_context!(NpdmContext, |r| -> Error { r.change_context(Error::Npdm) });
+
 fn create_npdm(
     target: PathBuf,
     npdmtool: PathBuf,
     title_id: String,
     m_time: FileTime,
-) -> Result<(), Error> {
-    let mut npdm_data: Value =
-        serde_json::from_str(include_str!("template/main.npdm.json"))
-        .change_context(Error::Npdm)?;
+) -> ResultIn<(), NpdmContext> {
+    infoln!("Creating", "main.npdm");
+
+    let mut npdm_data: Value = serde_json::from_str(include_str!("template/main.npdm.json"))?;
     npdm_data["title_id"] = json!(format!("0x{}", title_id));
-    let npdm_data = serde_json::to_string_pretty(&npdm_data)
-        .change_context(Error::Npdm)?;
+    let npdm_data = serde_json::to_string_pretty(&npdm_data)?;
     let npdm_json = target.join("main.npdm.json");
-    system::write_file(&npdm_json, &npdm_data)
-        .change_context(Error::Npdm)?;
-    system::set_mtime(&npdm_json, m_time).
-        change_context(Error::Npdm)?;
+    system::write_file(&npdm_json, &npdm_data)?;
+    system::set_mtime(&npdm_json, m_time)?;
     let main_npdm = target.join("main.npdm");
     // not piping output because it always displays some warning/error
-    let result = Command::new(npdmtool)
+    Command::new(npdmtool)
         .args(args![&npdm_json, &main_npdm])
         .silent()
-        .spawn().change_context(Error::Npdm)?
-        .wait().change_context(Error::Npdm)?;
-    if !result.is_success() {
-        let err = report!(Error::Npdm)
-        .attach_printable(format!("npdmtool failed with status: {}", result.status));
-        return Err(err);
-    }
+        .spawn()?
+        .wait()?
+        .check()?;
+    verboseln!("created main.npdm");
     Ok(())
 }
 
 fn create_verfile(verfile: PathBuf, entry: String) -> Result<(), Error> {
+    verboseln!("creating verfile");
     let verfile_data = format!(
         "{}{}{}",
         include_str!("template/verfile.before"),
@@ -489,12 +466,15 @@ fn create_verfile(verfile: PathBuf, entry: String) -> Result<(), Error> {
         include_str!("template/verfile.after")
     );
     system::write_file(verfile, &verfile_data).change_context(Error::Verfile)?;
+    infoln!("Created", "verfile");
     Ok(())
 }
 
-fn symbol_listing_changed(config: &Check, env: &ProjectEnv, m_time: Option<FileTime>) -> 
-Result<bool, system::Error> {
-
+fn symbol_listing_changed(
+    config: &Check,
+    env: &ProjectEnv,
+    m_time: Option<FileTime>,
+) -> Result<bool, system::Error> {
     for symbol in &config.symbols {
         let symbol = env.root.join(symbol);
         let symbol_mtime = system::get_mtime(&symbol)?;

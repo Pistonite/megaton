@@ -29,7 +29,7 @@ pub static DEFAULT_C: &[&str] = &[
     "-ffunction-sections",
     "-fdata-sections",
     // needed to make sure functions in headers are inlined
-    "-O3", 
+    "-O3",
 ];
 
 /// Default flags for `build.flags.cxx` in Megaton.toml
@@ -145,7 +145,10 @@ impl Flags {
 
     /// Add include flags (`-I<path>`) for C and C++
     pub fn add_includes(&mut self, includes: impl IntoIterator<Item = impl Display>) {
-        let flags = includes.into_iter().map(|x| format!("-I{}", x)).collect::<Vec<_>>();
+        let flags = includes
+            .into_iter()
+            .map(|x| format!("-I{}", x))
+            .collect::<Vec<_>>();
         self.cflags.extend(flags.iter().cloned());
         self.cxxflags.extend(flags);
     }
@@ -165,18 +168,21 @@ impl Flags {
     /// Add library paths (`-L<path>`) for the linker
     #[inline]
     pub fn add_libpaths(&mut self, paths: impl IntoIterator<Item = impl Display>) {
-        self.ldflags.extend(paths.into_iter().map(|x| format!("-L{}", x)));
+        self.ldflags
+            .extend(paths.into_iter().map(|x| format!("-L{}", x)));
     }
 
     /// Add libraries (`-l<name>`) for the linker
     #[inline]
     pub fn add_libraries(&mut self, libs: impl IntoIterator<Item = impl Display>) {
-        self.ldflags.extend(libs.into_iter().map(|x| format!("-l{}", x)));
+        self.ldflags
+            .extend(libs.into_iter().map(|x| format!("-l{}", x)));
     }
 
     /// Add linker scripts (`-Wl,-T<path>`) for the linker
     #[inline]
     pub fn add_ldscripts(&mut self, scripts: impl IntoIterator<Item = impl Display>) {
-        self.ldflags.extend(scripts.into_iter().map(|x| format!("-Wl,-T,{}", x)));
+        self.ldflags
+            .extend(scripts.into_iter().map(|x| format!("-Wl,-T,{}", x)));
     }
 }

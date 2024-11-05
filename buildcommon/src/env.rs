@@ -1,12 +1,11 @@
+use crate::prelude::*;
+
 use std::path::{Path, PathBuf};
 
 use derive_more::derive::Deref;
 use serde::{Deserialize, Serialize};
 
-use error_stack::{report, Result, ResultExt};
-
-use crate::system::{self, PathExt, Error};
-use crate::{errorln, hintln, infoln, verboseln};
+use crate::system::Error;
 
 /// Environment of the tool
 #[derive(Debug, Serialize, Deserialize)]
@@ -38,7 +37,6 @@ pub struct Env {
 }
 
 impl Env {
-
     /// Load the environment from cache file
     ///
     /// If no cache exists, it will fallback to [`check`](Self::check)
@@ -71,7 +69,6 @@ impl Env {
                 Err(report!(Error::InitEnv))
             }
         }
-
     }
 
     #[inline]
@@ -101,9 +98,7 @@ impl Env {
     /// If check fails, returns Ok(None)
     pub fn check(home: Option<&str>) -> Result<Option<Self>, Error> {
         match home {
-            Some(home) => {
-                Self::check_with_home(home, true)
-            }
+            Some(home) => Self::check_with_home(home, true),
             None => Self::check_with_home(get_megaton_home()?, true),
         }
     }
@@ -117,7 +112,10 @@ impl Env {
             ok = false;
             errorln!("Missing", "DEVKITPRO");
             hintln!("Fix", "Please install DevKitPro");
-            hintln!("Fix", "  https://devkitpro.org/wiki/devkitPro_pacman#customising-existing-pacman-install");
+            hintln!(
+                "Fix",
+                "  https://devkitpro.org/wiki/devkitPro_pacman#customising-existing-pacman-install"
+            );
             PathBuf::new()
         } else {
             match dunce::canonicalize(&devkitpro) {
@@ -134,7 +132,10 @@ impl Env {
                 Err(_) => {
                     ok = false;
                     errorln!("Missing", "DEVKITPRO");
-                    hintln!("Fix", "Set DEVKITPRO to the path of your DevKitPro installation");
+                    hintln!(
+                        "Fix",
+                        "Set DEVKITPRO to the path of your DevKitPro installation"
+                    );
                     PathBuf::new()
                 }
             }
@@ -167,8 +168,9 @@ impl Env {
             PathBuf::new()
         };
 
-        if rustup.as_os_str().is_empty() || rustc.as_os_str().is_empty() 
-        || cargo.as_os_str().is_empty()
+        if rustup.as_os_str().is_empty()
+            || rustc.as_os_str().is_empty()
+            || cargo.as_os_str().is_empty()
         {
             hintln!("Fix", "Please install Rust toolchain");
             hintln!("Fix", "  https://rustup.rs/");
@@ -221,7 +223,7 @@ impl Env {
 
         let env = if check_more {
             let env_more = RootEnv::from(env);
-             ok &= env_more.check()?;
+            ok &= env_more.check()?;
             env_more.env
         } else {
             env
@@ -251,7 +253,7 @@ impl Env {
         let cache_path = self.cache_path();
         let writer = system::buf_writer(&cache_path)?;
         serde_yaml_ng::to_writer(writer, self)
-        .change_context_lazy(|| Error::WriteFile(cache_path.display().to_string()))?;
+            .change_context_lazy(|| Error::WriteFile(cache_path.display().to_string()))?;
 
         Ok(())
     }
@@ -266,24 +268,20 @@ fn cache_path_from(home: &Path) -> PathBuf {
     home.join("bin").into_joined("env_cache.yml")
 }
 
-fn get_megaton_home() -> Result<PathBuf, Error> {
-    match get_megaton_home_internal() {
-        Ok(p) => Ok(p),
-        Err(e) => {
-            errorln!("Failed", "Megaton repo not found");
-            hintln!("Problem", "The tool might be incorrectly installed");
-            hintln!("Consider", "See README.md for more info");
-            return Err(e).change_context(Error::FindToolRoot)
-                .attach_printable("Please see README.md for how to install the tool properly")
-        }
-    }
-}
-
-fn get_megaton_home_internal() -> Result<PathBuf, Error> {
-        // should be MEGATON_HOME/target/{release,debug}/megaton-buildtool
-        let exe = std::env::current_exe().change_context(Error::CurrentExe)?
-            .into_parent()?.into_parent()?.into_parent()?;
-        Ok(exe)
+error_context!(FindToolRoot, |r| -> Error {
+    errorln!("Failed", "Megaton repo not found");
+    hintln!("Problem", "The tool might be incorrectly installed");
+    hintln!("Consider", "See README.md for more info");
+    r.change_context(Error::FindToolRoot)
+        .attach_printable("Please see README.md for how to install the tool properly")
+});
+fn get_megaton_home() -> ResultIn<PathBuf, FindToolRoot> {
+    // should be MEGATON_HOME/target/{release,debug}/EXE
+    let exe = std::env::current_exe()?
+        .into_parent()?
+        .into_parent()?
+        .into_parent()?;
+    Ok(exe)
 }
 
 /// Environment with extra cached paths
@@ -332,7 +330,6 @@ impl From<Env> for RootEnv {
         let cc = devkita64_bin.join("aarch64-none-elf-gcc");
         let cxx = devkita64_bin.join("aarch64-none-elf-g++");
         let objdump = devkita64_bin.into_joined("aarch64-none-elf-objdump");
-
 
         let tools_bin = devkitpro.join("tools").into_joined("bin");
         let npdmtool = tools_bin.join("npdmtool");
@@ -444,10 +441,18 @@ impl ProjectEnv {
     ///
     /// `home` is the path to root of metagon repo, and `root`
     /// is root of the project
-    pub fn load(home: Option<&str>, root: PathBuf, profile: &str, module: &str) -> Result<Self, Error> {
+    pub fn load(
+        home: Option<&str>,
+        root: PathBuf,
+        profile: &str,
+        module: &str,
+    ) -> Result<Self, Error> {
         let env = Env::load(home)?.into();
 
-        let target = root.join("target").into_joined("megaton").into_joined(profile);
+        let target = root
+            .join("target")
+            .into_joined("megaton")
+            .into_joined(profile);
         let target_o = target.join("o");
         let verfile = target.join("verfile");
         let cc_json = target.join("compile_commands.json");
@@ -474,23 +479,17 @@ impl ProjectEnv {
     }
 }
 
+error_context!(pub FindProjectRoot, |r| -> Error {
+    errorln!("Failed", "Project root not found");
+    hintln!("Consider", "Run inside a Megaton project or use the -C switch");
+    r.change_context(Error::FindProjectRoot)
+        .attach_printable("Please run inside a Megaton project")
+});
+
 /// Find the directory that contains Megaton.toml
 ///
 /// Prints error message when not found
-pub fn find_root(dir: &str) -> Result<PathBuf, Error> {
-    let result = find_root_internal(dir)
-        .change_context(Error::FindProjectRoot)
-        .attach_printable("Please run inside a Megaton project");
-
-    if result.is_err() {
-        errorln!("Failed", "Megaton.toml not found");
-        hintln!("Consider", "Run inside a Megaton project or use the -C switch");
-    }
-
-    result
-}
-
-fn find_root_internal(dir: &str) -> Result<PathBuf, Error> {
+pub fn find_root(dir: &str) -> ResultIn<PathBuf, FindProjectRoot> {
     let cwd = Path::new(dir).to_abs()?;
     let mut root: &Path = cwd.as_path();
     while !root.join("Megaton.toml").exists() {

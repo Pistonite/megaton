@@ -51,10 +51,8 @@ pub enum Error {
     ParseSymbols(String),
     #[error("failed to execute objdump -T")]
     ObjdumpSymbols,
-    #[error("failed to execute objdump -p")]
-    ObjdumpInstructions,
-    #[error("failed to parse instruction regex")]
-    ParseInstRegex,
+    #[error("failed to process instructions")]
+    ProcessInstructions,
     #[error("errors found when checking ELF")]
     CheckError,
 
@@ -68,3 +66,5 @@ pub enum Error {
     #[error("failed to convert ELF to NSO!")]
     Elf2Nso,
 }
+
+impl buildcommon::system::Context for Error {}

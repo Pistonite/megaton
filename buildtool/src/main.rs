@@ -1,8 +1,8 @@
+use buildcommon::prelude::*;
+
 use std::process::ExitCode;
 
-use buildcommon::hintln;
 use clap::Parser;
-use error_stack::Result;
 
 mod cli;
 use cli::{Cli, Command};
@@ -21,11 +21,17 @@ fn main() -> ExitCode {
     if let Err(e) = main_internal(&cli) {
         if cli.is_trace_on() {
             eprintln!("error: {:?}", e);
-        } else if !matches!(cli.command, Command::Build(_)) {
-            if cli.is_verbose_on() {
-                hintln!("Consider", "Running with --trace for more information");
-            } else {
-                hintln!("Consider", "Running with --verbose or --trace for more information");
+        } else {
+            errorln!("Fatal", "{}", e);
+            if !matches!(cli.command, Command::Build(_)) {
+                if cli.is_verbose_on() {
+                    hintln!("Consider", "Running with --trace for more information");
+                } else {
+                    hintln!(
+                        "Consider",
+                        "Running with --verbose or --trace for more information"
+                    );
+                }
             }
         }
         ExitCode::FAILURE
@@ -40,7 +46,7 @@ fn main_internal(cli: &Cli) -> Result<(), Error> {
         Command::Build(options) => cmd_build::run(&cli.top, &options)?,
         Command::Clean(options) => cmd_clean::run(&cli.top, &options)?,
         Command::Install(options) => cmd_install::run(&cli.top, &options)?,
-        _ => todo!()
+        _ => todo!(),
     }
 
     Ok(())

@@ -1,6 +1,6 @@
+use buildcommon::prelude::*;
+
 use buildcommon::env::Env;
-use buildcommon::{errorln, hintln, infoln};
-use error_stack::{report, Result, ResultExt};
 
 use crate::cli::TopLevelOptions;
 use crate::error::Error;
@@ -10,7 +10,7 @@ pub fn run(top: &TopLevelOptions) -> Result<(), Error> {
         Err(e) => {
             errorln!("Failed", "Error occured during environment check");
 
-            Err(e).change_context(Error::CheckEnv)
+            Err(e.change_context(Error::CheckEnv))
         }
         Ok(None) => {
             errorln!("Failed", "Environment check");

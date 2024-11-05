@@ -1,6 +1,5 @@
 use proc_macro::TokenStream;
 
-
 /// Put this on the entry point (main function) of your module
 /// to bootstrap the module.
 ///

@@ -1,6 +1,8 @@
 use proc_macro::TokenStream;
 use quote::ToTokens;
-use syn::{ItemFn, Meta, LitStr, Attribute, parenthesized, LitInt, punctuated::Punctuated, Token, Ident};
+use syn::{
+    parenthesized, punctuated::Punctuated, Attribute, Ident, ItemFn, LitInt, LitStr, Meta, Token,
+};
 
 type TokenStream2 = proc_macro2::TokenStream;
 /// Implementation of the `#[megaton::bootstrap]` attribute.
@@ -18,13 +20,14 @@ pub fn bootstrap_impl(item: TokenStream) -> TokenStream {
         if let Meta::List(list) = &attr.meta {
             if list.path.is_ident("module") {
                 found_module_name = true;
-                let module_name=TokenStream2::from(declare_module_name(list.tokens.clone().into()));
+                let module_name =
+                    TokenStream2::from(declare_module_name(list.tokens.clone().into()));
                 expanded.extend(module_name);
             } else if list.path.is_ident("abort") {
                 found_abort = true;
                 let abort_handler = TokenStream2::from(declare_abort_handler(&attr));
                 expanded.extend(abort_handler);
-            } 
+            }
             continue;
         }
         keep_attrs.push(attr);
@@ -76,11 +79,10 @@ pub fn declare_module_name(attr: TokenStream) -> TokenStream {
         byte_array.extend(quote::quote! { #byte, });
     }
 
-    
     let out = quote::quote! {
         #[link_section = ".nx-module-name"]
         #[used]
-        static NX_MODULE_NAME: megaton::ModuleName<[u8; #len]> = 
+        static NX_MODULE_NAME: megaton::ModuleName<[u8; #len]> =
             megaton::ModuleName::new(#len as u32, [#byte_array]);
         #[no_mangle]
         pub extern "C" fn megaton_module_name() -> *const megaton::ModuleName<[u8; #len]> {
@@ -95,7 +97,6 @@ pub fn declare_module_name(attr: TokenStream) -> TokenStream {
 }
 
 pub fn declare_abort_handler(attr: &Attribute) -> TokenStream {
-
     let nested = match attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated) {
         Ok(nested) => nested,
         Err(e) => panic!("Error parsing abort attribute: {}", e),
@@ -146,7 +147,4 @@ pub fn declare_abort_handler(attr: &Attribute) -> TokenStream {
     };
 
     out.into()
-
 }
-
-

@@ -5,11 +5,10 @@ use error_stack::Result;
 use crate::cli::{CommonOptions, TopLevelOptions};
 use crate::error::Error;
 
-mod run_impl;
 mod builder;
 mod checker;
 mod config;
-
+mod run_impl;
 
 /// CLI Options for the build command
 #[derive(Debug, Clone, PartialEq, Args, Deref)]
@@ -23,7 +22,12 @@ pub struct Options {
     pub compdb: bool,
 
     /// Build libmegaton instead of the current project
-    #[clap(short = 'L', long, conflicts_with = "profile", conflicts_with = "compdb")]
+    #[clap(
+        short = 'L',
+        long,
+        conflicts_with = "profile",
+        conflicts_with = "compdb"
+    )]
     pub lib: bool,
 
     /// Common options

@@ -1,4 +1,5 @@
 //! Build flags processing
+use buildcommon::prelude::*;
 
 use std::hash::{Hash, Hasher};
 use std::io::BufRead;
@@ -6,9 +7,7 @@ use std::path::Path;
 
 use buildcommon::env::ProjectEnv;
 use buildcommon::flags::Flags;
-use buildcommon::system::{Command, PathExt, Spawned};
-use buildcommon::{errorln, system, verboseln};
-use error_stack::{Result, ResultExt};
+use buildcommon::system::{Command, Spawned};
 use rustc_hash::{FxHashMap, FxHasher};
 use serde::{Deserialize, Serialize};
 
@@ -21,17 +20,12 @@ pub struct Builder<'a> {
     flags: Flags,
 }
 
+error_context!(pub BuilderNew, |r| -> Error {
+    errorln!("Failed", "Preparing build");
+    r.change_context(Error::BuildPrep)
+});
 impl<'a> Builder<'a> {
-    pub fn new(env: &'a ProjectEnv, entry: &str, build: &Build) -> Result<Self, Error> {
-        match Self::new_internal(env, entry, build) {
-            Ok(builder) => Ok(builder),
-            Err(e) => {
-                errorln!("Failed", "Preparing build");
-                return Err(e).change_context(Error::BuildPrep);
-            }
-        } 
-    }
-    fn new_internal(env: &'a ProjectEnv, entry: &str, build: &Build) -> Result<Self, system::Error> {
+    pub fn new(env: &'a ProjectEnv, entry: &str, build: &Build) -> ResultIn<Self, BuilderNew> {
         let mut flags = Flags::from_config(&build.flags);
 
         let mut includes = Vec::with_capacity(build.includes.len() + 1);
@@ -274,7 +268,6 @@ fn source_hashed(source: &str, base: &str, ext: &str) -> String {
     source.hash(&mut hasher);
     let hash = hasher.finish();
     format!("{}-{:016x}{}", base, hash, ext)
-    // format!("{}{}", base, ext)
 }
 
 fn are_deps_up_to_date(d_path: &Path, o_path: &Path) -> Result<bool, system::Error> {

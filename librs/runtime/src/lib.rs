@@ -23,8 +23,7 @@ impl<S> ModuleName<S> {
 static_assertions::assert_eq_size!(ModuleName<[u8; 10]>, [u8; 19]);
 
 /// Rust side initialization, called before rust's main
-pub fn bootstrap_rust() {
-}
+pub fn bootstrap_rust() {}
 
 /// Re-exports all proc macros
 pub use megaton_proc_macros::*;

@@ -1,11 +1,10 @@
 //! Config structures
+use buildcommon::prelude::*;
 
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use buildcommon::{errorln, flags::FlagConfig};
-use buildcommon::{hintln, system};
-use error_stack::{report, Result, ResultExt};
+use buildcommon::flags::FlagConfig;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
@@ -23,28 +22,25 @@ pub struct Config {
     pub check: Option<ProfileContainer<Check>>,
 }
 
+error_context!(pub LoadConfig, |r| -> Error {
+    errorln!("Failed", "Loading Megaton.toml");
+    r.change_context(Error::Config)
+});
 impl Config {
     /// Load a config from a file
     ///
     /// Prints formatted error message when failed
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self, Error> {
-        let config = match system::read_file(path) {
-            Err(e) => {
-                errorln!("Failed", "Reading Megaton.toml");
-                return Err(e.change_context(Error::Config));
-            }
-            Ok(config) => config,
-        };
+    pub fn from_path(path: impl AsRef<Path>) -> ResultIn<Self, LoadConfig> {
+        let config = system::read_file(path)?;
         // print pretty toml error
-        match toml::from_str(&config) {
-            Err(e) => {
-                for line in e.to_string().lines() {
-                    errorln!("Error", "{}", line);
-                }
-                return Err(e).change_context(Error::Config);
+        let config = toml::from_str(&config).map_err(|e| {
+            for line in e.to_string().lines() {
+                errorln!("Error", "{}", line);
             }
-            Ok(config) => Ok(config),
-        }
+            e
+        })?;
+
+        Ok(config)
     }
 }
 

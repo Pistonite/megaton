@@ -81,7 +81,7 @@ pub enum Command {
     Build(crate::cmd_build::Options),
     /// Clean outputs
     Clean(crate::cmd_clean::Options),
-    /// Check the environment and installation status of 
+    /// Check the environment and installation status of
     /// megaton, dependent tools and toolchain/libraries
     ///
     /// The paths found will be cached for faster lookup in the future

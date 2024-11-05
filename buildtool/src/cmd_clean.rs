@@ -1,5 +1,6 @@
-use buildcommon::system::PathExt;
-use buildcommon::{env, errorln, infoln, system};
+use buildcommon::prelude::*;
+
+use buildcommon::env;
 use clap::Args;
 use derive_more::derive::Deref;
 use error_stack::{Result, ResultExt};
@@ -43,9 +44,12 @@ pub fn run(top: &TopLevelOptions, clean: &Options) -> Result<(), Error> {
             Ok(())
         }
         Err(e) => {
-            errorln!("Failed", "Cannot remove '{}'", output.rebase(&root).display());
+            errorln!(
+                "Failed",
+                "Cannot remove '{}'",
+                output.rebase(&root).display()
+            );
             Err(e).change_context(Error::Clean)
         }
     }
 }
-

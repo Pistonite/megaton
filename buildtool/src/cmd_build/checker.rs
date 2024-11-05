@@ -1,28 +1,32 @@
+use buildcommon::prelude::*;
+
 use std::collections::BTreeSet;
 use std::io::BufRead;
 use std::path::PathBuf;
 use std::sync::mpsc;
 
 use buildcommon::env::ProjectEnv;
-use buildcommon::system::{Command, PathExt, Executor, Task};
-use buildcommon::{args, system, verboseln};
-use error_stack::{report, Result, ResultExt};
+use buildcommon::system::{Command, Executor, Task};
 use regex::Regex;
 
 use super::config::Check;
 
 use crate::error::Error;
 
-pub fn load(env: &ProjectEnv, config: Check, executer: &Executor) -> Result<Checker, Error> {
+error_context!(pub LoadChecker, |r| -> Error {
+    errorln!("Failed", "Loading checker config");
+    r.change_context(Error::CreateChecker)
+});
+pub fn load(
+    env: &ProjectEnv,
+    config: Check,
+    executer: &Executor,
+) -> ResultIn<Checker, LoadChecker> {
     let mut tasks = Vec::with_capacity(config.symbols.len());
     let (send, recv) = mpsc::channel();
     for path in &config.symbols {
-        let path = env
-            .root
-            .join(path)
-            .to_abs()
-            .change_context(Error::CreateChecker)?;
-        let file = system::buf_reader(&path).change_context(Error::CreateChecker)?;
+        let path = env.root.join(path).to_abs()?;
+        let file = system::buf_reader(&path)?;
 
         let id = env.from_root(&path).display().to_string();
         let send = send.clone();
@@ -46,18 +50,26 @@ pub struct Checker {
     recv: Option<mpsc::Receiver<String>>,
 }
 
+error_context!(pub ObjdumpSymbols, |r| -> Error {
+    r.change_context(Error::ObjdumpSymbols)
+});
+error_context!(pub ProcessInstructions, |r| -> Error {
+    r.change_context(Error::ProcessInstructions)
+});
+
 impl Checker {
-    pub fn check_symbols(&mut self, executer: &Executor) -> Result<CheckSymbolTask, Error> {
+    pub fn check_symbols(
+        &mut self,
+        executer: &Executor,
+    ) -> ResultIn<CheckSymbolTask, ObjdumpSymbols> {
         // run objdump -T
         let mut child = Command::new(&self.data.objdump)
             .args(args!["-T", self.data.elf])
             .piped()
-            .spawn()
-            .change_context(Error::ObjdumpSymbols)?;
+            .spawn()?;
         let elf_symbols = child
             .take_stdout()
-            .ok_or(Error::ObjdumpSymbols)
-            .attach_printable("failed to get output of objdump -T")?;
+            .ok_or(system::Error::Expect("failed to get output of objdump -T"))?;
 
         let (elf_send, elf_recv) = mpsc::channel();
         let dump_task = executer.execute(move || {
@@ -86,13 +98,13 @@ impl Checker {
             }
             missing_symbols
         });
-        let wait_task = executer.execute(move || {
-            let mut result = child.wait().change_context(Error::ObjdumpSymbols)?;
-            if !result.is_success() {
-                result.dump_stderr("Error");
-                return Err(Error::ObjdumpSymbols)
-                    .attach_printable(format!("objdump failed with status: {}", result.status));
+        let wait_task = executer.execute(move || -> ResultIn<(), ObjdumpSymbols> {
+            let mut child = child.wait()?;
+            let result = child.check();
+            if result.is_err() {
+                child.dump_stderr("Error");
             }
+            result?;
             Ok(())
         });
 
@@ -104,16 +116,17 @@ impl Checker {
         })
     }
 
-    pub fn check_instructions(&self, executer: &Executor) -> Result<CheckInstructionTask, Error> {
+    pub fn check_instructions(
+        &self,
+        executer: &Executor,
+    ) -> ResultIn<CheckInstructionTask, ProcessInstructions> {
         let mut child = Command::new(&self.data.objdump)
             .args(args!["-d", self.data.elf])
             .piped()
-            .spawn()
-            .change_context(Error::ObjdumpInstructions)?;
+            .spawn()?;
         let elf_instructions = child
             .take_stdout()
-            .ok_or(Error::ObjdumpInstructions)
-            .attach_printable("failed to get output of objdump -d")?;
+            .ok_or(system::Error::Expect("failed to get output of objdump -d"))?;
         let (elf_send, elf_recv) = mpsc::channel();
         let dump_task = executer.execute(move || {
             process_objdump_insts(
@@ -136,7 +149,7 @@ impl Checker {
         if !extra.is_empty() {
             disallowed_regexes.reserve_exact(extra.len());
             for s in extra {
-                disallowed_regexes.push(Regex::new(s).change_context(Error::ParseInstRegex)?);
+                disallowed_regexes.push(Regex::new(s)?);
             }
         }
         let check_task = executer.execute(move || {
@@ -151,13 +164,13 @@ impl Checker {
             }
             output
         });
-        let wait_task = executer.execute(move || {
-            let mut result = child.wait().change_context(Error::ObjdumpInstructions)?;
-            if !result.is_success() {
-                result.dump_stderr("Error");
-                return Err(Error::ObjdumpInstructions)
-                    .attach_printable(format!("objdump failed with status: {}", result.status));
+        let wait_task = executer.execute(move || -> ResultIn<(), ProcessInstructions> {
+            let mut child = child.wait()?;
+            let result = child.check();
+            if result.is_err() {
+                child.dump_stderr("Error");
             }
+            result?;
             Ok(())
         });
 
@@ -188,7 +201,7 @@ impl CheckData {
 pub struct CheckSymbolTask {
     dump_task: Task<Result<(), Error>>,
     check_task: Task<Vec<String>>,
-    wait_task: Task<Result<(), Error>>,
+    wait_task: Task<ResultIn<(), ObjdumpSymbols>>,
     load_tasks: Vec<Task<Result<(), Error>>>,
 }
 
@@ -206,7 +219,7 @@ impl CheckSymbolTask {
 
 pub struct CheckInstructionTask {
     dump_task: Task<()>,
-    wait_task: Task<Result<(), Error>>,
+    wait_task: Task<ResultIn<(), ProcessInstructions>>,
     check_task: Task<Vec<String>>,
 }
 

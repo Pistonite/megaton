@@ -61,7 +61,6 @@ pub mod __priv {
     }
 }
 
-
 /// Log a status line using info color
 #[macro_export]
 macro_rules! infoln {
@@ -139,7 +138,7 @@ macro_rules! verboseln {
 #[derive(Debug)]
 pub struct Progress<R: Read> {
     writer: ProgressWriter,
-    stream: BufReader<R>
+    stream: BufReader<R>,
 }
 
 impl<R: Read> Progress<R> {
@@ -158,7 +157,7 @@ impl<R: Read> Progress<R> {
                 tag: tag.to_string(),
                 term_width,
             },
-            stream
+            stream,
         }
     }
 
@@ -206,7 +205,6 @@ struct ProgressWriter {
 }
 
 impl ProgressWriter {
-
     pub fn is_terminal(&self) -> bool {
         // width needs to be greater than TAG + SPACE + MESSAGE + SPACE
         // to have meaningful output
@@ -220,7 +218,13 @@ impl ProgressWriter {
         let mut s = ::std::io::stderr().lock();
         // clear current line and restart
         if is_colored() {
-            let _ = write!(&mut s, "\x1b[1K\r{}{:>11}{}> ", __priv::CYAN, self.tag, __priv::RESET);
+            let _ = write!(
+                &mut s,
+                "\x1b[1K\r{}{:>11}{}> ",
+                __priv::CYAN,
+                self.tag,
+                __priv::RESET
+            );
         } else {
             let _ = write!(&mut s, "\x1b[1K\r{:>11}> ", self.tag);
         }
@@ -242,11 +246,16 @@ impl ProgressWriter {
             let _ = write!(&mut s, "\x1b[1K\r");
         }
         if is_colored() {
-            let _ = write!(&mut s, "{}{:>12}{} ", __priv::GREEN, self.tag, __priv::RESET);
+            let _ = write!(
+                &mut s,
+                "{}{:>12}{} ",
+                __priv::GREEN,
+                self.tag,
+                __priv::RESET
+            );
         } else {
             let _ = write!(&mut s, "{:>12} ", self.tag);
         }
         let _ = writeln!(&mut s, "{}", line);
     }
 }
-
