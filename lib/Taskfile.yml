@@ -11,5 +11,13 @@ tasks:
   build:
     desc: Execute incremental builds
     cmds:
-    - ninja -C build
+      - ninja -C build
+
+  clean:
+    desc: Clean build directory
+    cmds:
+      - rm -rf build/bin build/.cache
+      - rm -f build/.ninja*
+      - rm -f build/compile_commands.json
+
 

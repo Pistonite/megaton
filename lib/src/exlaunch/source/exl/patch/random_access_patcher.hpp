@@ -2,7 +2,7 @@
 
 #include <switch/arm/cache.h>
 
-#include <exl/lib.hpp>
+#include "patcher_impl.hpp"
 
 namespace exl::patch {
     
