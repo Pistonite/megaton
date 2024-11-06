@@ -1,7 +1,7 @@
 #include <switch/kernel/svc.h>
 #include <switch/result.h>
 
-#include <exl/lib/reloc/rtld.hpp>
+#include <exl/reloc/rtld.hpp>
 
 #include "mem_layout.hpp"
     

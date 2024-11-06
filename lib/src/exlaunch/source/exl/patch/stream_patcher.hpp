@@ -2,7 +2,7 @@
 
 #include <switch/arm/cache.h>
 
-#include <exl/lib/armv8.hpp>
+#include <exl/armv8.hpp>
 
 #include "patcher_impl.hpp"
 

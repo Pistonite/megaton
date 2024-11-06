@@ -2,7 +2,7 @@
 
 #include <span>
 
-#include <exl/lib/util/typed_storage.hpp>
+#include <exl/util/typed_storage.hpp>
 
 #include "rw_pages.hpp"
 

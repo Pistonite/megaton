@@ -2,9 +2,9 @@
 
 #include <array>
 
-#include <exl/lib/hook/setting.hpp>
-#include <exl/lib/armv8.hpp>
-#include <exl/lib/util/sys/jit.hpp>
+#include <exl/hook/setting.hpp>
+#include <exl/armv8.hpp>
+#include <exl/util/sys/jit.hpp>
 
 #include "impl.hpp"
 

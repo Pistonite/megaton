@@ -3,7 +3,7 @@
 
 /* #include <functional> */
 
-#include <exl/lib/util/func_ptrs.hpp>
+#include <exl/util/func_ptrs.hpp>
 
 #include "base.hpp"
 

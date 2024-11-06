@@ -1,8 +1,8 @@
 #include <megaton/prelude.h>
 
-#include <exl/lib/util/sys/mem_layout.hpp>
-#include <exl/lib/patch/patcher_impl.hpp>
-#include <exl/lib/hook/base.hpp>
+#include <exl/util/sys/mem_layout.hpp>
+#include <exl/patch/patcher_impl.hpp>
+#include <exl/hook/base.hpp>
 
 extern "C" {
     /** 

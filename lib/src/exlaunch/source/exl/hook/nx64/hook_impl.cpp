@@ -33,8 +33,8 @@
 
 #include <switch/result.h>
 
-#include <exl/lib/util/sys/jit.hpp>
-#include <exl/lib/hook/setting.hpp>
+#include <exl/util/sys/jit.hpp>
+#include <exl/hook/setting.hpp>
 #include "inline_impl.hpp"
 
 

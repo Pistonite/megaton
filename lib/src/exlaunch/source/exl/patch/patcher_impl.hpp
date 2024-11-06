@@ -2,9 +2,9 @@
 
 #include <optional>
 
-#include <exl/lib/util/sys/rw_pages.hpp>
-#include <exl/lib/util/sys/mem_layout.hpp>
-#include <exl/lib/util/typed_storage.hpp>
+#include <exl/util/sys/rw_pages.hpp>
+#include <exl/util/sys/mem_layout.hpp>
+#include <exl/util/typed_storage.hpp>
 
 namespace exl::patch {
 

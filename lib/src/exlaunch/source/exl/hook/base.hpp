@@ -3,8 +3,8 @@
 
 #include <cstring>
 
-#include <exl/lib/util/func_ptrs.hpp>
-#include <exl/lib/util/modules.hpp>
+#include <exl/util/func_ptrs.hpp>
+#include <exl/util/modules.hpp>
 
 #include "nx64/impl.hpp"
 
