@@ -41,4 +41,7 @@ void virtmemSetup(void);
     exl::hook::Initialize();
     }
 
+    void __megaton_rtld_init() {
+    }
+
 }

@@ -19,7 +19,20 @@ noreturn_ __megaton_abort(void) {
     // from: exlaunch/source/lib/diag/abort.cpp
     // this will store val to an invalid address, causing a data abort
     register s64 addr __asm__("x27") = 0x6969696969696969;
-    register s64 val __asm__("x28")  = 0xDEADDEADDEADDEAD;
+    register s64 val __asm__("x28")  = 0x00DEAD0000DEAD00;
+    while (true) {
+        __asm__ __volatile__ (
+                "str %[val], [%[addr]]"
+                :
+                : [val]"r"(val), [addr]"r"(addr)
+            );
+    }
+}
+
+/** Trigger abort from CRT */
+noreturn_ __megaton_crt_abort(void) {
+    register s64 addr __asm__("x27") = 0x6969696969696969;
+    register s64 val __asm__("x28")  = 0xCCCCCCCCCCCCCCCC;
     while (true) {
         __asm__ __volatile__ (
                 "str %[val], [%[addr]]"

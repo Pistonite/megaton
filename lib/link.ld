@@ -9,7 +9,7 @@ OUTPUT_FORMAT(elf64-littleaarch64)
 OUTPUT_ARCH(aarch64)
 
 /** Entry point*/
-ENTRY(__megaton_module_entry)
+ENTRY(__module_start)
 
 PHDRS
 {
