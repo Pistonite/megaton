@@ -1,4 +1,5 @@
 #pragma once
+#include <megaton/prelude.h>
 
 #include <exl/common.hpp>
 
@@ -7,7 +8,7 @@
 
 namespace exl::armv8 {
 
-    using InstType = uint;
+    using InstType = u32;
 
     template<InstType... Args>
     using InstMask = util::Mask<InstType, Args...>;

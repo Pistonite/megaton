@@ -19,6 +19,8 @@ pub enum Error {
     ParentPath,
     #[error("failed to canonicalize `{0}`")]
     Canonicalize(String),
+    #[error("path should be utf-8: {0}")]
+    NotUTF8(String),
 
     // === file operations ===
     #[error("failed to read from `{0}`")]

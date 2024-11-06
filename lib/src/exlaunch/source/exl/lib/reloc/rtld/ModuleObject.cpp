@@ -1,6 +1,6 @@
 #include <string.h>
 
-#include <megaton/assert.hpp>
+#include <megaton/prelude.h>
 
 #include "../rtld.hpp"
 #include "utils.hpp"

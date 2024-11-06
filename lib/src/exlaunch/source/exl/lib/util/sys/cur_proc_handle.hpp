@@ -1,6 +1,6 @@
 #pragma once
 
-#include <exl/common.hpp>
+#include <switch/types.h>
 
 namespace exl::util::proc_handle {
     Handle Get();

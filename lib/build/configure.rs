@@ -1,10 +1,11 @@
-use buildcommon::{flags, prelude::*};
+use buildcommon::prelude::*;
 
-use std::ffi::OsStr;
 use std::path::Path;
 use std::process::ExitCode;
 
 use buildcommon::env::{Env, RootEnv};
+use buildcommon::flags;
+use buildcommon::source::{SourceFile, SourceType};
 use ninja_writer::*;
 
 #[derive(Debug, thiserror::Error)]
@@ -21,8 +22,6 @@ enum Error {
     ReadDir,
     #[error("failed to read source directory entry")]
     ReadDirEntry,
-    #[error("failed to get source file or directory name")]
-    SourcePathName,
     #[error("source path is must be utf-8")]
     Encoding,
     #[error("failed to write build.ninja")]
@@ -48,29 +47,46 @@ fn main_internal() -> Result<(), Error> {
     let src_root = lib_root.join("src");
     let inc_root = lib_root.join("include");
 
-    let build_root = lib_root.join("build").into_joined("out");
+    let build_root = lib_root.join("build").into_joined("bin");
+    let build_o_root = build_root.join("o");
     let ninja = Ninja::new();
 
-    system::ensure_directory(&build_root).change_context(Error::CreateBuildDir)?;
+    let mut build_o_root_str = match build_o_root
+        .as_os_str().to_os_string().into_string() {
+        Ok(x) => x,
+        Err(_) => return Err(report!(Error::Encoding))
+        .attach_printable(format!("path: {}", build_root.join("o").display()))
+        ,
+    };
+
+    if cfg!(windows) {
+        while build_o_root_str.ends_with('/') {
+            build_o_root_str.pop();
+        }
+        if !build_o_root_str.ends_with('\\') {
+            build_o_root_str.push('\\');
+        }
+    } else {
+        if !build_o_root_str.ends_with('/') {
+            build_o_root_str.push('/');
+        }
+    }
+
+    system::ensure_directory(&build_o_root).change_context(Error::CreateBuildDir)?;
 
     ninja.comment("libmegaton build.ninja");
     let common_flags = flags::DEFAULT_COMMON.join(" ");
 
     ninja.variable("common_flags", &common_flags);
 
-    let exl_inc_root = src_root.join("exlaunch").into_joined("include");
+    let exl_inc_root = src_root.join("exlaunch").into_joined("source");
 
     let includes = [&inc_root, &exl_inc_root, &env.libnx_include];
 
     let mut c_flags = flags::DEFAULT_C.to_vec();
     // temp. no longer needed when EXL is refactored
     c_flags.extend([
-        "-DEXL_DEBUG",
-        "-DEXL_USE_FAKEHEAP",
-        "-DEXL_LOAD_KIND_ENUM=2",
-        "-DEXL_LOAD_KIND=Module",
         "-DEXL_PROGRAM_ID=0x0100000000000000",
-        "-DEXL_MODULE_NAME='\"test\"'",
     ]);
 
     let include_flag = includes
@@ -117,13 +133,15 @@ fn main_internal() -> Result<(), Error> {
         .depfile("$out.d")
         .deps_gcc()
         .description("CXX $out");
-    walk_directory(&src_root, &build_root, &rule_as, &rule_cc, &rule_cxx)
+
+
+    walk_directory(&src_root, &build_o_root_str, &rule_as, &rule_cc, &rule_cxx)
         .change_context(Error::WalkDir)?;
 
     let generator = ninja
         .rule(
             "configure",
-            "cargo --color always run --bin megaton-lib-configure -- $out",
+            "cargo run --quiet --bin megaton-lib-configure -- $out",
         )
         .description("Configuring build.ninja")
         .generator();
@@ -139,12 +157,11 @@ fn main_internal() -> Result<(), Error> {
 
 fn walk_directory(
     src: &Path,
-    build: &Path,
+    build_o_root: &str,
     rule_as: &RuleRef,
     rule_cc: &RuleRef,
     rule_cxx: &RuleRef,
 ) -> Result<(), Error> {
-    let mut create_build = false;
 
     for entry in std::fs::read_dir(src)
         .change_context(Error::ReadDir)
@@ -154,34 +171,29 @@ fn walk_directory(
             .change_context(Error::ReadDirEntry)
             .attach_printable_lazy(|| format!("inside: {}", src.display()))?;
         let path = entry.path();
-        let name = path.file_name().ok_or(Error::SourcePathName)?;
         if path.is_dir() {
-            walk_directory(&path, &build.join(name), rule_as, rule_cc, rule_cxx)?;
-        } else {
-            if let Some(ext) = path.extension() {
-                let out_name = format!(
-                    "{}.o",
-                    name.to_str()
-                        .ok_or(Error::Encoding)
-                        .attach_printable_lazy(|| format!("path: {}", path.display()))?
-                );
-                let build_path = build.join(out_name);
-
-                if ext == OsStr::new("s") {
-                    rule_as.build([build_path]).with([path]);
-                    create_build = true;
-                } else if ext == OsStr::new("c") {
-                    rule_cc.build([build_path]).with([path]);
-                    create_build = true;
-                } else if ext == OsStr::new("cpp") {
-                    rule_cxx.build([build_path]).with([path]);
-                    create_build = true;
-                }
-            }
+            walk_directory(&path, &build_o_root, rule_as, rule_cc, rule_cxx)?;
+            continue;
         }
-    }
-    if create_build && !build.exists() {
-        std::fs::create_dir_all(build)?;
+
+        let source_file = match SourceFile::from_path(&path).change_context(Error::Encoding)? {
+            Some(x) => x,
+            None => continue, // not a source type
+        };
+
+        let object_file = format!("{}{}.o", build_o_root, source_file.name_hash);
+        match source_file.typ {
+            SourceType::C => {
+                rule_cc.build([object_file]).with([path]);
+            }
+            SourceType::Cpp => {
+                rule_cxx.build([object_file]).with([path]);
+            }
+            SourceType::S => {
+                rule_as.build([object_file]).with([path]);
+            }
+
+        }
     }
 
     Ok(())

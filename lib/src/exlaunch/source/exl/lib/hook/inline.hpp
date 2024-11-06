@@ -1,4 +1,5 @@
 #pragma once
+#include <megaton/prelude.h>
 
 #include <exl/common.hpp>
 
@@ -15,13 +16,13 @@ namespace exl::hook::impl {
         template<typename T = Derived>
         using CallbackFuncPtr = decltype(&T::Callback);
 
-        static ALWAYS_INLINE void InstallAtOffset(ptrdiff_t address) {
+        inline_always_ void InstallAtOffset(ptrdiff_t address) {
             _HOOK_STATIC_CALLBACK_ASSERT();
 
             hook::HookInline(util::modules::GetTargetStart() + address, Derived::Callback);
         }
 
-        static ALWAYS_INLINE void InstallAtPtr(uintptr_t ptr) {
+        inline_always_ void InstallAtPtr(uintptr_t ptr) {
             _HOOK_STATIC_CALLBACK_ASSERT();
             
             hook::HookInline(ptr, Derived::Callback);

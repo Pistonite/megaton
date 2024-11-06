@@ -1,6 +1,6 @@
 #pragma once
+#include <megaton/prelude.h>
 
-#include <type_traits>
 #include <cstring>
 
 #include <exl/lib/util/func_ptrs.hpp>
@@ -20,10 +20,10 @@ namespace exl::hook {
         using Entrypoint = util::GenericFuncPtr<void, void*, void*>;
     };
 
-    inline void NORETURN CallTargetEntrypoint(void* x0, void* x1) {
+    inline noreturn_ CallTargetEntrypoint(void* x0, void* x1) {
         auto entrypoint = reinterpret_cast<Entrypoint>(util::modules::GetTargetStart());
         entrypoint(x0, x1);
-        UNREACHABLE;
+        __builtin_unreachable();
     }
 
     inline void Initialize() {

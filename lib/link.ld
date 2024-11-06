@@ -3,11 +3,13 @@
  *
  * Credits: 
  * - libnx 
- * - shadowninja108 (https://github.com/shadowninja108)
+ * - exlaunch by shadowninja108 (https://github.com/shadowninja108)
  */
 OUTPUT_FORMAT(elf64-littleaarch64)
 OUTPUT_ARCH(aarch64)
-ENTRY(__module_start)
+
+/** Entry point*/
+ENTRY(__megaton_module_entry)
 
 PHDRS
 {
@@ -39,8 +41,8 @@ SECTIONS
     /* === Read Only Data === */
     . = ALIGN(0x1000);
 
-    /* App name */
-    .module_name : { KEEP (*(.nx-module-name)) } :rodata
+    /* module name */
+    .nx-module-name : { KEEP (*(.nx-module-name)) } :rodata
 
   /* Make sure everything is aligned */
   . = ALIGN(8);

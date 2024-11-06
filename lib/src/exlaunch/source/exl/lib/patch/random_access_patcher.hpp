@@ -1,5 +1,7 @@
 #pragma once
 
+#include <switch/arm/cache.h>
+
 #include <exl/lib.hpp>
 
 namespace exl::patch {

@@ -12,7 +12,7 @@ namespace exl::armv8::inst {
             return 0b00 | rt.Is64();
         }
 
-        constexpr LdrLiteral(reg::Register rt, uint relative_distance) : LoadRegisterLiteral(rt, relative_distance / 4, V, GetOpc(rt)) {}
+        constexpr LdrLiteral(reg::Register rt, u32 relative_distance) : LoadRegisterLiteral(rt, relative_distance / 4, V, GetOpc(rt)) {}
     };
 
     static_assert(LdrLiteral(reg::X0, 0x08).Value() == 0x58000040, "");

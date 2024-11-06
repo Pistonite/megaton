@@ -1,14 +1,14 @@
 //! Build flags processing
 use buildcommon::prelude::*;
+use buildcommon::source::{SourceFile, SourceType};
 
-use std::hash::{Hash, Hasher};
 use std::io::BufRead;
 use std::path::Path;
 
 use buildcommon::env::ProjectEnv;
 use buildcommon::flags::Flags;
 use buildcommon::system::{Command, Spawned};
-use rustc_hash::{FxHashMap, FxHasher};
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
@@ -63,11 +63,11 @@ impl<'a> Builder<'a> {
 
     fn create_command(
         &self,
-        s_type: SourceType,
-        source: String,
+        source_file: SourceFile,
         d_file: String,
         o_file: String,
     ) -> CompileCommand {
+        let s_type = source_file.typ;
         let arguments: Vec<_> = match s_type {
             SourceType::C => std::iter::once(self.env.cc.display().to_string())
                 .chain([
@@ -81,7 +81,7 @@ impl<'a> Builder<'a> {
                     "-c".to_string(),
                     "-o".to_string(),
                     o_file.clone(),
-                    source.clone(),
+                    source_file.path.clone(),
                 ])
                 .collect(),
             SourceType::Cpp => std::iter::once(self.env.cxx.display().to_string())
@@ -96,7 +96,7 @@ impl<'a> Builder<'a> {
                     "-c".to_string(),
                     "-o".to_string(),
                     o_file.clone(),
-                    source.clone(),
+                    source_file.path.clone(),
                 ])
                 .collect(),
             SourceType::S => std::iter::once(self.env.cxx.display().to_string())
@@ -113,7 +113,7 @@ impl<'a> Builder<'a> {
                     "-c".to_string(),
                     "-o".to_string(),
                     o_file.clone(),
-                    source.clone(),
+                    source_file.path.clone(),
                 ])
                 .collect(),
         };
@@ -121,7 +121,7 @@ impl<'a> Builder<'a> {
         CompileCommand {
             directory: "/".to_string(),
             arguments,
-            file: source,
+            file: source_file.path,
             output: o_file,
         }
     }
@@ -132,33 +132,32 @@ impl<'a> Builder<'a> {
         cc_possibly_changed: bool,
         compile_commands: &mut FxHashMap<String, CompileCommand>,
     ) -> Result<SourceResult, system::Error> {
-        let source = source_path.display().to_string();
-        let (source_type, base, ext) = match get_source_type(&source) {
+        let source_file = match SourceFile::from_path(source_path)? {
             Some(x) => x,
             None => {
                 return Ok(SourceResult::NotSource);
             }
         };
-        let hashed = source_hashed(&source, base, ext);
-        let o_path = self.env.target_o.join(&format!("{}.o", hashed));
-        let o_file = o_path.display().to_string();
-        let d_path = self.env.target_o.join(&format!("{}.d", hashed));
-        let d_file = d_path.display().to_string();
+
+        let o_path = self.env.target_o.join(&format!("{}.o", source_file.name_hash));
+        let o_file = o_path.to_utf8()?;
+        let d_path = self.env.target_o.join(&format!("{}.d", source_file.name_hash));
+        let d_file = d_path.to_utf8()?;
         if !o_path.exists() {
             // output doesn't exist
-            let cc = self.create_command(source_type, source, d_file, o_file);
+            let cc = self.create_command(source_file, d_file, o_file);
             return Ok(SourceResult::NeedCompile(cc));
         }
         // d file changed? (source included in d_file)
         if !are_deps_up_to_date(&d_path, &o_path)? {
-            let cc = self.create_command(source_type, source, d_file, o_file);
+            let cc = self.create_command(source_file, d_file, o_file);
             return Ok(SourceResult::NeedCompile(cc));
         }
         // dependencies didn't change. Only rebuild if compile command changed
         if !cc_possibly_changed {
             return Ok(SourceResult::UpToDate(o_file));
         }
-        let cc = self.create_command(source_type, source, d_file, o_file);
+        let cc = self.create_command(source_file, d_file, o_file);
         match compile_commands.remove(&cc.output) {
             Some(old_cc) => {
                 if old_cc == cc {
@@ -234,41 +233,41 @@ pub fn load_compile_commands(cc_json: &Path, map: &mut FxHashMap<String, Compile
     }
 }
 
-pub enum SourceType {
-    C,
-    Cpp,
-    S,
-}
-
-impl SourceType {
-    pub fn from_ext(ext: &str) -> Option<Self> {
-        match ext {
-            ".c" => Some(Self::C),
-            ".cpp" | ".cc" | ".cxx" | ".c++" => Some(Self::Cpp),
-            ".s" | ".asm" => Some(Self::S),
-            _ => None,
-        }
-    }
-}
-
-fn get_source_type(source: &str) -> Option<(SourceType, &str, &str)> {
-    let dot = source.rfind('.').unwrap_or(source.len());
-    let ext = &source[dot..];
-    let source_type = SourceType::from_ext(ext)?;
-    let slash = source.rfind(|c| c == '/' || c == '\\').unwrap_or(0);
-    let base = &source[slash + 1..dot];
-    if base.is_empty() {
-        return None;
-    }
-    Some((source_type, base, ext))
-}
-
-fn source_hashed(source: &str, base: &str, ext: &str) -> String {
-    let mut hasher = FxHasher::default();
-    source.hash(&mut hasher);
-    let hash = hasher.finish();
-    format!("{}-{:016x}{}", base, hash, ext)
-}
+// pub enum SourceType {
+//     C,
+//     Cpp,
+//     S,
+// }
+//
+// impl SourceType {
+//     pub fn from_ext(ext: &str) -> Option<Self> {
+//         match ext {
+//             ".c" => Some(Self::C),
+//             ".cpp" | ".cc" | ".cxx" | ".c++" => Some(Self::Cpp),
+//             ".s" | ".asm" => Some(Self::S),
+//             _ => None,
+//         }
+//     }
+// }
+//
+// fn get_source_type(source: &str) -> Option<(SourceType, &str, &str)> {
+//     let dot = source.rfind('.').unwrap_or(source.len());
+//     let ext = &source[dot..];
+//     let source_type = SourceType::from_ext(ext)?;
+//     let slash = source.rfind(|c| c == '/' || c == '\\').unwrap_or(0);
+//     let base = &source[slash + 1..dot];
+//     if base.is_empty() {
+//         return None;
+//     }
+//     Some((source_type, base, ext))
+// }
+//
+// fn source_hashed(source: &str, base: &str, ext: &str) -> String {
+//     let mut hasher = FxHasher::default();
+//     source.hash(&mut hasher);
+//     let hash = hasher.finish();
+//     format!("{}-{:016x}{}", base, hash, ext)
+// }
 
 fn are_deps_up_to_date(d_path: &Path, o_path: &Path) -> Result<bool, system::Error> {
     if !d_path.exists() {

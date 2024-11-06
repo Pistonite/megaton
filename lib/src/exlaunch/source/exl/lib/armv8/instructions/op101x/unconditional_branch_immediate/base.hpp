@@ -16,7 +16,7 @@ namespace exl::armv8::inst::impl::op101x {
             BL = 1,
         };
 
-        constexpr UnconditionalBranchImmediate(Op op, uint relative_address) : Op101xInstruction(Op0) {
+        constexpr UnconditionalBranchImmediate(Op op, u32 relative_address) : Op101xInstruction(Op0) {
             SetOp(op);
             SetImm26(relative_address / 4);
         }

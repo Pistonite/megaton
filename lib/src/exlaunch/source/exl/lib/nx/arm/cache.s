@@ -1,3 +1,4 @@
+; TODO: link with libnx
 .macro CODE_BEGIN name
 	.section .text.\name, "ax", %progbits
 	.global \name

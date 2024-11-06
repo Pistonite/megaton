@@ -2,6 +2,7 @@ pub mod env;
 pub mod flags;
 pub mod print;
 pub mod system;
+pub mod source;
 
 pub mod prelude {
     pub use crate::system;

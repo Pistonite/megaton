@@ -1,8 +1,14 @@
+#include <megaton/prelude.h>
+
 #include <cstring>
 #include <algorithm>
+
+#include <switch/kernel/svc.h>
+#include <switch/arm/cache.h>
+#include <switch/result.h>
+
 #include <functional>
 
-#include <megaton/assert.hpp>
 
 #include "rw_pages.hpp"
 #include "cur_proc_handle.hpp"

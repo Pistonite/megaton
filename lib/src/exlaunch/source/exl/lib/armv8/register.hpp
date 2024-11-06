@@ -1,4 +1,5 @@
 #pragma once
+#include <megaton/prelude.h>
 
 #include <exl/common.hpp>
 
@@ -15,11 +16,11 @@ namespace exl::armv8::reg {
         char m_Index : 7;
 
         public:
-        constexpr Register(RegisterKind kind, uchar index) : m_Kind(kind), m_Index(index) { }
+        constexpr Register(RegisterKind kind, u8 index) : m_Kind(kind), m_Index(index) { }
 
         constexpr inline bool Is32() const { return m_Kind == RegisterKind::W; }
         constexpr inline bool Is64() const { return m_Kind == RegisterKind::X; }
-        constexpr inline uchar Index() const { return m_Index; }
+        constexpr inline u8 Index() const { return m_Index; }
     };
     static_assert(sizeof(Register) == 1, "Register");
 

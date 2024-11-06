@@ -15,6 +15,7 @@
  */
 
 #pragma once
+#include <megaton/prelude.h>
 
 #include <utility>
 #include <new>
@@ -30,41 +31,41 @@ namespace exl::util {
     };
 
     template<typename T>
-    static ALWAYS_INLINE T *GetPointer(TypedStorage<T> &ts) {
+    inline_always_ T *GetPointer(TypedStorage<T> &ts) {
         return std::launder(reinterpret_cast<T *>(std::addressof(ts._storage)));
     }
 
     template<typename T>
-    static ALWAYS_INLINE const T *GetPointer(const TypedStorage<T> &ts) {
+    inline_always_ const T *GetPointer(const TypedStorage<T> &ts) {
         return std::launder(reinterpret_cast<const T *>(std::addressof(ts._storage)));
     }
 
     template<typename T>
-    static ALWAYS_INLINE T &GetReference(TypedStorage<T> &ts) {
+    inline_always_ T &GetReference(TypedStorage<T> &ts) {
         return *GetPointer(ts);
     }
 
     template<typename T>
-    static ALWAYS_INLINE const T &GetReference(const TypedStorage<T> &ts) {
+    inline_always_ const T &GetReference(const TypedStorage<T> &ts) {
         return *GetPointer(ts);
     }
 
     namespace impl {
 
         template<typename T>
-        static ALWAYS_INLINE T *GetPointerForConstructAt(TypedStorage<T> &ts) {
+        inline_always_ T *GetPointerForConstructAt(TypedStorage<T> &ts) {
             return reinterpret_cast<T *>(std::addressof(ts._storage));
         }
 
     }
 
     template<typename T, typename... Args>
-    static ALWAYS_INLINE T *ConstructAt(TypedStorage<T> &ts, Args &&... args) {
+    inline_always_ T *ConstructAt(TypedStorage<T> &ts, Args &&... args) {
         return std::construct_at(impl::GetPointerForConstructAt(ts), std::forward<Args>(args)...);
     }
 
     template<typename T>
-    static ALWAYS_INLINE void DestroyAt(TypedStorage<T> &ts) {
+    inline_always_ void DestroyAt(TypedStorage<T> &ts) {
         return std::destroy_at(GetPointer(ts));
     }
 

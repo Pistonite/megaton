@@ -26,10 +26,12 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  SOFTWARE.
  */
-#include <megaton/assert.hpp>
+#include <megaton/prelude.h>
 #define __STDC_FORMAT_MACROS
 #include <cstring>
 #include <stdlib.h>
+
+#include <switch/result.h>
 
 #include <exl/lib/util/sys/jit.hpp>
 #include <exl/usersetting.hpp>  
@@ -523,21 +525,21 @@ namespace exl::hook::nx64 {
 
     //-------------------------------------------------------------------------
 
-    static Result AllocForTrampoline(uint32_t** rx, uint32_t** rw) {
+    static void AllocForTrampoline(uint32_t** rx, uint32_t** rw) {
         static_assert((TrampolineSize * sizeof(uint32_t)) % 8 == 0, "8-byte align");
         static volatile s32 index = -1;
 
         uint32_t i = __atomic_increase(&index);
+
         
-        if(i > HookMax)
-            return result::HookTrampolineAllocFail;
+        if(i > HookMax) {
+            panic_("failed to allocate trampoline: max hook limit reached");
+        }
 
         HookPool* rwptr = (HookPool*)s_HookJit.GetRw();
         HookPool* rxptr = (HookPool*)s_HookJit.GetRo();
         *rw = (*rwptr)[i];
         *rx = (*rxptr)[i];
-
-        return result::Success;
     }
 
     //-------------------------------------------------------------------------
@@ -601,7 +603,7 @@ namespace exl::hook::nx64 {
         u32* rxtrampoline = NULL;
         u32* rwtrampoline = NULL;
         if (do_trampoline)  {
-            assert_(R_SUCCEEDED(AllocForTrampoline(&rxtrampoline, &rwtrampoline)));
+        AllocForTrampoline(&rxtrampoline, &rwtrampoline);
         }
 
         if (!HookFuncImpl(reinterpret_cast<void*>(hook), reinterpret_cast<void*>(callback), rxtrampoline, rwtrampoline))

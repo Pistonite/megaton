@@ -1,6 +1,7 @@
 #pragma once
+#include <megaton/prelude.h>
 
-#include <functional>
+/* #include <functional> */
 
 #include <exl/lib/util/func_ptrs.hpp>
 
@@ -17,7 +18,7 @@ namespace exl::hook::impl {
         template<typename T = Derived>
         using CallbackFuncPtr = decltype(&T::Callback);
 
-        static ALWAYS_INLINE auto& OrigRef() {
+        inline_always_ auto& OrigRef() {
             _HOOK_STATIC_CALLBACK_ASSERT();
 
             static constinit CallbackFuncPtr<> s_FnPtr = nullptr;
@@ -27,20 +28,20 @@ namespace exl::hook::impl {
 
         public:
         template<typename... Args>
-        static ALWAYS_INLINE decltype(auto) Orig(Args &&... args) {
+        inline_always_ decltype(auto) Orig(Args &&... args) {
             _HOOK_STATIC_CALLBACK_ASSERT();
 
             return OrigRef()(std::forward<Args>(args)...);
         }
 
-        static ALWAYS_INLINE void InstallAtOffset(ptrdiff_t address) {
+        inline_always_ void InstallAtOffset(ptrdiff_t address) {
             _HOOK_STATIC_CALLBACK_ASSERT();
 
             OrigRef() = hook::Hook(util::modules::GetTargetStart() + address, Derived::Callback, true);
         }
 
         template<typename R, typename ...A>
-        static ALWAYS_INLINE void InstallAtFuncPtr(util::GenericFuncPtr<R, A...> ptr) {
+        inline_always_ void InstallAtFuncPtr(util::GenericFuncPtr<R, A...> ptr) {
             _HOOK_STATIC_CALLBACK_ASSERT();
             using ArgFuncPtr = decltype(ptr);
 
@@ -49,7 +50,7 @@ namespace exl::hook::impl {
             OrigRef() = hook::Hook(ptr, Derived::Callback, true);
         }
 
-        static ALWAYS_INLINE void InstallAtPtr(uintptr_t ptr) {
+        inline_always_ void InstallAtPtr(uintptr_t ptr) {
             _HOOK_STATIC_CALLBACK_ASSERT();
             
             OrigRef() = hook::Hook(ptr, Derived::Callback, true);

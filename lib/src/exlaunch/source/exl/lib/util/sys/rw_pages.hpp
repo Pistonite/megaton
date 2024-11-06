@@ -1,14 +1,19 @@
 #pragma once
+#include <switch/kernel/virtmem.h>
+
+#include <megaton/align.h>
 
 #include <utility>
-#include <new>
+/* #include <new> */
 
 #include <exl/common.hpp>
 
 namespace exl::util {
     
     class RwPages {
-        NON_COPYABLE(RwPages);
+    // not copyable
+    RwPages(const RwPages&) = delete;
+    RwPages& operator=(const RwPages&) = delete;
         private:
             struct Claim {
                 uintptr_t m_Ro = 0;
@@ -17,15 +22,15 @@ namespace exl::util {
                 VirtmemReservation* m_RwReserve = nullptr;
 
                 constexpr uintptr_t GetAlignedRo() const {
-                    return ALIGN_DOWN(m_Ro, PAGE_SIZE);
+                    return align_down_(m_Ro, PAGE_SIZE);
                 }
 
                 constexpr uintptr_t GetAlignedRw() const {
-                    return ALIGN_DOWN(m_Rw, PAGE_SIZE);
+                    return align_down_(m_Rw, PAGE_SIZE);
                 }
 
                 constexpr size_t GetAlignedSize() const {
-                    return ALIGN_UP(m_Size, PAGE_SIZE);
+                    return align_up_(m_Size, PAGE_SIZE);
                 }
 
                 constexpr ptrdiff_t RoToOffset(uintptr_t address) const {

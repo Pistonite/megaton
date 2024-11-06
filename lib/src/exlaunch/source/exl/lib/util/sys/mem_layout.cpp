@@ -1,3 +1,6 @@
+#include <switch/kernel/svc.h>
+#include <switch/result.h>
+
 #include <exl/lib/reloc/rtld.hpp>
 #include <exl/usersetting.hpp>
 
@@ -92,10 +95,8 @@ namespace exl::util {
                     total.m_Size = data.GetEnd() - total.m_Start;
 
                     /* This only needs to be determined at runtime if we are in an application. */
-                    #ifdef EXL_AS_MODULE
                     if(total.m_Start == (uintptr_t) &__module_start)
                         util::mem_layout::s_SelfModuleIdx = nextModIdx;
-                    #endif
 
                     /* Store built module info. */
                     impl::mem_layout::s_ModuleInfos[nextModIdx] = curModInfo;
@@ -115,12 +116,8 @@ namespace exl::util {
         } while(offset >= prevOffset);
 
         /* Ensure we found a valid self index and module count. */
-        #ifdef EXL_AS_MODULE
         assert_(util::mem_layout::s_SelfModuleIdx != -1);
         assert_(util::mem_layout::s_SelfModuleIdx < util::mem_layout::s_MaxModules);
-        #endif
-        assert_(util::mem_layout::s_ModuleCount != -1);
-        assert_(util::mem_layout::s_ModuleCount <= util::mem_layout::s_MaxModules);
     }
 
     static Result TryGetAddressFromInfo(InfoType type, uintptr_t* ptr) {
@@ -135,7 +132,7 @@ static uintptr_t GetAddressFromInfo(InfoType type) {
     return addr;
 }
 
-    static Result InferAslrAndStack() {
+    static void InferAslrAndStack() {
         Result rc = svcUnmapMemory((void*)0xFFFFFFFFFFFFE000UL, (void*)0xFFFFFE000UL, 0x1000);
         if (R_VALUE(rc) == KERNELRESULT(InvalidMemoryState)) {
             // Invalid src-address error means that a valid 36-bit address was rejected.
@@ -151,10 +148,10 @@ static uintptr_t GetAddressFromInfo(InfoType type) {
         }
         else {
             // Wat.
-            return MAKERESULT(Module_Libnx, LibnxError_WeirdKernel);
+        panic_nx_("failed infer aslr and stack",
+                  MAKERESULT(Module_Libnx, LibnxError_WeirdKernel)
+                  );
         }
-
-        return result::Success;
     }
 
     static void FindRegions() {
@@ -174,7 +171,7 @@ static uintptr_t GetAddressFromInfo(InfoType type) {
            R_FAILED(TryGetAddressFromInfo(InfoType_StackRegionSize,     &util::mem_layout::s_Stack.m_Size))
         )
         {
-            assert_(R_SUCCEEDED(InferAslrAndStack()));
+            InferAslrAndStack();
         }
     }
 

@@ -8,7 +8,7 @@ namespace exl::armv8::inst::impl::op100x {
 
         static constexpr u8 Op0 = 0b010;
         
-        static const uint ImmShift  = 12;
+        static const u32 ImmShift  = 12;
         static const u32 MaskForImmShift = (1 << ImmShift) - 1;
 
         ACCESSOR(Sf,    31);

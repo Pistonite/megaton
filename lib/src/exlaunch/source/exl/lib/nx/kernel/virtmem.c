@@ -1,12 +1,13 @@
+#include <megaton/prelude.h>
 #include <stdlib.h>
 
-#include "../types.h"
-#include "../result.h"
+#include <switch/types.h>
+#include <switch/result.h>
 // #include "mutex.h"
-#include "svc.h"
-#include "virtmem.h"
+#include <switch/kernel/svc.h>
+#include <switch/kernel/virtmem.h>
 
-#include "../abort.h"
+#include "virtmem_setup.h"
 
 #define SEQUENTIAL_GUARD_REGION_SIZE 0x1000
 #define RANDOM_MAX_ATTEMPTS 0x200
@@ -34,11 +35,7 @@ static VirtmemReservation *g_Reservations;
 
 static bool g_IsLegacyKernel;
 
-uintptr_t __virtmem_rng(void) {
-    /* Lazy. */
-    extern u64 exl_random();
-    return exl_random();
-}
+uintptr_t __virtmem_rng(void);
 
 static Result _memregionInitWithInfo(MemRegion* r, InfoType id0_addr, InfoType id0_sz) {
     u64 base;
@@ -79,8 +76,9 @@ NX_INLINE bool _memregionIsMapped(uintptr_t start, uintptr_t end, uintptr_t guar
     MemoryInfo meminfo;
     u32 pageinfo;
     Result rc = svcQueryMemory(&meminfo, &pageinfo, start);
-    if (R_FAILED(rc))
-        exl_abort(MAKERESULT(Module_Libnx, LibnxError_BadQueryMemory));
+    if (R_FAILED(rc)) {
+        panic_nx_("libnx bad query memory", MAKERESULT(Module_Libnx, LibnxError_BadQueryMemory));
+    }
 
     // Return true if there's anything mapped.
     uintptr_t memend = meminfo.addr + meminfo.size;
@@ -161,22 +159,23 @@ void virtmemSetup(void) {
     rc = _memregionInitWithInfo(&g_AliasRegion, InfoType_AliasRegionAddress, InfoType_AliasRegionSize);
     if (R_FAILED(rc)) {
         // Wat.
-        exl_abort(MAKERESULT(Module_Libnx, LibnxError_WeirdKernel));
+        panic_nx_("virtmem setup: alias region failed", MAKERESULT(Module_Libnx, LibnxError_WeirdKernel));
     }
 
     // Retrieve memory region information for the reserved heap region.
     rc = _memregionInitWithInfo(&g_HeapRegion, InfoType_HeapRegionAddress, InfoType_HeapRegionSize);
     if (R_FAILED(rc)) {
         // Wat.
-        exl_abort(MAKERESULT(Module_Libnx, LibnxError_BadGetInfo_Heap));
+        panic_nx_("virtmem setup: heap region failed", MAKERESULT(Module_Libnx, LibnxError_BadGetInfo_Heap));
     }
 
     // Retrieve memory region information for the aslr/stack regions if available [2.0.0+]
     rc = _memregionInitWithInfo(&g_AslrRegion, InfoType_AslrRegionAddress, InfoType_AslrRegionSize);
     if (R_SUCCEEDED(rc)) {
         rc = _memregionInitWithInfo(&g_StackRegion, InfoType_StackRegionAddress, InfoType_StackRegionSize);
-        if (R_FAILED(rc))
-            exl_abort(MAKERESULT(Module_Libnx, LibnxError_BadGetInfo_Stack));
+        if (R_FAILED(rc)) {
+            panic_nx_("virtmem setup: stack region failed", MAKERESULT(Module_Libnx, LibnxError_BadGetInfo_Stack));
+        }
     }
     else {
         // [1.0.0] doesn't expose aslr/stack region information so we have to do this dirty hack to detect it.
@@ -197,7 +196,7 @@ void virtmemSetup(void) {
         }
         else {
             // Wat.
-            exl_abort(MAKERESULT(Module_Libnx, LibnxError_WeirdKernel));
+            panic_nx_("virtmem setup: init memory region failed", MAKERESULT(Module_Libnx, LibnxError_WeirdKernel));
         }
     }
 }

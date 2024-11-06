@@ -28,6 +28,11 @@ pub trait PathExt: Sized + AsRef<Path> {
         assert!(base.is_absolute());
         pathdiff::diff_paths(path, base).unwrap_or(path.to_path_buf())
     }
+
+    fn to_utf8(&self) -> Result<String, Error> {
+        self.as_ref().as_os_str().to_os_string().into_string()
+        .map_err(|_| report!(Error::NotUTF8(self.as_ref().display().to_string())))
+    }
 }
 
 impl PathExt for PathBuf {

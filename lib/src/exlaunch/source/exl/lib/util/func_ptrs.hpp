@@ -1,4 +1,5 @@
 #pragma once
+#include <megaton/prelude.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -53,7 +54,7 @@ namespace exl::util {
             }
 
             template<typename... Args>
-            ALWAYS_INLINE auto Call(T* _this, Args &&... args) const {
+            inline auto Call(T* _this, Args &&... args) const {
                 return GetPtr(_this)(_this, std::forward<Args>(args)...);
             }
         };
