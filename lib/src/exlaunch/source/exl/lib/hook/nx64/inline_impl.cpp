@@ -2,9 +2,8 @@
 
 #include <array>
 
-#include <exl/common.hpp>
 #include <exl/lib.hpp>
-#include <exl/usersetting.hpp>
+#include <exl/lib/hook/setting.hpp>
 
 #include "impl.hpp"
 

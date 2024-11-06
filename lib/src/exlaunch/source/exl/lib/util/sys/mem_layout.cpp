@@ -2,7 +2,6 @@
 #include <switch/result.h>
 
 #include <exl/lib/reloc/rtld.hpp>
-#include <exl/usersetting.hpp>
 
 #include "mem_layout.hpp"
     

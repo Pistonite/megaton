@@ -1,4 +1,3 @@
-#include <exl/common.hpp>
 
 #include "elf.hpp"
 #include "rtld.hpp"

@@ -4,8 +4,6 @@
 
 #include <megaton/prelude.h>
 
-#include <exl/common.hpp>
-
 namespace exl::util {
 
     struct Range {

@@ -1,8 +1,6 @@
 #pragma once
 #include <megaton/prelude.h>
 
-#include <exl/common.hpp>
-
 #include "base.hpp"
 
 #define HOOK_DEFINE_INLINE(name)                        \

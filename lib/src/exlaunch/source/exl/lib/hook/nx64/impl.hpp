@@ -1,6 +1,6 @@
 #pragma once
+#include <megaton/prelude.h>
 
-#include <exl/common.hpp>
 #include "inline_impl.hpp"
 
 namespace exl::hook::nx64 {

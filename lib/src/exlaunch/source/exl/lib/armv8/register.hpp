@@ -1,8 +1,6 @@
 #pragma once
 #include <megaton/prelude.h>
 
-#include <exl/common.hpp>
-
 namespace exl::armv8::reg {
     
     enum class RegisterKind : bool {

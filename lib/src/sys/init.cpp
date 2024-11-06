@@ -1,7 +1,5 @@
 #include <megaton/prelude.h>
 
-#include <exl/lib/nx/kernel/virtmem_setup.h>
-
 #include <exl/lib/util/sys/mem_layout.hpp>
 #include <exl/lib/patch/patcher_impl.hpp>
 #include <exl/lib/hook/base.hpp>
@@ -29,6 +27,10 @@ extern "C" {
         for (i = 0; i < count; i++)
             __init_array_start[i] ();
     }
+
+// from libnx
+// virtmem needed for RwPages
+void virtmemSetup(void);
 
     void __megaton_lib_init() {
         exl::util::impl::InitMemLayout();

@@ -1,9 +1,9 @@
 #pragma once
 #include <megaton/prelude.h>
 
-#include <exl/common.hpp>
 
-#include "util/math/bitset.hpp"
+#include "armv8/util/common.hpp"
+#include "armv8/util/bitset.hpp"
 #include "armv8/register.hpp"
 
 namespace exl::armv8 {

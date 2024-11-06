@@ -21,8 +21,6 @@
 #include <new>
 #include <memory>
 
-#include <exl/common.hpp>
-
 namespace exl::util {
 
     template<typename T, size_t Size = sizeof(T), size_t Align = alignof(T)>

@@ -34,7 +34,7 @@
 #include <switch/result.h>
 
 #include <exl/lib/util/sys/jit.hpp>
-#include <exl/usersetting.hpp>  
+#include <exl/lib/hook/setting.hpp>
 #include "inline_impl.hpp"
 
 

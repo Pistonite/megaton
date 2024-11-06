@@ -6,10 +6,6 @@
 #include <utility>
 #include <bit>
 
-#include <exl/common.hpp>
-
-#include "ptr_path.hpp"
-
 namespace exl::util {
 
     template<typename R, typename... A>

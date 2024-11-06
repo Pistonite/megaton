@@ -1,7 +1,5 @@
 #pragma once
 
-#include <exl/common.hpp>
-
 #include "modules.hpp"
 
 namespace exl::util::pointer_path {

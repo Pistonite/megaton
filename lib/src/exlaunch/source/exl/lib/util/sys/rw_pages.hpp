@@ -6,8 +6,6 @@
 #include <utility>
 /* #include <new> */
 
-#include <exl/common.hpp>
-
 namespace exl::util {
     
     class RwPages {
