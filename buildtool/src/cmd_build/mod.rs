@@ -18,7 +18,7 @@ pub struct Options {
     pub profile: String,
 
     /// Only build the compile database (compile_commands.json)
-    #[clap(short = 'D', long)]
+    #[clap(short = 'c', long)]
     pub compdb: bool,
 
     /// Build libmegaton instead of the current project

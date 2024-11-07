@@ -84,10 +84,6 @@ fn main_internal() -> Result<(), Error> {
     let includes = [&inc_root, &exl_inc_root, &env.libnx_include];
 
     let mut c_flags = flags::DEFAULT_C.to_vec();
-    // temp. no longer needed when EXL is refactored
-    c_flags.extend([
-        "-DEXL_PROGRAM_ID=0x0100000000000000",
-    ]);
 
     let include_flag = includes
         .iter()
@@ -108,6 +104,7 @@ fn main_internal() -> Result<(), Error> {
     ninja.variable("as_flags", &as_flags);
     ninja.variable("cc", &env.cc);
     ninja.variable("cxx", &env.cxx);
+    ninja.variable("ar", &env.get_dkp_bin("aarch64-none-elf-ar"));
 
     let rule_as = ninja
         .rule(
@@ -134,9 +131,18 @@ fn main_internal() -> Result<(), Error> {
         .deps_gcc()
         .description("CXX $out");
 
+    let rule_ar = ninja
+        .rule("ar", "$ar rcs $out $in")
+        .description("AR $out");
 
-    walk_directory(&src_root, &build_o_root_str, &rule_as, &rule_cc, &rule_cxx)
+
+    let mut objects = Vec::new();
+    walk_directory(&src_root, &build_o_root_str, &rule_as, &rule_cc, &rule_cxx, &mut objects)
         .change_context(Error::WalkDir)?;
+
+    let libmegaton = build_root.into_joined("libmegaton.a");
+
+    rule_ar.build([&libmegaton]).with(objects);
 
     let generator = ninja
         .rule(
@@ -161,6 +167,7 @@ fn walk_directory(
     rule_as: &RuleRef,
     rule_cc: &RuleRef,
     rule_cxx: &RuleRef,
+    objects: &mut Vec<String>,
 ) -> Result<(), Error> {
 
     for entry in std::fs::read_dir(src)
@@ -172,7 +179,7 @@ fn walk_directory(
             .attach_printable_lazy(|| format!("inside: {}", src.display()))?;
         let path = entry.path();
         if path.is_dir() {
-            walk_directory(&path, &build_o_root, rule_as, rule_cc, rule_cxx)?;
+            walk_directory(&path, &build_o_root, rule_as, rule_cc, rule_cxx, objects)?;
             continue;
         }
 
@@ -184,16 +191,16 @@ fn walk_directory(
         let object_file = format!("{}{}.o", build_o_root, source_file.name_hash);
         match source_file.typ {
             SourceType::C => {
-                rule_cc.build([object_file]).with([path]);
+                rule_cc.build([&object_file]).with([path]);
             }
             SourceType::Cpp => {
-                rule_cxx.build([object_file]).with([path]);
+                rule_cxx.build([&object_file]).with([path]);
             }
             SourceType::S => {
-                rule_as.build([object_file]).with([path]);
+                rule_as.build([&object_file]).with([path]);
             }
-
         }
+        objects.push(object_file.clone());
     }
 
     Ok(())

@@ -22,8 +22,8 @@ fn main() -> ExitCode {
         if cli.is_trace_on() {
             eprintln!("error: {:?}", e);
         } else {
-            errorln!("Fatal", "{}", e);
-            if !matches!(cli.command, Command::Build(_)) {
+            if cli.command.show_fatal_error_message() {
+                errorln!("Fatal", "Error: {}", e);
                 if cli.is_verbose_on() {
                     hintln!("Consider", "Running with --trace for more information");
                 } else {

@@ -21,3 +21,16 @@ tasks:
       - rm -f build/compile_commands.json
 
 
+  check:
+    desc: Check code for errors
+    cmds:
+      - clang-format -n -Werror $(find src -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
+      - clang-format -n -Werror $(find include -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
+      - clang-format -n -Werror $(find runtime -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
+
+  fix:
+    desc: Fix code
+    cmds:
+      - clang-format -i $(find src -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
+      - clang-format -i $(find include -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
+      - clang-format -i $(find runtime -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')

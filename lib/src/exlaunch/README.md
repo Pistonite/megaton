@@ -8,4 +8,6 @@ You should look at the original exlaunch repository for more information. Do not
 
 # Credit
 - Atmosphère: A great reference and guide.
-- oss-rtld: Included for (pending) interop with rtld in applications (License [here](https://github.com/shadowninja108/exlaunch/blob/main/source/lib/reloc/rtld/LICENSE.txt)).
+- oss-rtld: 
+Included for (pending) interop with rtld in applications
+(License [here](https://github.com/shadowninja108/exlaunch/blob/main/source/lib/reloc/rtld/LICENSE.txt)).

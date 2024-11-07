@@ -88,8 +88,22 @@ pub enum Command {
     Checkenv(CommonOptions),
     /// Install or update the build tool
     Install(crate::cmd_install::Options),
+    /// Format the code
+    Fmt(CommonOptions),
     /// Rustc options
     Rustc(CommonOptions),
+}
+
+impl Command {
+    pub fn show_fatal_error_message(&self) -> bool {
+        match self {
+            Self::Build(options) => {
+                // don't show too many error messages for regular build
+                options.compdb || options.lib
+            }
+            _ => true
+        }
+    }
 }
 
 impl std::ops::Deref for Command {
@@ -102,6 +116,7 @@ impl std::ops::Deref for Command {
             Command::Clean(x) => x,
             Command::Checkenv(x) => x,
             Command::Install(x) => x,
+            Command::Fmt(x) => x,
             Command::Rustc(x) => x,
         }
     }

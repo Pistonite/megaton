@@ -6,6 +6,8 @@ use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 
+use crate::{print, Unused};
+
 /// Default flags for `build.flags.common` in Megaton.toml
 pub static DEFAULT_COMMON: &[&str] = &[
     "-march=armv8-a+crc+crypto",
@@ -24,7 +26,6 @@ pub static DEFAULT_C: &[&str] = &[
     // strict
     "-Wall",
     "-Werror",
-    "-fdiagnostics-color=always", // todo: auto inject this
     // size optimization
     "-ffunction-sections",
     "-fdata-sections",
@@ -86,6 +87,9 @@ pub struct FlagConfig {
     #[serde(rename = "as")]
     pub as_: Option<Vec<String>>,
     pub ld: Option<Vec<String>>,
+
+    #[serde(flatten, default)]
+    pub unused: Unused,
 }
 
 macro_rules! create_flags {
@@ -130,7 +134,13 @@ macro_rules! create_flags {
 impl Flags {
     pub fn from_config(config: &FlagConfig) -> Self {
         let common = create_flags!(&config.common, DEFAULT_COMMON);
-        let cflags = create_flags!(&config.c, DEFAULT_C extends common);
+        let mut cflags = create_flags!(&config.c, DEFAULT_C extends common);
+
+        // no need to check if the flag already exists.. that's O(N)
+        // we already said in the docs don't do that
+        cflags.push(format!("-fdiagnostics-color={}", print::color_flag()));
+
+
         let cxxflags = create_flags!(&config.cxx, DEFAULT_CPP extends cflags);
         let sflags = create_flags!(&config.as_, DEFAULT_AS extends cxxflags);
         let ldflags = create_flags!(&config.ld, DEFAULT_LD extends common);

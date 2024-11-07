@@ -1,5 +1,5 @@
 //! Config structures
-use buildcommon::prelude::*;
+use buildcommon::{prelude::*, Unused};
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -9,17 +9,34 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 
+fn default_true() -> bool {
+    true
+}
+
 /// Config data read from Megaton.toml
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Config {
     /// The `[module]` section
+    ///
+    /// Basic module info
     pub module: Module,
 
+    /// The `[profile]` section
+    ///
+    /// Configure behavior when selecting profile from command line
+    pub profile: ProfileConfig,
+
     /// The `[build]` section
+    ///
+    /// Specify options for building C/C++/assembly project code
+    /// and linking the module
     pub build: ProfileContainer<Build>,
 
     /// The `[check]` section (for checking unresolved dynamic symbols)
     pub check: Option<ProfileContainer<Check>>,
+
+    #[serde(flatten, default)]
+    unused: Unused,
 }
 
 error_context!(pub LoadConfig, |r| -> Error {
@@ -33,12 +50,20 @@ impl Config {
     pub fn from_path(path: impl AsRef<Path>) -> ResultIn<Self, LoadConfig> {
         let config = system::read_file(path)?;
         // print pretty toml error
-        let config = toml::from_str(&config).map_err(|e| {
+        let config: Self = toml::from_str(&config).map_err(|e| {
             for line in e.to_string().lines() {
                 errorln!("Error", "{}", line);
             }
             e
         })?;
+
+        config.unused.check();
+        config.module.unused.check_prefixed("module");
+        config.profile.unused.check_prefixed("profile");
+        config.build.unused.check_prefixed("build");
+        if let Some(check) = &config.check {
+            check.unused.check_prefixed("check");
+        }
 
         Ok(config)
     }
@@ -52,14 +77,9 @@ pub struct Module {
     pub name: String,
     /// The title ID as a 64-bit integer, used for generating the npdm file.
     pub title_id: u64,
-    /// Set the profile to use when profile is "none"
-    ///
-    /// If `Some("")`, a profile must be specified in command line or megaton will error
-    pub default_profile: Option<String>,
 
-    /// Disable the base (`none`) profile from being used
-    #[serde(default)]
-    pub disallow_base_profile: bool,
+    #[serde(flatten, default)]
+    unused: Unused,
 }
 
 impl Module {
@@ -67,15 +87,32 @@ impl Module {
     pub fn title_id_hex(&self) -> String {
         format!("{:016x}", self.title_id)
     }
+}
 
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct ProfileConfig {
+    /// Set the profile to use when profile is "none"
+    ///
+    /// If `Some("")`, a profile must be specified in command line or megaton will error
+    pub default: Option<String>,
+
+    /// Allow the base (`none`) profile to be used
+    #[serde(default= "default_true")]
+    pub allow_base: bool,
+
+    #[serde(flatten, default)]
+    unused: Unused,
+}
+
+impl ProfileConfig {
     /// Select profile based on command line and config
     ///
     /// Prints formatted error message on failure
-    pub fn select_profile<'a, 'b>(&'a self, cli_profile: &'b str) -> Result<&'a str, Error>
+    pub fn resolve<'a, 'b>(&'a self, cli_profile: &'b str) -> Result<&'a str, Error>
     where
         'b: 'a, // lifetime: cli should live longer since that's parsed before config
     {
-        let profile = match (cli_profile, &self.default_profile) {
+        let profile = match (cli_profile, &self.default) {
             ("none", Some(p)) if p.is_empty() => {
                 // default-profile = "" means to disallow no profile
                 errorln!("Error", "No profile specified");
@@ -88,7 +125,7 @@ impl Module {
             (profile, _) => profile,
         };
 
-        if self.disallow_base_profile && profile == "none" {
+        if !self.allow_base && profile == "none" {
             errorln!("Error", "Base profile is disallowed");
             hintln!(
                 "Consider",
@@ -124,15 +161,25 @@ impl Module {
 //         }
 //     }
 // }
+//
 
 /// Config in the `[build]` section
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Build {
-    /// Entry point symbol for the module
+    /// Whether to use libmegaton (default is true)
     ///
-    /// This value is not optional, but marked as optional so
-    /// we give a more descriptive error (rather than a TOML parse error)
+    /// If false, the module won't link with libmegaton and its dependencies,
+    /// and you won't be able to use megaton's runtime features. This is useful
+    /// if you want to bring your own runtime. Note that this is required for 
+    /// Rust support
+    ///
+    /// If libmegaton is not used, you also must set [`entry`](Self::entry) to the
+    /// name of the entrypoint function
+    #[serde(default = "default_true")]
+    pub libmegaton: bool,
+
+    /// Entry point symbol for the module. Only used if `libmegaton` is false
     pub entry: Option<String>,
 
     /// C/C++ Source directories, relative to Megaton.toml
@@ -143,19 +190,54 @@ pub struct Build {
     #[serde(default)]
     pub includes: Vec<String>,
 
-    /// Library paths
+    /// Additional Library paths
     #[serde(default)]
     pub libpaths: Vec<String>,
 
-    /// Libraries to link with
+    /// Additional Libraries to link with
     #[serde(default)]
     pub libraries: Vec<String>,
 
-    /// Linker scripts
+    /// Additional Linker scripts
     #[serde(default)]
     pub ldscripts: Vec<String>,
 
     pub flags: FlagConfig,
+
+    #[serde(flatten, default)]
+    unused: Unused,
+}
+
+impl Build {
+    /// Validate config values
+    pub fn check(&self) -> Result<(), Error> {
+        if self.libmegaton {
+            if self.entry.is_some() {
+                errorln!("Error", "Entry point specified with libmegaton enabled");
+                hintln!("Consider", "Set `build.libmegaton` to false if you want to use your own entry point with no runtime");
+                return Err(report!(Error::BadRuntime))
+                .attach_printable("entry point should not be specified when using libmegaton");
+            }
+        } else {
+            if self.entry.is_none() {
+                errorln!("Error", "Entry point not specified");
+                hintln!("Consider", "Set `build.libmegaton` to true to use libmegaton runtime");
+                hintln!("Consider", "Or specify an entry point with `build.entry`");
+                return Err(report!(Error::BadRuntime))
+                .attach_printable("entry point must be specified when not using libmegaton");
+            }
+        }
+        self.unused.check_prefixed("build");
+        self.flags.unused.check_prefixed("build.flags");
+        Ok(())
+    }
+
+    pub fn entry_point(&self) -> &str {
+        match &self.entry {
+            Some(entry) => entry,
+            None => "megaton_main",
+        }
+    }
 }
 
 impl Profilable for Build {
@@ -216,6 +298,15 @@ pub struct Check {
     /// Extra instructions to disallow (like `"msr"`). Values are regular expressions.
     #[serde(default)]
     pub disallowed_instructions: Vec<String>,
+
+    #[serde(flatten, default)]
+    unused: Unused,
+}
+
+impl Check {
+    pub fn check(&self) {
+        self.unused.check_prefixed("check");
+    }
 }
 
 impl Profilable for Check {
@@ -241,6 +332,9 @@ where
     /// The extended profiles
     #[serde(default)]
     profiles: BTreeMap<String, T>,
+
+    #[serde(default, flatten)]
+    unused: Unused,
 }
 
 impl<T> ProfileContainer<T>
@@ -268,3 +362,4 @@ pub trait Profilable {
     /// Extend this config section with another
     fn extend(&mut self, other: &Self);
 }
+

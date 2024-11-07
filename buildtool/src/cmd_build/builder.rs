@@ -1,9 +1,10 @@
 //! Build flags processing
 use buildcommon::prelude::*;
 use buildcommon::source::{SourceFile, SourceType};
+use filetime::FileTime;
 
 use std::io::BufRead;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use buildcommon::env::ProjectEnv;
 use buildcommon::flags::Flags;
@@ -18,6 +19,7 @@ use super::config::Build;
 pub struct Builder<'a> {
     env: &'a ProjectEnv,
     flags: Flags,
+    pub source_dirs: Vec<PathBuf>,
 }
 
 error_context!(pub BuilderNew, |r| -> Error {
@@ -25,40 +27,160 @@ error_context!(pub BuilderNew, |r| -> Error {
     r.change_context(Error::BuildPrep)
 });
 impl<'a> Builder<'a> {
-    pub fn new(env: &'a ProjectEnv, entry: &str, build: &Build) -> ResultIn<Self, BuilderNew> {
+    pub fn new(env: &'a ProjectEnv, build: &Build) -> ResultIn<Self, BuilderNew> {
+        build.check()?;
         let mut flags = Flags::from_config(&build.flags);
+        let mut source_dirs = Vec::with_capacity(build.sources.len() + 1);
+
+        if build.libmegaton {
+            let lib_path = env.megaton_home.join("lib");
+
+            flags.add_includes([lib_path.join("include").display()]);
+
+            let runtime_source = lib_path.into_joined("runtime");
+
+            source_dirs.push(runtime_source);
+        }
+
+        // always include libnx includes
+        flags.add_includes([env.libnx_include.display()]);
 
         let mut includes = Vec::with_capacity(build.includes.len() + 1);
-        includes.push(format!("-I{}", env.libnx_include.display()));
         for dir in &build.includes {
             let path = env.root.join(dir).to_abs()?;
-            includes.push(format!("-I{}", path.display()));
+            includes.push(path.display().to_string());
         }
 
         flags.add_includes(includes);
-        flags.set_init(entry);
-        flags.set_version_script(env.verfile.display());
-        flags.add_libpaths(
+
+
+        for source_dir in &build.sources {
+            source_dirs.push(env.root.join(source_dir));
+        }
+
+
+        Ok(Self { env, flags, source_dirs })
+    }
+
+    pub fn check_lib_changed(&self, build: &Build, elf_mtime: Option<FileTime>) -> Result<bool, Error> {
+        if build.libmegaton {
+            let libmegaton_path = self.env.megaton_home.join("lib").into_joined("build")
+            .into_joined("bin").into_joined("libmegaton.a");
+
+            if !libmegaton_path.exists() {
+                errorln!("Failed", "libmegaton is not built!");
+                hintln!("Consider", "Build it with `megaton build --lib`");
+                return Err(report!(Error::Dependency));
+            }
+
+            match system::get_mtime(libmegaton_path) {
+                Ok(mtime) => {
+                    if !system::up_to_date(mtime, elf_mtime) {
+                        verboseln!("relinking because libmegaton changed");
+                        return Ok(true);
+                    }
+                }
+                Err(e) => {
+                    verboseln!("failed to get mtime of libmegaton: {}", e);
+                    return Ok(true);
+                }
+            }
+
+            // check libnx
+            let libnx_path = self.env.libnx_lib.join("libnx.a");
+            if !libnx_path.exists() {
+                errorln!("Failed", "libnx is not found");
+                hintln!("Consider", "If it is installed, try refresh the environment with `megaton checkenv`");
+                return Err(report!(Error::Dependency));
+            }
+
+            match system::get_mtime(libnx_path) {
+                Ok(mtime) => {
+                    if !system::up_to_date(mtime, elf_mtime) {
+                        verboseln!("relinking because libnx changed");
+                        return Ok(true);
+                    }
+                }
+                Err(e) => {
+                    verboseln!("failed to get mtime of libnx: {}", e);
+                    return Ok(true);
+                }
+            }
+        }
+
+        // check if any other lib changed
+        for libpath in &build.libpaths {
+            for lib in &build.libraries {
+                let lib_path = self.env.root.join(libpath).join(format!("lib{}.a", lib));
+                if lib_path.exists() {
+                    match system::get_mtime(lib_path) {
+                        Ok(mtime) => {
+                            if !system::up_to_date(mtime, elf_mtime) {
+                                verboseln!("relinking because lib{} changed", lib);
+                                return Ok(true);
+                            }
+                        }
+                        Err(e) => {
+                            verboseln!("failed to get mtime of libpath: {}", e);
+                            return Ok(true);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(false)
+    }
+
+    pub fn configure_linker(&mut self, build: &Build) -> Result<(), Error> {
+
+        self.flags.set_init(build.entry_point());
+        self.flags.set_version_script(self.env.verfile.display());
+
+        if build.libmegaton {
+            let lib_path = self.env.megaton_home.join("lib");
+            let libmegaton_path = lib_path.join("build")
+            .into_joined("bin");
+            self.flags.add_libpaths([
+                libmegaton_path.display(),
+                self.env.libnx_lib.display(),
+            ]);
+
+            let libmegaton = libmegaton_path.into_joined("libmegaton.a");
+            if !libmegaton.exists() {
+                errorln!("Failed", "libmegaton is not built!");
+                hintln!("Consider", "Build it with `megaton build --lib`");
+                return Err(report!(Error::Dependency));
+            }
+
+            self.flags.add_libraries(["megaton", "nx"]);
+
+            let runtime_source = lib_path.into_joined("runtime");
+
+            self.flags.add_ldscripts([
+                runtime_source.into_joined("link.ld").display(),
+            ]);
+        }
+
+        self.flags.add_libpaths(
             build
                 .libpaths
                 .iter()
-                .map(|libpath| env.root.join(libpath).to_abs())
-                .collect::<Result<Vec<_>, _>>()?
-                .iter()
-                .map(|path| path.display()),
+                .map(|libpath| self.env.root.join(libpath))
+                .collect::<Vec<_>>()
+                .iter().map(|x| x.display())
         );
-        flags.add_libraries(&build.libraries);
-        flags.add_ldscripts(
+        self.flags.add_libraries(&build.libraries);
+        self.flags.add_ldscripts(
             build
                 .ldscripts
                 .iter()
-                .map(|ldscript| env.root.join(ldscript).to_abs())
-                .collect::<Result<Vec<_>, _>>()?
-                .iter()
-                .map(|path| path.display()),
+                .map(|ldscript| self.env.root.join(ldscript))
+                .collect::<Vec<_>>()
+                .iter().map(|x| x.display())
         );
 
-        Ok(Self { env, flags })
+        Ok(())
     }
 
     fn create_command(
@@ -232,42 +354,6 @@ pub fn load_compile_commands(cc_json: &Path, map: &mut FxHashMap<String, Compile
         map.insert(cc.output.clone(), cc);
     }
 }
-
-// pub enum SourceType {
-//     C,
-//     Cpp,
-//     S,
-// }
-//
-// impl SourceType {
-//     pub fn from_ext(ext: &str) -> Option<Self> {
-//         match ext {
-//             ".c" => Some(Self::C),
-//             ".cpp" | ".cc" | ".cxx" | ".c++" => Some(Self::Cpp),
-//             ".s" | ".asm" => Some(Self::S),
-//             _ => None,
-//         }
-//     }
-// }
-//
-// fn get_source_type(source: &str) -> Option<(SourceType, &str, &str)> {
-//     let dot = source.rfind('.').unwrap_or(source.len());
-//     let ext = &source[dot..];
-//     let source_type = SourceType::from_ext(ext)?;
-//     let slash = source.rfind(|c| c == '/' || c == '\\').unwrap_or(0);
-//     let base = &source[slash + 1..dot];
-//     if base.is_empty() {
-//         return None;
-//     }
-//     Some((source_type, base, ext))
-// }
-//
-// fn source_hashed(source: &str, base: &str, ext: &str) -> String {
-//     let mut hasher = FxHasher::default();
-//     source.hash(&mut hasher);
-//     let hash = hasher.finish();
-//     format!("{}-{:016x}{}", base, hash, ext)
-// }
 
 fn are_deps_up_to_date(d_path: &Path, o_path: &Path) -> Result<bool, system::Error> {
     if !d_path.exists() {

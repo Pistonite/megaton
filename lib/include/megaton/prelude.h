@@ -5,9 +5,9 @@
  */
 #pragma once
 
-#include <stdint.h>
-#include <stddef.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 /**
  * @file switch/types.h
@@ -38,12 +38,10 @@ typedef volatile s32 vs32;   ///<  32-bit volatile signed integer.
 typedef volatile s64 vs64;   ///<  64-bit volatile signed integer.
 typedef volatile s128 vs128; ///< 128-bit volatile signed integer.
 
-
 typedef size_t usize;
 
-
 /** #[inline(never)] */
-#define inline_never_  __attribute__((noinline))
+#define inline_never_ __attribute__((noinline))
 /** #[inline(always)] */
 #define inline_always_ __attribute__((always_inline)) static inline
 
@@ -53,4 +51,3 @@ typedef size_t usize;
 // prelude headers
 
 #include <megaton/panic_abort.h>
-

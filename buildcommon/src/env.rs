@@ -305,6 +305,11 @@ pub struct RootEnv {
     /// Should be at $DEVKITPRO/libnx/include
     pub libnx_include: PathBuf,
 
+    /// Path to the libnx lib directory
+    ///
+    /// Should be at $DEVKITPRO/libnx/lib
+    pub libnx_lib: PathBuf,
+
     /// Path to npdmtool
     ///
     /// Should be at $DEVKITPRO/tools/bin/npdmtool
@@ -324,7 +329,10 @@ pub struct RootEnv {
 impl From<Env> for RootEnv {
     fn from(env: Env) -> Self {
         let devkitpro = &env.devkitpro;
-        let libnx_include = devkitpro.join("libnx").into_joined("include");
+        let libnx = devkitpro.join("libnx");
+
+        let libnx_include = libnx.join("include");
+        let libnx_lib = libnx.into_joined("lib");
 
         let devkita64_bin = devkitpro.join("devkitA64").into_joined("bin");
         let cc = devkita64_bin.join("aarch64-none-elf-gcc");
@@ -340,11 +348,25 @@ impl From<Env> for RootEnv {
             cc,
             cxx,
             libnx_include,
+            libnx_lib,
             npdmtool,
             objdump,
             elf2nso,
         }
     }
+}
+
+macro_rules! check_dkp_tool {
+    ($ok:ident, $path:expr, $tool:literal) => {
+        match which::which($path) {
+            Ok(p) if &p == $path => infoln!("OK", concat!("Found ", $tool)),
+            _ => {
+                $ok = false;
+                errorln!("Missing", $tool);
+                hintln!("Fix", "(Re-)install DevKitPro");
+            }
+        }
+    };
 }
 
 impl RootEnv {
@@ -359,52 +381,37 @@ impl RootEnv {
             hintln!("Fix", "(Re-)install DevKitPro");
         }
 
-        match which::which(&self.cc) {
-            Ok(p) if p == self.cc => infoln!("OK", "Found aarch64-none-elf-gcc"),
-            _ => {
-                ok = false;
-                errorln!("Missing", "aarch64-none-elf-gcc");
-                hintln!("Fix", "(Re-)install DevKitPro");
-            }
+        let libnx = self.libnx_lib.join("libnx.a");
+        if libnx.exists() {
+            infoln!("OK", "Found libnx.a");
+        } else {
+            ok = false;
+            errorln!("Missing", "libnx.a");
+            hintln!("Fix", "(Re-)install DevKitPro");
         }
 
-        match which::which(&self.cxx) {
-            Ok(p) if p == self.cxx => infoln!("OK", "Found aarch64-none-elf-g++"),
-            _ => {
-                ok = false;
-                errorln!("Missing", "aarch64-none-elf-g++");
-                hintln!("Fix", "(Re-)install DevKitPro");
-            }
-        }
+        check_dkp_tool!(ok, &self.cc, "aarch64-none-elf-gcc");
+        check_dkp_tool!(ok, &self.cxx, "aarch64-none-elf-g++");
+        check_dkp_tool!(ok, &self.objdump, "aarch64-none-elf-objdump");
 
-        match which::which(&self.objdump) {
-            Ok(p) if p == self.objdump => infoln!("OK", "Found aarch64-none-elf-objdump"),
-            _ => {
-                ok = false;
-                errorln!("Missing", "aarch64-none-elf-objdump");
-                hintln!("Fix", "(Re-)install DevKitPro");
-            }
-        }
+        let ar = self.get_dkp_bin("aarch64-none-elf-ar");
+        check_dkp_tool!(ok, &ar, "aarch64-none-elf-ar");
 
-        match which::which(&self.elf2nso) {
-            Ok(p) if p == self.elf2nso => infoln!("OK", "Found elf2nso"),
-            _ => {
-                ok = false;
-                errorln!("Missing", "elf2nso");
-                hintln!("Fix", "(Re-)install DevKitPro");
-            }
-        }
+        let as_ = self.get_dkp_bin("aarch64-none-elf-as");
+        check_dkp_tool!(ok, &as_, "aarch64-none-elf-as");
 
-        match which::which(&self.npdmtool) {
-            Ok(p) if p == self.npdmtool => infoln!("OK", "Found npdmtool"),
-            _ => {
-                ok = false;
-                errorln!("Missing", "npdmtool");
-                hintln!("Fix", "(Re-)install DevKitPro");
-            }
-        }
+        check_dkp_tool!(ok, &self.elf2nso, "elf2nso");
+        check_dkp_tool!(ok, &self.npdmtool, "npdmtool");
 
         Ok(ok)
+    }
+
+    /// Get path to additional tool in DevKitPro
+    ///
+    /// Tools not used during a project build is not automatically initialized
+    /// and cached to help with build performance
+    pub fn get_dkp_bin(&self, tool: &str) -> PathBuf {
+        self.devkitpro.join("devkitA64").into_joined("bin").into_joined(tool)
     }
 }
 

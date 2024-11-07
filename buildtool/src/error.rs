@@ -27,10 +27,12 @@ pub enum Error {
     Config,
     #[error("no profile selected")]
     NoProfile,
-    #[error("no entry point specified")]
-    NoEntryPoint,
+    #[error("bad runtime configuration")]
+    BadRuntime,
 
     // build:prep
+    #[error("build dependency not satisfied")]
+    Dependency,
     #[error("error when preparing build")]
     BuildPrep,
     #[error("error when processing source files")]

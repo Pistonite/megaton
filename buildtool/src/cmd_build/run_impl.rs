@@ -25,7 +25,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
     let root = env::find_root(dir).change_context(Error::Config)?;
     let megaton_toml = root.join("Megaton.toml");
     let config = Config::from_path(&megaton_toml)?;
-    let profile = config.module.select_profile(options.profile.as_str())?;
+    let profile = config.profile.resolve(options.profile.as_str())?;
     let env =
         ProjectEnv::load(home, root, profile, &config.module.name).change_context(Error::Config)?;
 
@@ -40,7 +40,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
     let npdm_mtime = system::get_mtime(&npdm_json).change_context(Error::BuildPrep)?;
     let megaton_toml_changed = !system::up_to_date(megaton_toml_mtime, npdm_mtime);
 
-    if megaton_toml_changed {
+    if megaton_toml_changed && !options.compdb{
         let target = env.target.clone();
         let npdmtool = env.npdmtool.clone();
         let title_id = config.module.title_id_hex();
@@ -53,15 +53,6 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
     }
 
     let build = config.build.get_profile(profile);
-    let entry = match build.entry.as_ref() {
-        Some(entry) => entry,
-        None => {
-            errorln!("Error", "No entry point specified");
-            hintln!("Fix", "Please specify `build.entry` in `Megaton.toml`");
-            return Err(report!(Error::NoEntryPoint))
-                .attach_printable("Please specify `build.entry` in `Megaton.toml`");
-        }
-    };
 
     let cc_possibly_changed = megaton_toml_changed;
     let mut compile_commands = FxHashMap::default();
@@ -71,7 +62,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
         // this will only load when Megaton.toml changes
         load_compile_commands(&env.cc_json, &mut compile_commands);
     }
-    let builder = Builder::new(&env, entry, &build)?;
+    let mut builder = Builder::new(&env, &build)?;
     // if any .o files were rebuilt
     let mut objects_changed = false;
     // all .o files
@@ -79,8 +70,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
     let mut cc_tasks = Vec::new();
 
     // fire off all cc tasks
-    for source_dir in &build.sources {
-        let source_dir = env.root.join(source_dir);
+    for source_dir in &builder.source_dirs {
         for entry in WalkDir::new(source_dir).into_iter().flatten() {
             let source_path = entry.path();
             let cc = builder
@@ -102,40 +92,50 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
             objects.push(cc.output.clone());
             let source_display = env.from_root(&source_path).display().to_string();
             let child = cc.create_child();
-            let task = executor.execute(move || {
-                infoln!("Compiling", "{}", source_display);
-                let child = child.spawn()?;
-                let result = child.wait()?;
-                if !result.is_success() {
-                    verboseln!("failed to build '{}'", source_display);
-                } else {
-                    verboseln!("built '{}'", source_display);
-                }
-                Ok::<_, Report<system::Error>>(result)
-            });
+            if !options.compdb {
+                let task = executor.execute(move || {
+                    infoln!("Compiling", "{}", source_display);
+                    let child = child.spawn()?;
+                    let result = child.wait()?;
+                    if !result.is_success() {
+                        verboseln!("failed to build '{}'", source_display);
+                    } else {
+                        verboseln!("built '{}'", source_display);
+                    }
+                    Ok::<_, Report<system::Error>>(result)
+                });
+                cc_tasks.push(task);
+            }
             new_compile_commands.push(cc);
-            cc_tasks.push(task);
         }
     }
 
-    let verfile_task = if megaton_toml_changed {
+    let verfile_task = if megaton_toml_changed && !options.compdb{
         let verfile = env.verfile.clone();
-        let entry = entry.clone();
+        let entry = build.entry_point().to_string();
         Some(executor.execute(move || create_verfile(verfile, entry)))
     } else {
         None
     };
 
     // if compiled, save cc_json
-    let save_cc_json_task = if objects_changed || !compile_commands.is_empty() {
+    let save_cc_json_task = if objects_changed || !compile_commands.is_empty() || options.compdb {
         let file = system::buf_writer(&env.cc_json).change_context(Error::CompileDb)?;
-        Some(executor.execute(move || {
+        let task = executor.execute(move || {
             verboseln!("saving compile_commands.json");
             serde_json::to_writer_pretty(file, &new_compile_commands)
                 .change_context(Error::CompileDb)?;
             verboseln!("saved compile_commands.json");
             Ok::<_, Report<Error>>(())
-        }))
+        });
+        if options.compdb {
+            if let Err(e) = task.wait() {
+                errorln!("Error", "Failed to save compile_commands.json");
+                Err(e.change_context(Error::CompileDb))?;
+            }
+            return Ok(());
+        }
+        Some(task)
     } else {
         None
     };
@@ -178,7 +178,8 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
             }
         }
     }
-    // objects can be newer than elf even if not changed
+    // objects can be newer than elf even if not recompiled
+    // i.e. built in a previous run, but linking failed
     // note that even if compile is in progress, this works
     if !needs_linking {
         match system::get_mtime(&env.elf) {
@@ -204,7 +205,25 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
             }
         }
     }
-    // TODO: libs can change
+    // search for libs and see if they changed, etc..
+    // this is somewhat expensive, but this only needs to be done
+    // if linking is still not yet needed after all previous checks,
+    if !needs_linking {
+        match system::get_mtime(&env.elf) {
+            Ok(elf_mtime) => {
+        needs_linking = builder.check_lib_changed(&build, elf_mtime)?;
+        }
+        Err(e) => {
+            needs_linking = true;
+            verboseln!("failed to get mtime of elf: {}", e);
+        }
+        }
+    }
+
+    if needs_linking {
+        builder.configure_linker(&build)?;
+    }
+
 
     let check_config = config.check.as_ref().map(|c| c.get_profile(profile));
 
@@ -255,7 +274,10 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
 
     // eagerly load checker if checking is needed
     let checker = match (needs_nso || needs_linking, check_config) {
-        (true, Some(check)) => Some(checker::load(&env, check, &executor)?),
+        (true, Some(check)) => {
+            check.check();
+            Some(checker::load(&env, check, &executor)?)
+        }
         _ => None,
     };
 
