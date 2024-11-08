@@ -95,27 +95,6 @@ impl<'a> Builder<'a> {
                     return Ok(true);
                 }
             }
-
-            // check libnx
-            let libnx_path = self.env.libnx_lib.join("libnx.a");
-            if !libnx_path.exists() {
-                errorln!("Failed", "libnx is not found");
-                hintln!("Consider", "If it is installed, try refresh the environment with `megaton checkenv`");
-                return Err(report!(Error::Dependency));
-            }
-
-            match system::get_mtime(libnx_path) {
-                Ok(mtime) => {
-                    if !system::up_to_date(mtime, elf_mtime) {
-                        verboseln!("relinking because libnx changed");
-                        return Ok(true);
-                    }
-                }
-                Err(e) => {
-                    verboseln!("failed to get mtime of libnx: {}", e);
-                    return Ok(true);
-                }
-            }
         }
 
         // check if any other lib changed
@@ -151,10 +130,6 @@ impl<'a> Builder<'a> {
             let lib_path = self.env.megaton_home.join("lib");
             let libmegaton_path = lib_path.join("build")
             .into_joined("bin");
-            // self.flags.add_libpaths([
-            //     libmegaton_path.display(),
-            //     self.env.libnx_lib.display(),
-            // ]);
 
             let libmegaton = libmegaton_path.into_joined("libmegaton.a");
             if !libmegaton.exists() {
@@ -164,9 +139,6 @@ impl<'a> Builder<'a> {
             }
 
             self.lib_objects.push(libmegaton.display().to_string());
-            self.lib_objects.push(self.env.libnx_lib.join("libnx.a").display().to_string());
-
-            // self.flags.add_libraries(["megaton", "nx"]);
 
             let runtime_source = lib_path.into_joined("runtime");
 
@@ -280,11 +252,13 @@ impl<'a> Builder<'a> {
         let d_file = d_path.to_utf8()?;
         if !o_path.exists() {
             // output doesn't exist
+            verboseln!("will compile '{}' (output doesn't exist)", source_file.path);
             let cc = self.create_command(source_file, d_file, o_file);
             return Ok(SourceResult::NeedCompile(cc));
         }
         // d file changed? (source included in d_file)
         if !are_deps_up_to_date(&d_path, &o_path)? {
+            verboseln!("will compile '{}' (deps outdated)", source_file.path);
             let cc = self.create_command(source_file, d_file, o_file);
             return Ok(SourceResult::NeedCompile(cc));
         }
@@ -298,11 +272,13 @@ impl<'a> Builder<'a> {
                 if old_cc == cc {
                     Ok(SourceResult::UpToDate(cc.output))
                 } else {
+                    verboseln!("will compile '{}' (command changed)", cc.file);
                     Ok(SourceResult::NeedCompile(cc))
                 }
             }
             None => {
                 // no previous command found, (never built), need build
+                verboseln!("will compile '{}' (never built)", cc.file);
                 Ok(SourceResult::NeedCompile(cc))
             }
         }
@@ -378,9 +354,11 @@ fn are_deps_up_to_date(d_path: &Path, o_path: &Path) -> Result<bool, system::Err
     // - the first line is just the target
     let o_mtime = system::get_mtime(o_path)?;
     let file = system::buf_reader(d_path)?;
+
+    let mut file_name_buf = String::new();
     let lines = file.lines();
+    // skip the <target>: \ line
     for line in lines.skip(1) {
-        // skip the <target>: \ line
         let line = match line {
             Ok(x) => x,
             Err(_) => return Ok(false),
@@ -389,10 +367,31 @@ fn are_deps_up_to_date(d_path: &Path, o_path: &Path) -> Result<bool, system::Err
         if part.ends_with(':') {
             break;
         }
-        let d_mtime = system::get_mtime(part)?;
-        if !system::up_to_date(d_mtime, o_mtime) {
-            return Ok(false);
+        // 1. there could be multiple files per line
+        // 2. there could be spaces in the file name, escaped by \
+        for file_part in part.split(' ') {
+            // handle escape
+            if let Some(file_part) = file_part.strip_suffix('\\') {
+                // copy is unavoidable to undo the escape
+                // don't put spaces in your file names!
+                file_name_buf.push_str(file_part);
+                file_name_buf.push(' ');
+                continue;
+            }
+            let d_mtime = if file_name_buf.is_empty() {
+                system::get_mtime(file_part)?
+            } else {
+                file_name_buf.push_str(file_part);
+                let t = system::get_mtime(&file_name_buf)?;
+                file_name_buf.clear();
+                t
+            };
+            if !system::up_to_date(d_mtime, o_mtime) {
+                return Ok(false);
+            }
         }
+
+
     }
     Ok(true)
 }

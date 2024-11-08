@@ -343,10 +343,21 @@ pub fn run(
             infoln!("Checking", "{}", elf_name);
             let missing_symbols = checker.check_symbols(&executor)?;
             let bad_instructions = checker.check_instructions(&executor)?;
-            let missing_symbols = missing_symbols.wait()?;
+            let mut missing_symbols = missing_symbols.wait()?;
             let bad_instructions = bad_instructions.wait()?;
             let mut check_ok = true;
             if !missing_symbols.is_empty() {
+                missing_symbols.sort_by(|a, b| {
+                    // ignore the leading _Zxxx
+                    fn strip(s: &str) -> &str {
+                        if s.starts_with("_Z") {
+                            &s[2..].trim_start_matches(|c: char| c.is_digit(10))
+                        } else {
+                            s
+                        }
+                    }
+                    strip(a).cmp(strip(b))
+                });
                 errorln!("Error", "There are unresolved symbols:");
                 errorln!("Error", "");
                 for symbol in missing_symbols.iter().take(10) {

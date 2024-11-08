@@ -28,7 +28,7 @@ __module_start:
     .align 4
     .ascii "~~exlaunch uwu~~"
 
-entrypoint:
+__crt_phase_user_mode_exception:
     // Arguments on NSO entry:
     //   x0=zero                  | x1=main thread handle
     // Arguments on NRO entry (homebrew ABI):

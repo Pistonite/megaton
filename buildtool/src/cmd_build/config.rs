@@ -176,7 +176,7 @@ impl ProfileConfig {
 pub struct Build {
     /// Whether to use libmegaton (default is true)
     ///
-    /// If false, the module won't link with libmegaton and its dependencies,
+    /// If false, the module won't link with libmegaton
     /// and you won't be able to use megaton's runtime features. This is useful
     /// if you want to bring your own runtime. Note that this is required for 
     /// Rust support

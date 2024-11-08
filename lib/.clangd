@@ -1,5 +1,5 @@
 CompileFlags:
-  Compiler: /usr/bin/g++
+  Compiler: /usr/bin/gcc
   CompilationDatabase: ./build
   Remove:
   - -m*          # for some reason clangd does not like the -m flags

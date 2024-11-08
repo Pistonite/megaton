@@ -83,7 +83,13 @@ fn main_internal() -> Result<(), Error> {
 
     let includes = [&inc_root, &exl_inc_root, &env.libnx_include];
 
-    let mut c_flags = flags::DEFAULT_C.to_vec();
+    // let mut c_flags = flags::DEFAULT_C.to_vec();
+    let mut c_flags = vec![
+        "-Wall",
+        "-Werror",
+        "-O3",
+    ];
+    c_flags.push("-DMEGATON_LIB");
 
     let include_flag = includes
         .iter()
@@ -93,10 +99,14 @@ fn main_internal() -> Result<(), Error> {
 
     c_flags.push(&include_flag);
 
-    let c_flags = c_flags.join(" ");
+    let mut c_flags = c_flags.join(" ");
+    let mut cxx_flags = c_flags.clone();
+
+    c_flags.push_str(" -xc");
     ninja.variable("c_flags", &c_flags);
 
-    let cxx_flags = flags::DEFAULT_CPP.join(" ");
+    cxx_flags.push_str(" ");
+    cxx_flags.push_str(&flags::DEFAULT_CPP.join(" "));
     ninja.variable("cxx_flags", &cxx_flags);
 
     let as_flags = [format!("-x assembler-with-cpp {}", cxx_flags)];
@@ -124,7 +134,7 @@ fn main_internal() -> Result<(), Error> {
     let rule_cxx = ninja
         .rule(
             "cxx",
-            "$cxx -MD -MP -MF $out.d $common_flags $c_flags $cxx_flags -c $in -o $out",
+            "$cxx -MD -MP -MF $out.d $common_flags $cxx_flags -c $in -o $out",
         )
         .depfile("$out.d")
         .deps_gcc()

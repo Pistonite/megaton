@@ -30,6 +30,7 @@ void __init_array(void) {
 
 // from libnx
 // virtmem needed for RwPages
+// the setup is not in libnx's header for some reason
 void virtmemSetup(void);
 
 void __megaton_lib_init() {

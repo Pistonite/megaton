@@ -56,6 +56,9 @@ typedef size_t usize;
 /** -> ! */
 #define noreturn_ __attribute__((noreturn)) void
 
+/** #[used] */
+#define used_ __attribute__((used))
+
 // prelude headers
 
 #include <megaton/panic_abort.h>

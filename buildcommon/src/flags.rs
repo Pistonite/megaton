@@ -56,14 +56,14 @@ pub static DEFAULT_AS: &[&str] = &[];
 /// By default, also extends from `DEFAULT_COMMON`
 pub static DEFAULT_LD: &[&str] = &[
     "-nostartfiles",
-    // "-nodefaultlibs",
+    "-nodefaultlibs",
     "-Wl,--shared",
     "-Wl,--export-dynamic",
     "-Wl,-z,nodynamic-undefined-weak",
     "-Wl,--build-id=sha1",
     // "-Wl,--exclude-libs=ALL",
     // size optimization
-    // "-Wl,--gc-sections",
+    "-Wl,--gc-sections",
     // NX specific
     "-Wl,--nx-module-name",
 ];

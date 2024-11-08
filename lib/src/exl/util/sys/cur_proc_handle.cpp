@@ -3,9 +3,11 @@
 
 #include <cstring>
 
+extern "C" {
 #include <switch/arm/tls.h>
 #include <switch/kernel/svc.h>
 #include <switch/result.h>
+}
 
 #include "cur_proc_handle.hpp"
 

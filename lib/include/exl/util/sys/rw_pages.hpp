@@ -1,10 +1,11 @@
 #pragma once
-#include <switch/kernel/virtmem.h>
+#include <megaton/prelude.h>
 
 #include <megaton/align.h>
 
 #include <utility>
-/* #include <new> */
+
+typedef struct VirtmemReservation VirtmemReservation;
 
 namespace exl::util {
 
