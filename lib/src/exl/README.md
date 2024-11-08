@@ -1,3 +1,7 @@
+a large portion of megaton's hooking and patching is from exlaunch
+
+---
+
 # exlaunch
 A framework for injecting C/C++ code into Nintendo Switch applications/applet/sysmodules.
 
