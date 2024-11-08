@@ -1,3 +1,4 @@
+use buildcommon::env::Env;
 use buildcommon::prelude::*;
 
 use buildcommon::env;
@@ -17,7 +18,7 @@ pub struct Options {
     #[clap(short, long)]
     pub profile: Option<String>,
 
-    /// Clean libmegaton instead of the current project
+    /// Also clean libmegaton build output
     #[clap(short = 'L', long, conflicts_with = "profile")]
     pub lib: bool,
 
@@ -28,15 +29,25 @@ pub struct Options {
 }
 
 pub fn run(top: &TopLevelOptions, clean: &Options) -> Result<(), Error> {
-    if clean.lib {
-        todo!();
-    }
     let root = env::find_root(&top.dir).change_context(Error::Config)?;
     let target = root.join("target").into_joined("megaton");
     let output = match &clean.profile {
         Some(profile) => target.into_joined(profile),
         None => target,
     };
+
+    if clean.lib {
+        let env = Env::load(top.home.as_deref()).change_context(Error::Config)?;
+        let lib_root = env.megaton_home.join("lib").into_joined("build");
+
+        
+        system::remove_directory(lib_root.join("bin")).change_context(Error::Clean)?;
+        system::remove_file(lib_root.join("compile_commands.json")).change_context(Error::Clean)?;
+        system::remove_file(lib_root.join("build.ninja")).change_context(Error::Clean)?;
+        system::remove_file(lib_root.join(".ninja_log")).change_context(Error::Clean)?;
+        system::remove_file(lib_root.join(".ninja_deps")).change_context(Error::Clean)?;
+        infoln!("Cleaned", "libmegaton");
+    }
 
     match system::remove_directory(&output) {
         Ok(_) => {

@@ -35,7 +35,7 @@ bool __megaton_add_panic_hook(panic_hook_t hook);
 
 #define assert_(expr)                                                          \
     do {                                                                       \
-        if (!static_cast<bool>(expr)) {                                        \
+        if (!bool(expr)) {                                        \
             __megaton_handle_panic(__FILE__, __LINE__,                         \
                                    "assertion failed: " #expr);                \
         }                                                                      \

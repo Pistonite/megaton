@@ -24,6 +24,7 @@ pub struct Config {
     /// The `[profile]` section
     ///
     /// Configure behavior when selecting profile from command line
+    #[serde(default)]
     pub profile: ProfileConfig,
 
     /// The `[build]` section
@@ -60,10 +61,6 @@ impl Config {
         config.unused.check();
         config.module.unused.check_prefixed("module");
         config.profile.unused.check_prefixed("profile");
-        config.build.unused.check_prefixed("build");
-        if let Some(check) = &config.check {
-            check.unused.check_prefixed("check");
-        }
 
         Ok(config)
     }
@@ -89,7 +86,7 @@ impl Module {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProfileConfig {
     /// Set the profile to use when profile is "none"
     ///
@@ -102,6 +99,16 @@ pub struct ProfileConfig {
 
     #[serde(flatten, default)]
     unused: Unused,
+}
+
+impl Default for ProfileConfig {
+    fn default() -> Self {
+        Self {
+            default: None,
+            allow_base: true,
+            unused: Unused::default(),
+        }
+    }
 }
 
 impl ProfileConfig {
@@ -129,7 +136,7 @@ impl ProfileConfig {
             errorln!("Error", "Base profile is disallowed");
             hintln!(
                 "Consider",
-                "Set `module.default-profile` in config or specify a profile with `--profile`"
+                "Set `profile.default` in config or specify a profile with `--profile`"
             );
 
             return Err(report!(Error::NoProfile));
@@ -202,6 +209,7 @@ pub struct Build {
     #[serde(default)]
     pub ldscripts: Vec<String>,
 
+    #[serde(default)]
     pub flags: FlagConfig,
 
     #[serde(flatten, default)]
@@ -211,6 +219,7 @@ pub struct Build {
 impl Build {
     /// Validate config values
     pub fn check(&self) -> Result<(), Error> {
+        verboseln!("build: {:?}", self);
         if self.libmegaton {
             if self.entry.is_some() {
                 errorln!("Error", "Entry point specified with libmegaton enabled");
@@ -235,7 +244,7 @@ impl Build {
     pub fn entry_point(&self) -> &str {
         match &self.entry {
             Some(entry) => entry,
-            None => "megaton_main",
+            None => "__megaton_module_entry",
         }
     }
 }
@@ -332,14 +341,11 @@ where
     /// The extended profiles
     #[serde(default)]
     profiles: BTreeMap<String, T>,
-
-    #[serde(default, flatten)]
-    unused: Unused,
 }
 
 impl<T> ProfileContainer<T>
 where
-    T: Profilable + Clone,
+    T: Profilable + Clone + std::fmt::Debug,
 {
     /// Get a profile by name
     ///

@@ -99,7 +99,7 @@ impl Command {
         match self {
             Self::Build(options) => {
                 // don't show too many error messages for regular build
-                options.compdb || options.lib
+                options.compdb
             }
             _ => true
         }

@@ -78,7 +78,7 @@ pub fn set_mtime(path: impl AsRef<Path>, time: FileTime) -> Result<(), Error> {
 #[inline]
 pub fn up_to_date(in_mtime: Option<FileTime>, out_mtime: Option<FileTime>) -> bool {
     match (in_mtime, out_mtime) {
-        (Some(in_mtime), Some(out_mtime)) => in_mtime < out_mtime,
+        (Some(in_mtime), Some(out_mtime)) => in_mtime <= out_mtime,
         _ => false,
     }
 }
@@ -92,6 +92,17 @@ pub fn remove_directory(path: impl AsRef<Path>) -> Result<(), Error> {
     }
     std::fs::remove_dir_all(path)
         .change_context_lazy(|| Error::RemoveDirectory(path.display().to_string()))
+}
+
+/// Convenience wrapper for std::fs::remove_file
+pub fn remove_file(path: impl AsRef<Path>) -> Result<(), Error> {
+    let path = path.as_ref();
+    verboseln!("rm '{}'", path.display());
+    if !path.exists() {
+        return Ok(());
+    }
+    std::fs::remove_file(path)
+        .change_context_lazy(|| Error::RemoveFile(path.display().to_string()))
 }
 
 /// Convenience wrapper for std::fs::create_dir_all

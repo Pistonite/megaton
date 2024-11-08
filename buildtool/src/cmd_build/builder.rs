@@ -14,12 +14,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 
-use super::config::Build;
+use super::config::{Build, Module};
 
 pub struct Builder<'a> {
     env: &'a ProjectEnv,
     flags: Flags,
     pub source_dirs: Vec<PathBuf>,
+    lib_objects: Vec<String>,
 }
 
 error_context!(pub BuilderNew, |r| -> Error {
@@ -27,7 +28,7 @@ error_context!(pub BuilderNew, |r| -> Error {
     r.change_context(Error::BuildPrep)
 });
 impl<'a> Builder<'a> {
-    pub fn new(env: &'a ProjectEnv, build: &Build) -> ResultIn<Self, BuilderNew> {
+    pub fn new(env: &'a ProjectEnv, module: &Module, build: &Build) -> ResultIn<Self, BuilderNew> {
         build.check()?;
         let mut flags = Flags::from_config(&build.flags);
         let mut source_dirs = Vec::with_capacity(build.sources.len() + 1);
@@ -40,6 +41,15 @@ impl<'a> Builder<'a> {
             let runtime_source = lib_path.into_joined("runtime");
 
             source_dirs.push(runtime_source);
+
+            let defines = [
+                format!("MEGART_NX_MODULE_NAME=\"{}\"", module.name),
+                format!("MEGART_NX_MODULE_NAME_LEN={}", module.name.len()),
+                format!("MEGART_TITLE_ID={}", module.title_id),
+                format!("MEGART_TITLE_ID_HEX=\"{}\"", module.title_id_hex()),
+            ];
+
+            flags.add_defines(defines);
         }
 
         // always include libnx includes
@@ -59,7 +69,7 @@ impl<'a> Builder<'a> {
         }
 
 
-        Ok(Self { env, flags, source_dirs })
+        Ok(Self { env, flags, source_dirs, lib_objects: Vec::new() })
     }
 
     pub fn check_lib_changed(&self, build: &Build, elf_mtime: Option<FileTime>) -> Result<bool, Error> {
@@ -141,10 +151,10 @@ impl<'a> Builder<'a> {
             let lib_path = self.env.megaton_home.join("lib");
             let libmegaton_path = lib_path.join("build")
             .into_joined("bin");
-            self.flags.add_libpaths([
-                libmegaton_path.display(),
-                self.env.libnx_lib.display(),
-            ]);
+            // self.flags.add_libpaths([
+            //     libmegaton_path.display(),
+            //     self.env.libnx_lib.display(),
+            // ]);
 
             let libmegaton = libmegaton_path.into_joined("libmegaton.a");
             if !libmegaton.exists() {
@@ -153,7 +163,10 @@ impl<'a> Builder<'a> {
                 return Err(report!(Error::Dependency));
             }
 
-            self.flags.add_libraries(["megaton", "nx"]);
+            self.lib_objects.push(libmegaton.display().to_string());
+            self.lib_objects.push(self.env.libnx_lib.join("libnx.a").display().to_string());
+
+            // self.flags.add_libraries(["megaton", "nx"]);
 
             let runtime_source = lib_path.into_joined("runtime");
 
@@ -303,6 +316,7 @@ impl<'a> Builder<'a> {
                     .ldflags
                     .iter()
                     .chain(objects.iter())
+                    .chain(self.lib_objects.iter())
                     .chain(["-o".to_string(), self.env.elf.display().to_string()].iter()),
             )
             .silence_stdout()

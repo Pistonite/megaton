@@ -31,6 +31,8 @@ pub enum Error {
     BadRuntime,
 
     // build:prep
+    #[error("failed to build libmegaton")]
+    BuildLib,
     #[error("build dependency not satisfied")]
     Dependency,
     #[error("error when preparing build")]

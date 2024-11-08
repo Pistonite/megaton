@@ -1,10 +1,9 @@
 //! The megaton build command
 use buildcommon::prelude::*;
 
-use std::path::PathBuf;
-use std::time::Instant;
+use std::path::{Path, PathBuf};
 
-use buildcommon::env::{self, ProjectEnv};
+use buildcommon::env::ProjectEnv;
 use buildcommon::system::{Command, Executor};
 use filetime::FileTime;
 use rustc_hash::FxHashMap;
@@ -19,26 +18,27 @@ use super::Options;
 use crate::error::Error;
 
 /// Run megaton build
-pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error> {
-    let start_time = Instant::now();
-
-    let root = env::find_root(dir).change_context(Error::Config)?;
-    let megaton_toml = root.join("Megaton.toml");
-    let config = Config::from_path(&megaton_toml)?;
-    let profile = config.profile.resolve(options.profile.as_str())?;
-    let env =
-        ProjectEnv::load(home, root, profile, &config.module.name).change_context(Error::Config)?;
+///
+/// Return the name of the built artifact
+pub fn run(
+    env: &ProjectEnv, 
+    config: &Config,
+    profile: &str,
+    megaton_toml: &Path,
+    options: &Options) -> Result<String, Error> {
 
     let executor = Executor::new();
 
     let mut main_npdm_task = None;
 
-    infoln!("Building", "{} (profile `{profile}`)", config.module.name);
+    infoln!("Building", "{} (profile `{}`)", config.module.name, profile);
     system::ensure_directory(&env.target_o).change_context(Error::BuildPrep)?;
     let megaton_toml_mtime = system::get_mtime(&megaton_toml).change_context(Error::BuildPrep)?;
     let npdm_json = env.target.join("main.npdm.json");
     let npdm_mtime = system::get_mtime(&npdm_json).change_context(Error::BuildPrep)?;
     let megaton_toml_changed = !system::up_to_date(megaton_toml_mtime, npdm_mtime);
+
+    verboseln!("megaton.toml changed: {}", megaton_toml_changed);
 
     if megaton_toml_changed && !options.compdb{
         let target = env.target.clone();
@@ -62,7 +62,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
         // this will only load when Megaton.toml changes
         load_compile_commands(&env.cc_json, &mut compile_commands);
     }
-    let mut builder = Builder::new(&env, &build)?;
+    let mut builder = Builder::new(&env, &config.module, &build)?;
     // if any .o files were rebuilt
     let mut objects_changed = false;
     // all .o files
@@ -133,7 +133,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
                 errorln!("Error", "Failed to save compile_commands.json");
                 Err(e.change_context(Error::CompileDb))?;
             }
-            return Ok(());
+            return Ok(format!("compdb for profile `{}`", profile));
         }
         Some(task)
     } else {
@@ -339,84 +339,86 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
 
     if needs_nso {
         let nso_name = format!("{}.nso", config.module.name);
-        let mut checker = checker.expect("checker not loaded, dependency bug");
-        infoln!("Checking", "{}", elf_name);
-        let missing_symbols = checker.check_symbols(&executor)?;
-        let bad_instructions = checker.check_instructions(&executor)?;
-        let missing_symbols = missing_symbols.wait()?;
-        let bad_instructions = bad_instructions.wait()?;
-        let mut check_ok = true;
-        if !missing_symbols.is_empty() {
-            errorln!("Error", "There are unresolved symbols:");
-            errorln!("Error", "");
-            for symbol in missing_symbols.iter().take(10) {
-                errorln!("Error", "  {}", symbol);
-            }
-            if missing_symbols.len() > 10 {
-                errorln!("Error", "  ... ({} more)", missing_symbols.len() - 10);
-            }
-            errorln!("Error", "");
-            errorln!(
-                "Error",
-                "Found {} unresolved symbols!",
-                missing_symbols.len()
-            );
-            hintln!(
-                "Hint",
-                "Include the symbols in the linker scripts, or add them to the `ignore` section."
-            );
-            let missing_symbols = missing_symbols.join("\n");
-            let missing_symbols_path = env.target.join("missing_symbols.txt");
-            if system::write_file(&missing_symbols_path, &missing_symbols).is_ok() {
-                hintln!(
-                    "Saved",
-                    "All missing symbols to `{}`",
-                    env.from_root(missing_symbols_path).display()
+        if let Some(mut checker) = checker {
+            infoln!("Checking", "{}", elf_name);
+            let missing_symbols = checker.check_symbols(&executor)?;
+            let bad_instructions = checker.check_instructions(&executor)?;
+            let missing_symbols = missing_symbols.wait()?;
+            let bad_instructions = bad_instructions.wait()?;
+            let mut check_ok = true;
+            if !missing_symbols.is_empty() {
+                errorln!("Error", "There are unresolved symbols:");
+                errorln!("Error", "");
+                for symbol in missing_symbols.iter().take(10) {
+                    errorln!("Error", "  {}", symbol);
+                }
+                if missing_symbols.len() > 10 {
+                    errorln!("Error", "  ... ({} more)", missing_symbols.len() - 10);
+                }
+                errorln!("Error", "");
+                errorln!(
+                    "Error",
+                    "Found {} unresolved symbols!",
+                    missing_symbols.len()
                 );
-            } else {
-                hintln!("Error", "Failed to save missing symbols");
+                hintln!(
+                    "Hint",
+                    "Include the symbols in the linker scripts, or add them to the `ignore` section."
+                );
+                let missing_symbols = missing_symbols.join("\n");
+                let missing_symbols_path = env.target.join("missing_symbols.txt");
+                if system::write_file(&missing_symbols_path, &missing_symbols).is_ok() {
+                    hintln!(
+                        "Saved",
+                        "All missing symbols to `{}`",
+                        env.from_root(missing_symbols_path).display()
+                    );
+                } else {
+                    hintln!("Error", "Failed to save missing symbols");
+                }
+                check_ok = false;
             }
-            check_ok = false;
-        }
-        if !bad_instructions.is_empty() {
-            errorln!("Error", "There are unsupported/disallowed instructions:");
-            errorln!("Error", "");
-            for inst in bad_instructions.iter().take(10) {
-                errorln!("Error", "  {}", inst);
-            }
-            if bad_instructions.len() > 10 {
-                errorln!("Error", "  ... ({} more)", bad_instructions.len() - 10);
-            }
-            errorln!("Error", "");
-            errorln!(
-                "Error",
-                "Found {} disallowed instructions!",
-                bad_instructions.len()
-            );
+            if !bad_instructions.is_empty() {
+                errorln!("Error", "There are unsupported/disallowed instructions:");
+                errorln!("Error", "");
+                for inst in bad_instructions.iter().take(10) {
+                    errorln!("Error", "  {}", inst);
+                }
+                if bad_instructions.len() > 10 {
+                    errorln!("Error", "  ... ({} more)", bad_instructions.len() - 10);
+                }
+                errorln!("Error", "");
+                errorln!(
+                    "Error",
+                    "Found {} disallowed instructions!",
+                    bad_instructions.len()
+                );
 
-            let output = bad_instructions.join("\n");
-            let output_path = env.target.join("disallowed_instructions.txt");
-            if system::write_file(&output_path, &output).is_ok() {
-                hintln!(
-                    "Saved",
-                    "All disallowed instructions to {}",
-                    env.from_root(output_path).display()
-                );
-            } else {
-                hintln!("Error", "Failed to save disallowed instructions");
+                let output = bad_instructions.join("\n");
+                let output_path = env.target.join("disallowed_instructions.txt");
+                if system::write_file(&output_path, &output).is_ok() {
+                    hintln!(
+                        "Saved",
+                        "All disallowed instructions to {}",
+                        env.from_root(output_path).display()
+                    );
+                } else {
+                    hintln!("Error", "Failed to save disallowed instructions");
+                }
+                check_ok = false;
             }
-            check_ok = false;
+            if !check_ok {
+                errorln!("Error", "Check failed. Please fix the errors above.");
+                return Err(report!(Error::CheckError).attach_printable("Please fix the errors above."));
+            }
+            hintln!("Checked", "Looks good to me");
         }
-        if !check_ok {
-            errorln!("Error", "Check failed. Please fix the errors above.");
-            return Err(report!(Error::CheckError).attach_printable("Please fix the errors above."));
-        }
-        hintln!("Checked", "Looks good to me");
 
         // create the nso after checking
         // so if check failed, nso is not created,
         // and an immediately build with no change won't succeed
-        infoln!("Creating", "{}", nso_name);
+        //
+        verboseln!("creating nso");
 
         let mut child = Command::new(&env.elf2nso)
             .args([&env.elf, &env.nso])
@@ -430,6 +432,8 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
             child.dump_stderr("Error");
         }
         result.change_context(Error::Elf2Nso)?;
+
+        infoln!("Created", "{}", nso_name);
     }
 
     if let Some(task) = save_cc_json_task {
@@ -440,15 +444,7 @@ pub fn run(home: Option<&str>, dir: &str, options: &Options) -> Result<(), Error
         task.wait()?;
     }
 
-    let elapsed = start_time.elapsed();
-    infoln!(
-        "Finished",
-        "{} (profile `{profile}`) in {:.2}s",
-        config.module.name,
-        elapsed.as_secs_f32()
-    );
-
-    Ok(())
+    Ok(format!("{} (profile `{}`)", config.module.name, profile))
 }
 
 error_context!(NpdmContext, |r| -> Error { r.change_context(Error::Npdm) });
@@ -459,7 +455,7 @@ fn create_npdm(
     title_id: String,
     m_time: FileTime,
 ) -> ResultIn<(), NpdmContext> {
-    infoln!("Creating", "main.npdm");
+    verboseln!("creating main.npdm");
 
     let mut npdm_data: Value = serde_json::from_str(include_str!("template/main.npdm.json"))?;
     npdm_data["title_id"] = json!(format!("0x{}", title_id));
@@ -475,7 +471,8 @@ fn create_npdm(
         .spawn()?
         .wait()?
         .check()?;
-    verboseln!("created main.npdm");
+
+    infoln!("Created", "main.npdm");
     Ok(())
 }
 

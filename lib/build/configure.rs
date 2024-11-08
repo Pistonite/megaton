@@ -113,15 +113,14 @@ fn main_internal() -> Result<(), Error> {
         )
         .depfile("$out.d")
         .deps_gcc()
-        .description("AS $out");
+        .description("Assembling $out");
     let rule_cc = ninja
         .rule(
             "cc",
             "$cc -MD -MP -MF $out.d $common_flags $c_flags -c $in -o $out",
         )
         .depfile("$out.d")
-        .deps_gcc()
-        .description("CC $out");
+        .description("Compiling $out");
     let rule_cxx = ninja
         .rule(
             "cxx",
@@ -129,11 +128,11 @@ fn main_internal() -> Result<(), Error> {
         )
         .depfile("$out.d")
         .deps_gcc()
-        .description("CXX $out");
+        .description("Compiling $out");
 
     let rule_ar = ninja
         .rule("ar", "$ar rcs $out $in")
-        .description("AR $out");
+        .description("Linking $out");
 
 
     let mut objects = Vec::new();
@@ -155,6 +154,8 @@ fn main_internal() -> Result<(), Error> {
     generator
         .build([&build_ninja_path])
         .with_implicit(["configure.rs"]);
+
+    ninja.defaults([&libmegaton]);
 
     std::fs::write(build_ninja_path, ninja.to_string()).change_context(Error::WriteNinja)?;
 

@@ -26,6 +26,14 @@ typedef int32_t s32;     ///<  32-bit signed integer.
 typedef int64_t s64;     ///<  64-bit signed integer.
 typedef __int128_t s128; ///< 128-bit unsigned integer.
 
+// rust-ish types
+typedef s8 i8;
+typedef s16 i16;
+typedef s32 i32;
+typedef s64 i64;
+typedef float f32;       
+typedef double f64;      
+
 typedef volatile u8 vu8;     ///<   8-bit volatile unsigned integer.
 typedef volatile u16 vu16;   ///<  16-bit volatile unsigned integer.
 typedef volatile u32 vu32;   ///<  32-bit volatile unsigned integer.

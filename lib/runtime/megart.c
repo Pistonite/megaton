@@ -6,21 +6,21 @@
 struct module_name_t {
     i32 unknown;
     i32 name_len;
-    u8 name[MEGART_MODULE_NAME_LEN + 1];
+    u8 name[MEGART_NX_MODULE_NAME_LEN + 1];
 };
 
 __attribute__((section(".nx-module-name"))) __attribute__((used))
-const module_name_t s_module_name = {.unknown = 0,
-                                     .name_len = MEGART_MODULE_NAME_LEN,
-                                     .name = MEGART_MODULE_NAME};
+const struct module_name_t s_module_name = {.unknown = 0,
+                                     .name_len = MEGART_NX_MODULE_NAME_LEN,
+                                     .name = MEGART_NX_MODULE_NAME};
 
-const u8* __megaton_module_name() { return MEGART_NX_MODULE_NAME; }
+const char* __megaton_module_name() { return MEGART_NX_MODULE_NAME; }
 
-u32 __megaton_module_name_len() { return MEGART_NX_MODULE_NAME_LEN; }
+usize __megaton_module_name_len() { return MEGART_NX_MODULE_NAME_LEN; }
 
 u64 __megaton_title_id() { return MEGART_TITLE_ID; }
 
-const u8* __megaton_title_id_hex() { return MEGART_TITLE_ID_HEX; }
+const char* __megaton_title_id_hex() { return MEGART_TITLE_ID_HEX; }
 
 void __megaton_lib_init();
 void __megaton_librs_init();

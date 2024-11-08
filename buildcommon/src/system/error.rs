@@ -29,6 +29,8 @@ pub enum Error {
     ReadYaml(String),
     #[error("failed to write to `{0}`")]
     WriteFile(String),
+    #[error("failed to remove file `{0}`")]
+    RemoveFile(String),
     #[error("failed to get modified time for `{0}`")]
     GetMTime(String),
     #[error("failed to set modified time for `{0}`")]

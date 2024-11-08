@@ -56,14 +56,14 @@ pub static DEFAULT_AS: &[&str] = &[];
 /// By default, also extends from `DEFAULT_COMMON`
 pub static DEFAULT_LD: &[&str] = &[
     "-nostartfiles",
-    "-nodefaultlibs",
+    // "-nodefaultlibs",
     "-Wl,--shared",
     "-Wl,--export-dynamic",
     "-Wl,-z,nodynamic-undefined-weak",
     "-Wl,--build-id=sha1",
-    "-Wl,--exclude-libs=ALL",
+    // "-Wl,--exclude-libs=ALL",
     // size optimization
-    "-Wl,--gc-sections",
+    // "-Wl,--gc-sections",
     // NX specific
     "-Wl,--nx-module-name",
 ];
@@ -151,6 +151,16 @@ impl Flags {
             sflags,
             ldflags,
         }
+    }
+
+    /// Add define flags (`-D<name>`) for C and C++
+    pub fn add_defines(&mut self, defines: impl IntoIterator<Item = impl Display>) {
+        let flags = defines
+            .into_iter()
+            .map(|x| format!("-D{}", x))
+            .collect::<Vec<_>>();
+        self.cflags.extend(flags.iter().cloned());
+        self.cxxflags.extend(flags);
     }
 
     /// Add include flags (`-I<path>`) for C and C++
