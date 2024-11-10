@@ -2,9 +2,9 @@ use std::io::BufRead;
 use std::path::Path;
 use std::time::Instant;
 
+use buildcommon::env::{self, ProjectEnv};
 use buildcommon::prelude::*;
 use buildcommon::system::Command;
-use buildcommon::env::{self, ProjectEnv};
 
 use clap::Args;
 use derive_more::derive::Deref;
@@ -12,10 +12,10 @@ use derive_more::derive::Deref;
 use crate::cli::{CommonOptions, TopLevelOptions};
 use crate::error::Error;
 
+mod build_project;
 mod builder;
 mod checker;
 mod config;
-mod build_project;
 
 use config::Config;
 
@@ -52,31 +52,20 @@ pub fn run(top: &TopLevelOptions, options: &Options) -> Result<(), Error> {
     let megaton_toml = root.join("Megaton.toml");
     let config = Config::from_path(&megaton_toml)?;
     let profile = config.profile.resolve(options.profile.as_str())?;
-    let env =
-        ProjectEnv::load(
-        top.home.as_deref(), root, profile, &config.module.name).change_context(Error::Config)?;
+    let env = ProjectEnv::load(top.home.as_deref(), root, profile, &config.module.name)
+        .change_context(Error::Config)?;
 
     if options.lib {
         // we can technically prep the project while buliding
-        // libmegaton, however, that's not a common workflow worth the 
+        // libmegaton, however, that's not a common workflow worth the
         // optimization effor
         build_lib(&env)?;
     }
 
-    let artifact = build_project::run(
-        &env,
-        &config,
-        profile,
-        &megaton_toml,
-        options)?;
+    let artifact = build_project::run(&env, &config, profile, &megaton_toml, options)?;
 
     let elapsed = start_time.elapsed();
-    infoln!(
-        "Finished",
-        "{} in {:.2}s",
-        artifact,
-        elapsed.as_secs_f32()
-    );
+    infoln!("Finished", "{} in {:.2}s", artifact, elapsed.as_secs_f32());
 
     Ok(())
 }
@@ -95,7 +84,14 @@ fn build_lib(env: &ProjectEnv) -> ResultIn<(), BuildLib> {
     // configure ninja
     Command::new(&env.cargo)
         .current_dir(&env.megaton_home)
-        .args(args!["run", "--quiet", "--bin", "megaton-lib-configure", "--", &build_ninja])
+        .args(args![
+            "run",
+            "--quiet",
+            "--bin",
+            "megaton-lib-configure",
+            "--",
+            &build_ninja
+        ])
         .spawn()?
         .wait()?
         .check()?;
@@ -114,7 +110,7 @@ fn build_lib(env: &ProjectEnv) -> ResultIn<(), BuildLib> {
                     None => continue,
                 };
 
-                let line = line[i+1..].trim_start();
+                let line = line[i + 1..].trim_start();
 
                 let s = match line.find(' ') {
                     Some(s) => s,
@@ -122,7 +118,7 @@ fn build_lib(env: &ProjectEnv) -> ResultIn<(), BuildLib> {
                 };
 
                 let status = &line[..s];
-                let path = Path::new(&line[s+1..]).rebase(&ninja_build_dir);
+                let path = Path::new(&line[s + 1..]).rebase(&ninja_build_dir);
                 infoln!(status, "{}", path.display());
             }
         })

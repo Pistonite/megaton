@@ -30,8 +30,11 @@ pub trait PathExt: Sized + AsRef<Path> {
     }
 
     fn to_utf8(&self) -> Result<String, Error> {
-        self.as_ref().as_os_str().to_os_string().into_string()
-        .map_err(|_| report!(Error::NotUTF8(self.as_ref().display().to_string())))
+        self.as_ref()
+            .as_os_str()
+            .to_os_string()
+            .into_string()
+            .map_err(|_| report!(Error::NotUTF8(self.as_ref().display().to_string())))
     }
 }
 

@@ -18,6 +18,14 @@ pub enum Error {
     #[error("environment check failed")]
     CheckEnv,
 
+    // init
+    #[error("target location already exists and is non-empty")]
+    AlreadyExists,
+    #[error("failed to create target directory")]
+    InitDir,
+    #[error("failed to create project file `{0}`")]
+    InitFile(&'static str),
+
     // clean
     #[error("failed to clean")]
     Clean,
@@ -58,7 +66,7 @@ pub enum Error {
     #[error("failed to process instructions")]
     ProcessInstructions,
     #[error("errors found when checking ELF")]
-    CheckError,
+    Check,
 
     // build:other tools/outputs
     #[error("failed to create compile_commands.json")]

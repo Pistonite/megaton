@@ -72,14 +72,13 @@ fn run_internal(top: &TopLevelOptions, options: &Options) -> Result<(), Error> {
         cargo_build(&env, bin_name)?;
     }
 
-    let target_exe = replace_executable(&env, &target_release_path, bin_name).map_err(|err| {
-        errorln!("Failed", "Error when replacing executable");
-        err
-    })?;
+    let target_exe =
+        replace_executable(&env, &target_release_path, bin_name).inspect_err(|_| {
+            errorln!("Failed", "Error when replacing executable");
+        })?;
 
-    let shim_path = create_shims(&env, &target_exe).map_err(|err| {
+    let shim_path = create_shims(&env, &target_exe).inspect_err(|_| {
         errorln!("Failed", "Error when creating shim script");
-        err
     })?;
 
     if build_skipped {
@@ -90,7 +89,6 @@ fn run_internal(top: &TopLevelOptions, options: &Options) -> Result<(), Error> {
             "To ensure installation is successful, follow the steps below"
         );
     } else {
-        infoln!("Done", "");
         infoln!("Done", "Installation successful");
     }
 
@@ -100,20 +98,23 @@ fn run_internal(top: &TopLevelOptions, options: &Options) -> Result<(), Error> {
             .map(|path| path == shim_path)
             .unwrap_or_default()
     {
-    if build_skipped {
-        hintln!("WARNING", "");
+        if build_skipped {
+            hintln!("WARNING", "");
         } else {
-        infoln!("Done", "");
+            hintln!("Next", "");
         }
 
         let bin_path = env.megaton_home.join("bin");
-        
+
         hintln!(
             "Next",
             "Make sure scripts from '{}' is callable from your shell",
             bin_path.display()
         );
-        hintln!("Next", "You can do that by adding the directory to PATH, or");
+        hintln!(
+            "Next",
+            "You can do that by adding the directory to PATH, or"
+        );
         hintln!("Next", "  by creating symlinks to the scripts.");
     }
 
@@ -231,14 +232,13 @@ error_context!(CreateShim, |r| -> Error {
     r.change_context(Error::CreateShim)
 });
 /// Create platform-specific shim script
-fn create_shims(env: &Env, megaton_buildtool: &Path ) -> ResultIn<PathBuf, CreateShim> {
+fn create_shims(env: &Env, megaton_buildtool: &Path) -> ResultIn<PathBuf, CreateShim> {
     let bin_path = env.megaton_home.join("bin");
     // canonicalize just to make sure
     let megaton_buildtool = megaton_buildtool.to_abs()?;
     let megaton_home = env.megaton_home.to_abs()?;
 
     if cfg!(windows) {
-
         let content = format!(
             "@echo off\r\n\"{}\" -H \"{}\"%*\r\n",
             megaton_buildtool.display(),
@@ -247,7 +247,6 @@ fn create_shims(env: &Env, megaton_buildtool: &Path ) -> ResultIn<PathBuf, Creat
         let shim_path = bin_path.into_joined("megaton.cmd");
         system::write_file(&shim_path, content)?;
         infoln!("Created", "shim script at '{}'", shim_path.display());
-
 
         Ok(shim_path)
     } else {

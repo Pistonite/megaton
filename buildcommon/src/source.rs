@@ -3,7 +3,10 @@ use rustc_hash::FxHasher;
 
 use crate::prelude::*;
 
-use std::{hash::{Hash, Hasher}, path::Path};
+use std::{
+    hash::{Hash, Hasher},
+    path::Path,
+};
 
 use crate::system::Error;
 
@@ -19,18 +22,6 @@ pub enum SourceType {
 }
 
 impl SourceType {
-    /// Parse
-    pub fn parse_path(source: &str) -> Option<(SourceType, &str, &str)> {
-        let dot = source.rfind('.').unwrap_or(source.len());
-        let ext = &source[dot..];
-        let source_type = SourceType::from_ext(ext)?;
-        let slash = source.rfind(|c| c == '/' || c == '\\').unwrap_or(0);
-        let base = &source[slash + 1..dot];
-        if base.is_empty() {
-            return None;
-        }
-        Some((source_type, base, ext))
-    }
     /// Get source type from file extension
     pub fn from_ext(ext: &str) -> Option<Self> {
         match ext {
@@ -67,14 +58,14 @@ impl SourceFile {
             Some(dot) => dot,
             None => return Ok(None),
         };
-        let ext = &path[dot+1..];
+        let ext = &path[dot + 1..];
         let typ = match SourceType::from_ext(ext) {
             Some(typ) => typ,
             None => return Ok(None),
         };
 
         // get the base name of file
-        let slash = path.rfind(|c| c == '/' || c == '\\').unwrap_or(0);
+        let slash = path.rfind(['/', '\\']).unwrap_or(0);
         let base = &path[slash + 1..dot];
         if base.is_empty() {
             return Ok(None);
@@ -93,5 +84,4 @@ impl SourceFile {
             name_hash: object_name,
         }))
     }
-
 }

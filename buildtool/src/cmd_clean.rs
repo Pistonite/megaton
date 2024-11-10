@@ -40,7 +40,6 @@ pub fn run(top: &TopLevelOptions, clean: &Options) -> Result<(), Error> {
         let env = Env::load(top.home.as_deref()).change_context(Error::Config)?;
         let lib_root = env.megaton_home.join("lib").into_joined("build");
 
-        
         system::remove_directory(lib_root.join("bin")).change_context(Error::Clean)?;
         system::remove_file(lib_root.join("compile_commands.json")).change_context(Error::Clean)?;
         system::remove_file(lib_root.join("build.ninja")).change_context(Error::Clean)?;

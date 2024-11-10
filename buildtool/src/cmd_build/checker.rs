@@ -89,6 +89,11 @@ impl Checker {
             }
             let mut missing_symbols = vec![];
             while let Ok(symbol) = elf_recv.recv() {
+                // dot is not a valid character in a C identifier
+                // so it's probably a false positive (like .data, .text)
+                if symbol.starts_with('.') {
+                    continue;
+                }
                 if ignore.contains(&symbol) {
                     continue;
                 }

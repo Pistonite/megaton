@@ -101,8 +101,7 @@ pub fn remove_file(path: impl AsRef<Path>) -> Result<(), Error> {
     if !path.exists() {
         return Ok(());
     }
-    std::fs::remove_file(path)
-        .change_context_lazy(|| Error::RemoveFile(path.display().to_string()))
+    std::fs::remove_file(path).change_context_lazy(|| Error::RemoveFile(path.display().to_string()))
 }
 
 /// Convenience wrapper for std::fs::create_dir_all

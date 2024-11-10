@@ -63,19 +63,31 @@ impl<'a> Builder<'a> {
 
         flags.add_includes(includes);
 
-
         for source_dir in &build.sources {
             source_dirs.push(env.root.join(source_dir));
         }
 
-
-        Ok(Self { env, flags, source_dirs, lib_objects: Vec::new() })
+        Ok(Self {
+            env,
+            flags,
+            source_dirs,
+            lib_objects: Vec::new(),
+        })
     }
 
-    pub fn check_lib_changed(&self, build: &Build, elf_mtime: Option<FileTime>) -> Result<bool, Error> {
+    pub fn check_lib_changed(
+        &self,
+        build: &Build,
+        elf_mtime: Option<FileTime>,
+    ) -> Result<bool, Error> {
         if build.libmegaton {
-            let libmegaton_path = self.env.megaton_home.join("lib").into_joined("build")
-            .into_joined("bin").into_joined("libmegaton.a");
+            let libmegaton_path = self
+                .env
+                .megaton_home
+                .join("lib")
+                .into_joined("build")
+                .into_joined("bin")
+                .into_joined("libmegaton.a");
 
             if !libmegaton_path.exists() {
                 errorln!("Failed", "libmegaton is not built!");
@@ -122,14 +134,12 @@ impl<'a> Builder<'a> {
     }
 
     pub fn configure_linker(&mut self, build: &Build) -> Result<(), Error> {
-
         self.flags.set_init(build.entry_point());
         self.flags.set_version_script(self.env.verfile.display());
 
         if build.libmegaton {
             let lib_path = self.env.megaton_home.join("lib");
-            let libmegaton_path = lib_path.join("build")
-            .into_joined("bin");
+            let libmegaton_path = lib_path.join("build").into_joined("bin");
 
             let libmegaton = libmegaton_path.into_joined("libmegaton.a");
             if !libmegaton.exists() {
@@ -142,9 +152,8 @@ impl<'a> Builder<'a> {
 
             let runtime_source = lib_path.into_joined("runtime");
 
-            self.flags.add_ldscripts([
-                runtime_source.into_joined("link.ld").display(),
-            ]);
+            self.flags
+                .add_ldscripts([runtime_source.into_joined("link.ld").display()]);
         }
 
         self.flags.add_libpaths(
@@ -153,7 +162,8 @@ impl<'a> Builder<'a> {
                 .iter()
                 .map(|libpath| self.env.root.join(libpath))
                 .collect::<Vec<_>>()
-                .iter().map(|x| x.display())
+                .iter()
+                .map(|x| x.display()),
         );
         self.flags.add_libraries(&build.libraries);
         self.flags.add_ldscripts(
@@ -162,7 +172,8 @@ impl<'a> Builder<'a> {
                 .iter()
                 .map(|ldscript| self.env.root.join(ldscript))
                 .collect::<Vec<_>>()
-                .iter().map(|x| x.display())
+                .iter()
+                .map(|x| x.display()),
         );
 
         Ok(())
@@ -246,9 +257,15 @@ impl<'a> Builder<'a> {
             }
         };
 
-        let o_path = self.env.target_o.join(&format!("{}.o", source_file.name_hash));
+        let o_path = self
+            .env
+            .target_o
+            .join(format!("{}.o", source_file.name_hash));
         let o_file = o_path.to_utf8()?;
-        let d_path = self.env.target_o.join(&format!("{}.d", source_file.name_hash));
+        let d_path = self
+            .env
+            .target_o
+            .join(format!("{}.d", source_file.name_hash));
         let d_file = d_path.to_utf8()?;
         if !o_path.exists() {
             // output doesn't exist
@@ -390,8 +407,6 @@ fn are_deps_up_to_date(d_path: &Path, o_path: &Path) -> Result<bool, system::Err
                 return Ok(false);
             }
         }
-
-
     }
     Ok(true)
 }

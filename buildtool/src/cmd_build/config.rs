@@ -51,11 +51,10 @@ impl Config {
     pub fn from_path(path: impl AsRef<Path>) -> ResultIn<Self, LoadConfig> {
         let config = system::read_file(path)?;
         // print pretty toml error
-        let config: Self = toml::from_str(&config).map_err(|e| {
+        let config: Self = toml::from_str(&config).inspect_err(|e| {
             for line in e.to_string().lines() {
                 errorln!("Error", "{}", line);
             }
-            e
         })?;
 
         config.unused.check();
@@ -94,7 +93,7 @@ pub struct ProfileConfig {
     pub default: Option<String>,
 
     /// Allow the base (`none`) profile to be used
-    #[serde(default= "default_true")]
+    #[serde(default = "default_true")]
     pub allow_base: bool,
 
     #[serde(flatten, default)]
@@ -178,7 +177,7 @@ pub struct Build {
     ///
     /// If false, the module won't link with libmegaton
     /// and you won't be able to use megaton's runtime features. This is useful
-    /// if you want to bring your own runtime. Note that this is required for 
+    /// if you want to bring your own runtime. Note that this is required for
     /// Rust support
     ///
     /// If libmegaton is not used, you also must set [`entry`](Self::entry) to the
@@ -225,16 +224,17 @@ impl Build {
                 errorln!("Error", "Entry point specified with libmegaton enabled");
                 hintln!("Consider", "Set `build.libmegaton` to false if you want to use your own entry point with no runtime");
                 return Err(report!(Error::BadRuntime))
-                .attach_printable("entry point should not be specified when using libmegaton");
+                    .attach_printable("entry point should not be specified when using libmegaton");
             }
-        } else {
-            if self.entry.is_none() {
-                errorln!("Error", "Entry point not specified");
-                hintln!("Consider", "Set `build.libmegaton` to true to use libmegaton runtime");
-                hintln!("Consider", "Or specify an entry point with `build.entry`");
-                return Err(report!(Error::BadRuntime))
+        } else if self.entry.is_none() {
+            errorln!("Error", "Entry point not specified");
+            hintln!(
+                "Consider",
+                "Set `build.libmegaton` to true to use libmegaton runtime"
+            );
+            hintln!("Consider", "Or specify an entry point with `build.entry`");
+            return Err(report!(Error::BadRuntime))
                 .attach_printable("entry point must be specified when not using libmegaton");
-            }
         }
         self.unused.check_prefixed("build");
         self.flags.unused.check_prefixed("build.flags");
@@ -368,4 +368,3 @@ pub trait Profilable {
     /// Extend this config section with another
     fn extend(&mut self, other: &Self);
 }
-

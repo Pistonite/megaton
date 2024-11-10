@@ -411,7 +411,10 @@ impl RootEnv {
     /// Tools not used during a project build is not automatically initialized
     /// and cached to help with build performance
     pub fn get_dkp_bin(&self, tool: &str) -> PathBuf {
-        self.devkitpro.join("devkitA64").into_joined("bin").into_joined(tool)
+        self.devkitpro
+            .join("devkitA64")
+            .into_joined("bin")
+            .into_joined(tool)
     }
 }
 

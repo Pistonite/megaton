@@ -51,12 +51,12 @@ fn main_internal() -> Result<(), Error> {
     let build_o_root = build_root.join("o");
     let ninja = Ninja::new();
 
-    let mut build_o_root_str = match build_o_root
-        .as_os_str().to_os_string().into_string() {
+    let mut build_o_root_str = match build_o_root.as_os_str().to_os_string().into_string() {
         Ok(x) => x,
-        Err(_) => return Err(report!(Error::Encoding))
-        .attach_printable(format!("path: {}", build_root.join("o").display()))
-        ,
+        Err(_) => {
+            return Err(report!(Error::Encoding))
+                .attach_printable(format!("path: {}", build_root.join("o").display()))
+        }
     };
 
     if cfg!(windows) {
@@ -66,10 +66,8 @@ fn main_internal() -> Result<(), Error> {
         if !build_o_root_str.ends_with('\\') {
             build_o_root_str.push('\\');
         }
-    } else {
-        if !build_o_root_str.ends_with('/') {
-            build_o_root_str.push('/');
-        }
+    } else if !build_o_root_str.ends_with('/') {
+        build_o_root_str.push('/');
     }
 
     system::ensure_directory(&build_o_root).change_context(Error::CreateBuildDir)?;
@@ -84,11 +82,7 @@ fn main_internal() -> Result<(), Error> {
     let includes = [&inc_root, &exl_inc_root, &env.libnx_include];
 
     // let mut c_flags = flags::DEFAULT_C.to_vec();
-    let mut c_flags = vec![
-        "-Wall",
-        "-Werror",
-        "-O3",
-    ];
+    let mut c_flags = vec!["-Wall", "-Werror", "-O3"];
     c_flags.push("-DMEGATON_LIB");
 
     let include_flag = includes
@@ -105,7 +99,7 @@ fn main_internal() -> Result<(), Error> {
     c_flags.push_str(" -xc");
     ninja.variable("c_flags", &c_flags);
 
-    cxx_flags.push_str(" ");
+    cxx_flags.push(' ');
     cxx_flags.push_str(&flags::DEFAULT_CPP.join(" "));
     ninja.variable("cxx_flags", &cxx_flags);
 
@@ -114,7 +108,7 @@ fn main_internal() -> Result<(), Error> {
     ninja.variable("as_flags", &as_flags);
     ninja.variable("cc", &env.cc);
     ninja.variable("cxx", &env.cxx);
-    ninja.variable("ar", &env.get_dkp_bin("aarch64-none-elf-ar"));
+    ninja.variable("ar", env.get_dkp_bin("aarch64-none-elf-ar"));
 
     let rule_as = ninja
         .rule(
@@ -144,10 +138,16 @@ fn main_internal() -> Result<(), Error> {
         .rule("ar", "$ar rcs $out $in")
         .description("Linking $out");
 
-
     let mut objects = Vec::new();
-    walk_directory(&src_root, &build_o_root_str, &rule_as, &rule_cc, &rule_cxx, &mut objects)
-        .change_context(Error::WalkDir)?;
+    walk_directory(
+        &src_root,
+        &build_o_root_str,
+        &rule_as,
+        &rule_cc,
+        &rule_cxx,
+        &mut objects,
+    )
+    .change_context(Error::WalkDir)?;
 
     let libmegaton = build_root.into_joined("libmegaton.a");
 
@@ -180,7 +180,6 @@ fn walk_directory(
     rule_cxx: &RuleRef,
     objects: &mut Vec<String>,
 ) -> Result<(), Error> {
-
     for entry in std::fs::read_dir(src)
         .change_context(Error::ReadDir)
         .attach_printable_lazy(|| format!("reading: {}", src.display()))?
@@ -190,7 +189,7 @@ fn walk_directory(
             .attach_printable_lazy(|| format!("inside: {}", src.display()))?;
         let path = entry.path();
         if path.is_dir() {
-            walk_directory(&path, &build_o_root, rule_as, rule_cc, rule_cxx, objects)?;
+            walk_directory(&path, build_o_root, rule_as, rule_cc, rule_cxx, objects)?;
             continue;
         }
 

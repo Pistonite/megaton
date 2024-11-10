@@ -30,7 +30,7 @@ default flags that are maintained by the megaton build tool
 plus extending from another set of flags (for example, the 
 default flags of `cxx` include all `c` flags).
 
-The default flags can be found [here](), and the flag extension
+The default flags can be found [here](https://github.com/Pistonite/megaton/tree/main/buildcommon/flags.rs), and the flag extension
 behavior is detailed below.
 
 | Property | `<default>` includes  |
@@ -46,11 +46,8 @@ to `["<default>"]`. Setting a property to an empty array `[]` means
 not add any flags.
 
 ## Includes and Libraries
-The build tool will complain if the build flags contain 
-any include paths (`-I`), library paths (`-L`), or library names (`-l`).
-These flags should be set in the `[module]` top-level section, so the build tool
-can monitor their timestamps for incremental builds. They are
-converted to the appropriate flags for the compiler and linker by the build tool.
+Includes and libraries should be specified in `build.includes`,
+`build.libpaths`, and `build.libraries` respectively. See [here](./module.md#includes) for more details.
 
 The build tool will also automatically include the headers for
 `libmegaton` and link with your project's rust code if the `[rust]` top-level section
@@ -60,7 +57,7 @@ Rust support is not yet available
 ```
 
 ## Profiles
-The build flags also support the [profile]() system.
+The build flags also support the [profile](./profiles.md) system.
 
 The profile-specific flags for a profile `foo` is defined at `build.profiles.foo.flags`.
 The flags are merged with flags from the base `build.flags` in the following way:
@@ -87,9 +84,9 @@ to get the desired behavior for selecting profile with command line.
 For example, if you want to build with `-DDEBUG` by default,
 and change it to `-DNODEBUG` for the `release` profile, you can do:
 ```toml
-[module]
-default-profile = "debug"
-disallow-base-profile = true
+[profile]
+default = "debug"
+allow-base = false
 
 [build.flags]
 

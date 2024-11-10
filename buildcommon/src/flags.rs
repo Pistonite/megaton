@@ -140,7 +140,6 @@ impl Flags {
         // we already said in the docs don't do that
         cflags.push(format!("-fdiagnostics-color={}", print::color_flag()));
 
-
         let cxxflags = create_flags!(&config.cxx, DEFAULT_CPP extends cflags);
         let sflags = create_flags!(&config.as_, DEFAULT_AS extends cxxflags);
         let ldflags = create_flags!(&config.ld, DEFAULT_LD extends common);

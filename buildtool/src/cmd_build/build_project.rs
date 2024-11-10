@@ -21,26 +21,26 @@ use crate::error::Error;
 ///
 /// Return the name of the built artifact
 pub fn run(
-    env: &ProjectEnv, 
+    env: &ProjectEnv,
     config: &Config,
     profile: &str,
     megaton_toml: &Path,
-    options: &Options) -> Result<String, Error> {
-
+    options: &Options,
+) -> Result<String, Error> {
     let executor = Executor::new();
 
     let mut main_npdm_task = None;
 
     infoln!("Building", "{} (profile `{}`)", config.module.name, profile);
     system::ensure_directory(&env.target_o).change_context(Error::BuildPrep)?;
-    let megaton_toml_mtime = system::get_mtime(&megaton_toml).change_context(Error::BuildPrep)?;
+    let megaton_toml_mtime = system::get_mtime(megaton_toml).change_context(Error::BuildPrep)?;
     let npdm_json = env.target.join("main.npdm.json");
     let npdm_mtime = system::get_mtime(&npdm_json).change_context(Error::BuildPrep)?;
     let megaton_toml_changed = !system::up_to_date(megaton_toml_mtime, npdm_mtime);
 
     verboseln!("megaton.toml changed: {}", megaton_toml_changed);
 
-    if megaton_toml_changed && !options.compdb{
+    if megaton_toml_changed && !options.compdb {
         let target = env.target.clone();
         let npdmtool = env.npdmtool.clone();
         let title_id = config.module.title_id_hex();
@@ -62,7 +62,7 @@ pub fn run(
         // this will only load when Megaton.toml changes
         load_compile_commands(&env.cc_json, &mut compile_commands);
     }
-    let mut builder = Builder::new(&env, &config.module, &build)?;
+    let mut builder = Builder::new(env, &config.module, &build)?;
     // if any .o files were rebuilt
     let mut objects_changed = false;
     // all .o files
@@ -82,7 +82,7 @@ pub fn run(
                     continue;
                 }
                 SourceResult::UpToDate(o_file) => {
-                    verboseln!("skipped '{}'", env.from_root(&source_path).display());
+                    verboseln!("skipped '{}'", env.from_root(source_path).display());
                     objects.push(o_file);
                     continue;
                 }
@@ -90,7 +90,7 @@ pub fn run(
             };
             objects_changed = true;
             objects.push(cc.output.clone());
-            let source_display = env.from_root(&source_path).display().to_string();
+            let source_display = env.from_root(source_path).display().to_string();
             let child = cc.create_child();
             if !options.compdb {
                 let task = executor.execute(move || {
@@ -110,7 +110,7 @@ pub fn run(
         }
     }
 
-    let verfile_task = if megaton_toml_changed && !options.compdb{
+    let verfile_task = if megaton_toml_changed && !options.compdb {
         let verfile = env.verfile.clone();
         let entry = build.entry_point().to_string();
         Some(executor.execute(move || create_verfile(verfile, entry)))
@@ -211,19 +211,18 @@ pub fn run(
     if !needs_linking {
         match system::get_mtime(&env.elf) {
             Ok(elf_mtime) => {
-        needs_linking = builder.check_lib_changed(&build, elf_mtime)?;
-        }
-        Err(e) => {
-            needs_linking = true;
-            verboseln!("failed to get mtime of elf: {}", e);
-        }
+                needs_linking = builder.check_lib_changed(&build, elf_mtime)?;
+            }
+            Err(e) => {
+                needs_linking = true;
+                verboseln!("failed to get mtime of elf: {}", e);
+            }
         }
     }
 
     if needs_linking {
         builder.configure_linker(&build)?;
     }
-
 
     let check_config = config.check.as_ref().map(|c| c.get_profile(profile));
 
@@ -236,7 +235,7 @@ pub fn run(
                     needs_nso = true;
                     verboseln!("failed to get mtime of nso: {}", e);
                 }
-                Ok(nso_mtime) => match symbol_listing_changed(config, &env, nso_mtime) {
+                Ok(nso_mtime) => match symbol_listing_changed(config, env, nso_mtime) {
                     Err(e) => {
                         needs_nso = true;
                         verboseln!("failed to check if symbol listing changed: {}", e);
@@ -276,7 +275,7 @@ pub fn run(
     let checker = match (needs_nso || needs_linking, check_config) {
         (true, Some(check)) => {
             check.check();
-            Some(checker::load(&env, check, &executor)?)
+            Some(checker::load(env, check, &executor)?)
         }
         _ => None,
     };
@@ -350,11 +349,9 @@ pub fn run(
                 missing_symbols.sort_by(|a, b| {
                     // ignore the leading _Zxxx
                     fn strip(s: &str) -> &str {
-                        if s.starts_with("_Z") {
-                            &s[2..].trim_start_matches(|c: char| c.is_digit(10))
-                        } else {
-                            s
-                        }
+                        s.strip_prefix("_Z")
+                            .map(|s| s.trim_start_matches(|c: char| c.is_ascii_digit()))
+                            .unwrap_or(s)
                     }
                     strip(a).cmp(strip(b))
                 });
@@ -420,7 +417,7 @@ pub fn run(
             }
             if !check_ok {
                 errorln!("Error", "Check failed. Please fix the errors above.");
-                return Err(report!(Error::CheckError).attach_printable("Please fix the errors above."));
+                return Err(report!(Error::Check).attach_printable("Please fix the errors above."));
             }
             hintln!("Checked", "Looks good to me");
         }
