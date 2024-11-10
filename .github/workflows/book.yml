@@ -18,7 +18,7 @@ jobs:
           version: 3.x
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: cargo-bins/cargo-binstall@main
-      - run: cargo-binstall --no-confirm mdbook
+      - run: cargo-binstall --no-confirm mdbook mdbook-admonish
       - run: task docs:build
       - uses: actions/upload-pages-artifact@v3
         with:
