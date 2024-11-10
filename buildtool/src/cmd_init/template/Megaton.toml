@@ -1,0 +1,7 @@
+# See https://megaton.pistonite.dev/config/module.html
+[module]
+name = "NAMEPLACEHOLDER"
+title-id = 0xFFFFFFFFFFFFFFFF # change me
+
+[build]
+sources = ["src"]

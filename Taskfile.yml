@@ -1,5 +1,10 @@
 version: '3'
 
+includes:
+  docs:
+    taskfile: ./docs
+    dir: ./docs
+
 tasks:
   rustc:
     desc: Install custom rustc toolchain
@@ -9,10 +14,5 @@ tasks:
   run:
     dir: '{{.USER_WORKING_DIR}}'
     desc: Run megaton-hammer
-    cmds:
-    - echo "TODO"
-
-  doc:
-    desc: Build documentation into the docs/ directory
     cmds:
     - echo "TODO"

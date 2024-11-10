@@ -1,0 +1,15 @@
+version: '3'
+
+tasks:
+  dev:
+    desc: Serve the book and watch
+    cmds:
+      - task: build
+      - mdbook watch &
+      - live-server book -p 8081 {{.CLI_ARGS}}
+
+  build:
+    desc: (Re-)build the book
+    cmds:
+      - rm -rf book
+      - mdbook build

@@ -1,0 +1,26 @@
+[package]
+name = "buildcommon"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+error-stack = "0.5.0"
+thiserror = "1.0.66"
+serde = { version = "1.0.214", features = ["derive"] }
+serde_yaml_ng = "0.10.0"
+derive_more = { version = "1.0.0", features = ["full"] }
+which = "7.0.0"
+dunce = "1.0.5"
+filetime = "0.2.25"
+pathdiff = "0.2.2"
+terminal_size = "0.4.0"
+unicode_reader = "1.0.2"
+threadpool = "1.8.1"
+num_cpus = "1.16.0"
+derivative = "2.2.0"
+oneshot = { version = "0.1.8", default-features = false, features = ["std"] }
+regex = "1.11.1"
+toml = "0.8.19"
+serde_json = "1.0.132"
+rustc-hash = "2.0.0"
+

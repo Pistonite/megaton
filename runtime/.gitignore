@@ -1,7 +1,0 @@
-/build
-*.o
-*.a
-*.d
-/build.ninja
-/.ninja*
-/target

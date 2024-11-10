@@ -1,0 +1,18 @@
+[package]
+name = "megaton-lib-configure"
+version = "0.0.0"
+edition = "2021"
+description = "Ninja configuration for building libmegaton"
+
+[dependencies.buildcommon]
+path = "../../buildcommon"
+
+[dependencies]
+error-stack = "0.5.0"
+ninja-writer = "0.3.0"
+thiserror = "1.0.68"
+
+[[bin]]
+name = "megaton-lib-configure"
+path = "configure.rs"
+
