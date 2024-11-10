@@ -22,12 +22,7 @@ jobs:
       - run: task docs:build
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: book/book
-          retention-days: 3
-      - uses: actions/upload-artifact@v4
-        with:
           path: docs/book
-          name: docs
           retention-days: 3
 
 
