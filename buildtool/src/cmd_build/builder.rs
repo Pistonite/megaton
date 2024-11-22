@@ -1,14 +1,15 @@
 //! Build flags processing
-use buildcommon::compdb::{CompileDB, CompileDBEntry};
 use buildcommon::prelude::*;
-use buildcommon::source::{SourceFile, SourceType};
-use filetime::FileTime;
 
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
 
+use filetime::FileTime;
+
+use buildcommon::compdb::{CompileDB, CompileDBEntry};
 use buildcommon::env::ProjectEnv;
 use buildcommon::flags::Flags;
+use buildcommon::source::{SourceFile, SourceType};
 use buildcommon::system::{Command, Spawned};
 
 use crate::error::Error;
@@ -284,44 +285,6 @@ pub enum SourceResult {
     UpToDate(String),
     NeedCompile(CompileDBEntry, String),
 }
-
-// #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// pub struct CompileCommand {
-//     #[serde(default)]
-//     directory: String,
-//     pub arguments: Vec<String>,
-//     pub file: String,
-//     pub output: String,
-// }
-//
-// impl CompileCommand {
-//     pub fn create_child(&self) -> Command {
-//         Command::new(&self.arguments[0])
-//             .args(&self.arguments[1..])
-//             .silence_stdout()
-//             .pipe_stderr()
-//     }
-// }
-//
-// pub fn load_compile_commands(cc_json: &Path, map: &mut FxHashMap<String, CompileCommand>) {
-//     verboseln!("loading '{}'", cc_json.display());
-//     if !cc_json.exists() {
-//         return;
-//     }
-//     let file = match system::buf_reader(cc_json) {
-//         Ok(file) => file,
-//         _ => {
-//             return;
-//         }
-//     };
-//     let ccs: Vec<CompileCommand> = match serde_json::from_reader(file) {
-//         Ok(ccs) => ccs,
-//         Err(_) => return,
-//     };
-//     for cc in ccs {
-//         map.insert(cc.output.clone(), cc);
-//     }
-// }
 
 fn are_deps_up_to_date(d_path: &Path, o_path: &Path) -> Result<bool, system::Error> {
     if !d_path.exists() {

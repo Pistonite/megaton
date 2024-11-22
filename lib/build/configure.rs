@@ -1,14 +1,15 @@
 use buildcommon::prelude::*;
-use clap::Parser;
 
 use std::io::BufReader;
 use std::path::Path;
 use std::process::ExitCode;
 
+use clap::Parser;
+use ninja_writer::*;
+
 use buildcommon::env::{Env, RootEnv};
 use buildcommon::flags;
 use buildcommon::source::{SourceFile, SourceType};
-use ninja_writer::*;
 
 #[derive(Debug, Parser)]
 struct Cli {

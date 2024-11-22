@@ -1,13 +1,12 @@
-use crate::{prelude::*, source::SourceType};
+use crate::prelude::*;
 
-use std::{
-    io::{BufRead, Write},
-    path::{Path, PathBuf},
-};
+use std::io::{BufRead, Write};
+use std::path::{Path, PathBuf};
 
 use derive_more::derive::Deref;
 use serde::{Deserialize, Serialize};
 
+use crate::source::SourceType;
 use crate::system::{Command, Error};
 
 /// Environment of the tool

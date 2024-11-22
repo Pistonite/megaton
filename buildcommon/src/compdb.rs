@@ -1,6 +1,5 @@
 //! Compile DB and compile_commands.json related functionality.
-use crate::env::SystemHeaderPaths;
-use crate::{env::Env, prelude::*};
+use crate::prelude::*;
 
 use std::ffi::OsStr;
 use std::io::{Read, Write};
@@ -10,6 +9,7 @@ use derive_more::derive::{Deref, DerefMut};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
+use crate::env::{Env, SystemHeaderPaths};
 use crate::system::Command;
 
 /// Compile DB format used internally by build tool to track
