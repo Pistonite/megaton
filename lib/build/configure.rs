@@ -1,5 +1,7 @@
 use buildcommon::prelude::*;
+use clap::Parser;
 
+use std::io::BufReader;
 use std::path::Path;
 use std::process::ExitCode;
 
@@ -8,12 +10,23 @@ use buildcommon::flags;
 use buildcommon::source::{SourceFile, SourceType};
 use ninja_writer::*;
 
+#[derive(Debug, Parser)]
+struct Cli {
+    /// Output file path
+    #[clap(short, long)]
+    pub output: String,
+
+    /// Patch output of ninja -t compdb (from stdin), and write to output
+    #[clap(long)]
+    pub compdb: bool,
+}
+
 #[derive(Debug, thiserror::Error)]
 enum Error {
-    #[error("invalid argument. First arg should be path to build.ninja")]
-    Arg,
     #[error("failed to load environment")]
     Env,
+    #[error("failed to write output file")]
+    WriteFile,
     #[error("failed to create build directory")]
     CreateBuildDir,
     #[error("failed while walking source directory")]
@@ -29,7 +42,8 @@ enum Error {
 }
 
 fn main() -> ExitCode {
-    match main_internal() {
+    let cli = Cli::parse();
+    match main_internal(&cli) {
         Ok(_) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("error: {:?}", e);
@@ -37,10 +51,22 @@ fn main() -> ExitCode {
         }
     }
 }
+fn main_internal(cli: &Cli) -> Result<(), Error> {
+    if !cli.compdb {
+        build_ninja(cli)?;
+        return Ok(());
+    }
 
-fn main_internal() -> Result<(), Error> {
-    let mut args = std::env::args().skip(1);
-    let build_ninja_path = args.next().ok_or(Error::Arg)?;
+    let stdin_reader = BufReader::new(std::io::stdin());
+    let env = Env::load(None).change_context(Error::Env)?;
+    let mut file = system::buf_writer(&cli.output).change_context(Error::WriteFile)?;
+    buildcommon::compdb::inject_system_headers(&env, stdin_reader, &mut file)
+        .change_context(Error::WriteFile)?;
+    Ok(())
+}
+
+fn build_ninja(cli: &Cli) -> Result<(), Error> {
+    let build_ninja_path = &cli.output;
 
     let env = RootEnv::from(Env::load(None).change_context(Error::Env)?);
     let lib_root = env.megaton_home.join("lib");
@@ -59,16 +85,7 @@ fn main_internal() -> Result<(), Error> {
         }
     };
 
-    if cfg!(windows) {
-        while build_o_root_str.ends_with('/') {
-            build_o_root_str.pop();
-        }
-        if !build_o_root_str.ends_with('\\') {
-            build_o_root_str.push('\\');
-        }
-    } else if !build_o_root_str.ends_with('/') {
-        build_o_root_str.push('/');
-    }
+    system::ensure_path_sep(&mut build_o_root_str);
 
     system::ensure_directory(&build_o_root).change_context(Error::CreateBuildDir)?;
 
@@ -77,9 +94,7 @@ fn main_internal() -> Result<(), Error> {
 
     ninja.variable("common_flags", &common_flags);
 
-    let exl_inc_root = src_root.join("exlaunch").into_joined("source");
-
-    let includes = [&inc_root, &exl_inc_root, &env.libnx_include];
+    let includes = [&inc_root, &env.libnx_include];
 
     // let mut c_flags = flags::DEFAULT_C.to_vec();
     let mut c_flags = vec!["-Wall", "-Werror", "-O3"];
@@ -113,7 +128,7 @@ fn main_internal() -> Result<(), Error> {
     let rule_as = ninja
         .rule(
             "as",
-            "$cc -MD -MP -MF $out.d $as_flags $common_flags -c $in -o $out",
+            "$cxx -MD -MP -MF $out.d $common_flags $as_flags -c $in -o $out",
         )
         .depfile("$out.d")
         .deps_gcc()
@@ -124,6 +139,7 @@ fn main_internal() -> Result<(), Error> {
             "$cc -MD -MP -MF $out.d $common_flags $c_flags -c $in -o $out",
         )
         .depfile("$out.d")
+        .deps_gcc()
         .description("Compiling $out");
     let rule_cxx = ninja
         .rule(
@@ -156,13 +172,13 @@ fn main_internal() -> Result<(), Error> {
     let generator = ninja
         .rule(
             "configure",
-            "cargo run --quiet --bin megaton-lib-configure -- $out",
+            "cargo run --quiet --bin megaton-lib-configure -- -o $out",
         )
         .description("Configuring build.ninja")
         .generator();
 
     generator
-        .build([&build_ninja_path])
+        .build([build_ninja_path])
         .with_implicit(["configure.rs"]);
 
     ninja.defaults([&libmegaton]);

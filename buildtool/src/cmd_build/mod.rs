@@ -90,6 +90,7 @@ fn build_lib(env: &ProjectEnv) -> ResultIn<(), BuildLib> {
             "--bin",
             "megaton-lib-configure",
             "--",
+            "-o",
             &build_ninja
         ])
         .spawn()?

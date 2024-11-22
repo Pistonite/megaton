@@ -31,6 +31,11 @@ impl SourceType {
             _ => None,
         }
     }
+
+    pub fn from_file(file: &str) -> Option<Self> {
+        let dot = file.rfind('.')?;
+        Self::from_ext(&file[dot + 1..])
+    }
 }
 
 pub struct SourceFile {

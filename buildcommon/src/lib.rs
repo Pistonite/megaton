@@ -1,3 +1,4 @@
+pub mod compdb;
 pub mod env;
 pub mod flags;
 pub mod print;

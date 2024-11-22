@@ -31,8 +31,8 @@ typedef s8 i8;
 typedef s16 i16;
 typedef s32 i32;
 typedef s64 i64;
-typedef float f32;       
-typedef double f64;      
+typedef float f32;
+typedef double f64;
 
 typedef volatile u8 vu8;     ///<   8-bit volatile unsigned integer.
 typedef volatile u16 vu16;   ///<  16-bit volatile unsigned integer.

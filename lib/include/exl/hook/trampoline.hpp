@@ -5,7 +5,7 @@
 #include <exl/hook/macros.h>
 #include <exl/hook/util/func_ptrs.hpp>
 
-#define hook_trampoline_(name)                                                  \
+#define hook_trampoline_(name)                                                 \
     struct name : public ::exl::hook::impl::TrampolineHook<name>
 
 namespace exl::hook::impl {
