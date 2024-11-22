@@ -11,8 +11,9 @@ struct module_name_t {
 
 __attribute__((section(".nx-module-name"))) __attribute__((used))
 const struct module_name_t s_module_name = {.unknown = 0,
-                                     .name_len = MEGART_NX_MODULE_NAME_LEN,
-                                     .name = MEGART_NX_MODULE_NAME};
+                                            .name_len =
+                                                MEGART_NX_MODULE_NAME_LEN,
+                                            .name = MEGART_NX_MODULE_NAME};
 
 const char* __megaton_module_name() { return MEGART_NX_MODULE_NAME; }
 

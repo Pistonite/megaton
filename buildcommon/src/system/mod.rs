@@ -3,7 +3,7 @@
 mod error;
 pub use error::*;
 mod path;
-pub use path::PathExt;
+pub use path::*;
 mod fs;
 pub use fs::*;
 mod executor;

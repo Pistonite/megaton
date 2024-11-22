@@ -15,11 +15,11 @@
  */
 
 #pragma once
-#include <megaton/prelude.h>
-
 #include <memory>
 #include <new>
 #include <utility>
+
+#include <megaton/prelude.h>
 
 namespace exl::util {
 

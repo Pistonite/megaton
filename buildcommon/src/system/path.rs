@@ -71,3 +71,15 @@ impl PathExt for &Path {
         self.join(path)
     }
 }
+
+/// Ensure the string path has a path separator in the end
+pub fn ensure_path_sep(path: &mut String) {
+    if cfg!(windows) {
+        while path.ends_with('/') || path.ends_with('\\') {
+            path.pop();
+        }
+        path.push('\\');
+    } else if !path.ends_with('/') {
+        path.push('/');
+    }
+}

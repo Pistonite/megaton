@@ -1,4 +1,5 @@
 //! The megaton build command
+use buildcommon::compdb::CompileDB;
 use buildcommon::prelude::*;
 
 use std::path::{Path, PathBuf};
@@ -6,11 +7,10 @@ use std::path::{Path, PathBuf};
 use buildcommon::env::ProjectEnv;
 use buildcommon::system::{Command, Executor};
 use filetime::FileTime;
-use rustc_hash::FxHashMap;
 use serde_json::{json, Value};
 use walkdir::WalkDir;
 
-use super::builder::{load_compile_commands, Builder, SourceResult};
+use super::builder::{Builder, SourceResult};
 use super::checker;
 use super::config::{Check, Config};
 use super::Options;
@@ -54,14 +54,14 @@ pub fn run(
 
     let build = config.build.get_profile(profile);
 
-    let cc_possibly_changed = megaton_toml_changed;
-    let mut compile_commands = FxHashMap::default();
-    let mut new_compile_commands = Vec::new();
-    if cc_possibly_changed {
-        // even though this is blocking
-        // this will only load when Megaton.toml changes
-        load_compile_commands(&env.cc_json, &mut compile_commands);
-    }
+    // if compdb should be checked for if an edge needs rebuilding
+    // when --compdb, we force regenerate all compile commands
+    let check_compdb = megaton_toml_changed || options.compdb;
+    let mut compdb = if check_compdb {
+        CompileDB::load(&env.compdb_cache)
+    } else {
+        Default::default()
+    };
     let mut builder = Builder::new(env, &config.module, &build)?;
     // if any .o files were rebuilt
     let mut objects_changed = false;
@@ -74,9 +74,9 @@ pub fn run(
         for entry in WalkDir::new(source_dir).into_iter().flatten() {
             let source_path = entry.path();
             let cc = builder
-                .process_source(source_path, cc_possibly_changed, &mut compile_commands)
+                .process_source(source_path, check_compdb, &compdb)
                 .change_context(Error::SourcePrep)?;
-            let cc = match cc {
+            let child = match cc {
                 SourceResult::NotSource => {
                     // file type not recognized, skip
                     continue;
@@ -86,12 +86,15 @@ pub fn run(
                     objects.push(o_file);
                     continue;
                 }
-                SourceResult::NeedCompile(cc) => cc,
+                SourceResult::NeedCompile(cc, o_file) => {
+                    let child = cc.create_command(&o_file);
+                    compdb.insert(o_file.clone(), cc);
+                    objects.push(o_file);
+                    child
+                }
             };
             objects_changed = true;
-            objects.push(cc.output.clone());
             let source_display = env.from_root(source_path).display().to_string();
-            let child = cc.create_child();
             if !options.compdb {
                 let task = executor.execute(move || {
                     infoln!("Compiling", "{}", source_display);
@@ -106,9 +109,12 @@ pub fn run(
                 });
                 cc_tasks.push(task);
             }
-            new_compile_commands.push(cc);
         }
     }
+
+    // keep order of objects.cache consistent
+    // This allows O(n + n log n) instead of O(2n log n) when comparing
+    objects.sort();
 
     let verfile_task = if megaton_toml_changed && !options.compdb {
         let verfile = env.verfile.clone();
@@ -118,23 +124,32 @@ pub fn run(
         None
     };
 
-    // if compiled, save cc_json
-    let save_cc_json_task = if objects_changed || !compile_commands.is_empty() || options.compdb {
-        let file = system::buf_writer(&env.cc_json).change_context(Error::CompileDb)?;
-        let task = executor.execute(move || {
-            verboseln!("saving compile_commands.json");
-            serde_json::to_writer_pretty(file, &new_compile_commands)
-                .change_context(Error::CompileDb)?;
-            verboseln!("saved compile_commands.json");
-            Ok::<_, Report<Error>>(())
-        });
-        if options.compdb {
-            if let Err(e) = task.wait() {
-                errorln!("Error", "Failed to save compile_commands.json");
-                Err(e.change_context(Error::CompileDb))?;
-            }
-            return Ok(format!("compdb for profile `{}`", profile));
+    if options.compdb {
+        // since we didn't link, don't update compdb or objects cache
+        // only update the compile_commands.json
+        if !check_compdb {
+            compdb.merge_old(&env.compdb_cache);
         }
+        let mut file = system::buf_writer(&env.cc_json).change_context(Error::CompileDb)?;
+        compdb
+            .write_as_compile_commands(&env.system_headers, &mut file)
+            .change_context(Error::CompileDb)?;
+        return Ok(format!("compdb for profile `{}`", profile));
+    }
+
+    // if compiled, save cc_json
+    let save_cc_json_task = if objects_changed || check_compdb {
+        let path = env.compdb_cache.clone();
+        let cc_json = env.cc_json.clone();
+        let system_headers = env.system_headers.clone();
+        let task = if check_compdb {
+            executor.execute(move || compdb.save(&system_headers, &path, &cc_json))
+        } else {
+            executor.execute(move || {
+                compdb.merge_old(&path);
+                compdb.save(&system_headers, &path, &cc_json)
+            })
+        };
         Some(task)
     } else {
         None
@@ -142,12 +157,22 @@ pub fn run(
 
     // compute if linking is needed
 
-    // compile_commands not empty means sources were removed
     // link flags can change if megaton toml changed
-    let mut needs_linking = objects_changed
-        || !compile_commands.is_empty()
-        || megaton_toml_changed
-        || !env.elf.exists();
+    let mut needs_linking = objects_changed || megaton_toml_changed || !env.elf.exists();
+
+    // The list of objects can change even if objects_changed is false,
+    // due to sources being removed
+    let new_obj_cache = format!("{}\n{}", objects.len(), objects.join("\n"));
+    if !needs_linking {
+        let old = system::read_file(&env.objects_cache).unwrap_or_default();
+        if old != new_obj_cache {
+            verboseln!("linking needed because list of objects changed");
+            needs_linking = true;
+        }
+    }
+    if let Err(e) = system::write_file(&env.objects_cache, &new_obj_cache) {
+        errorln!("Error", "Failed to save objects cache: {}", e);
+    }
 
     // LD scripts can change
     if !needs_linking {
@@ -445,7 +470,7 @@ pub fn run(
     }
 
     if let Some(task) = save_cc_json_task {
-        task.wait()?;
+        task.wait();
     }
 
     if let Some(task) = main_npdm_task {

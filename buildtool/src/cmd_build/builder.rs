@@ -1,16 +1,16 @@
 //! Build flags processing
 use buildcommon::prelude::*;
-use buildcommon::source::{SourceFile, SourceType};
-use filetime::FileTime;
 
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
 
+use filetime::FileTime;
+
+use buildcommon::compdb::{CompileDB, CompileDBEntry};
 use buildcommon::env::ProjectEnv;
 use buildcommon::flags::Flags;
+use buildcommon::source::{SourceFile, SourceType};
 use buildcommon::system::{Command, Spawned};
-use rustc_hash::FxHashMap;
-use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 
@@ -53,6 +53,7 @@ impl<'a> Builder<'a> {
         }
 
         // always include libnx includes
+        // TODO: maybe make this a build config option?
         flags.add_includes([env.libnx_include.display()]);
 
         let mut includes = Vec::with_capacity(build.includes.len() + 1);
@@ -179,76 +180,36 @@ impl<'a> Builder<'a> {
         Ok(())
     }
 
-    fn create_command(
-        &self,
-        source_file: SourceFile,
-        d_file: String,
-        o_file: String,
-    ) -> CompileCommand {
-        let s_type = source_file.typ;
-        let arguments: Vec<_> = match s_type {
-            SourceType::C => std::iter::once(self.env.cc.display().to_string())
-                .chain([
-                    "-MMD".to_string(),
-                    "-MP".to_string(),
-                    "-MF".to_string(),
-                    d_file,
-                ])
-                .chain(self.flags.cflags.iter().cloned())
-                .chain([
-                    "-c".to_string(),
-                    "-o".to_string(),
-                    o_file.clone(),
-                    source_file.path.clone(),
-                ])
-                .collect(),
-            SourceType::Cpp => std::iter::once(self.env.cxx.display().to_string())
-                .chain([
-                    "-MMD".to_string(),
-                    "-MP".to_string(),
-                    "-MF".to_string(),
-                    d_file,
-                ])
-                .chain(self.flags.cxxflags.iter().cloned())
-                .chain([
-                    "-c".to_string(),
-                    "-o".to_string(),
-                    o_file.clone(),
-                    source_file.path.clone(),
-                ])
-                .collect(),
-            SourceType::S => std::iter::once(self.env.cxx.display().to_string())
-                .chain([
-                    "-MMD".to_string(),
-                    "-MP".to_string(),
-                    "-MF".to_string(),
-                    d_file,
-                    "-x".to_string(),
-                    "assembler-with-cpp".to_string(),
-                ])
-                .chain(self.flags.sflags.iter().cloned())
-                .chain([
-                    "-c".to_string(),
-                    "-o".to_string(),
-                    o_file.clone(),
-                    source_file.path.clone(),
-                ])
-                .collect(),
-        };
-
-        CompileCommand {
-            directory: "/".to_string(),
-            arguments,
-            file: source_file.path,
-            output: o_file,
+    fn create_compdb_entry(&self, source_file: SourceFile, d_file: String) -> CompileDBEntry {
+        match source_file.typ {
+            SourceType::C => CompileDBEntry::new(
+                &self.env.cc,
+                &source_file.path,
+                d_file,
+                self.flags.cflags.iter().cloned(),
+            ),
+            SourceType::Cpp => CompileDBEntry::new(
+                &self.env.cxx,
+                &source_file.path,
+                d_file,
+                self.flags.cxxflags.iter().cloned(),
+            ),
+            SourceType::S => CompileDBEntry::new(
+                &self.env.cxx,
+                &source_file.path,
+                d_file,
+                ["-x".to_string(), "assembler-with-cpp".to_string()]
+                    .into_iter()
+                    .chain(self.flags.sflags.iter().cloned()),
+            ),
         }
     }
 
     pub fn process_source(
         &self,
         source_path: &Path,
-        cc_possibly_changed: bool,
-        compile_commands: &mut FxHashMap<String, CompileCommand>,
+        check_compdb: bool,
+        compdb: &CompileDB,
     ) -> Result<SourceResult, system::Error> {
         let source_file = match SourceFile::from_path(source_path)? {
             Some(x) => x,
@@ -270,33 +231,34 @@ impl<'a> Builder<'a> {
         if !o_path.exists() {
             // output doesn't exist
             verboseln!("will compile '{}' (output doesn't exist)", source_file.path);
-            let cc = self.create_command(source_file, d_file, o_file);
-            return Ok(SourceResult::NeedCompile(cc));
+            let cc = self.create_compdb_entry(source_file, d_file);
+            return Ok(SourceResult::NeedCompile(cc, o_file));
         }
         // d file changed? (source included in d_file)
         if !are_deps_up_to_date(&d_path, &o_path)? {
             verboseln!("will compile '{}' (deps outdated)", source_file.path);
-            let cc = self.create_command(source_file, d_file, o_file);
-            return Ok(SourceResult::NeedCompile(cc));
+            let cc = self.create_compdb_entry(source_file, d_file);
+            return Ok(SourceResult::NeedCompile(cc, o_file));
         }
-        // dependencies didn't change. Only rebuild if compile command changed
-        if !cc_possibly_changed {
+        // dependencies didn't change.
+        // Only rebuild if compile command changed
+        if !check_compdb {
             return Ok(SourceResult::UpToDate(o_file));
         }
-        let cc = self.create_command(source_file, d_file, o_file);
-        match compile_commands.remove(&cc.output) {
+        let cc = self.create_compdb_entry(source_file, d_file);
+        match compdb.get(&o_file) {
             Some(old_cc) => {
-                if old_cc == cc {
-                    Ok(SourceResult::UpToDate(cc.output))
+                if old_cc == &cc {
+                    Ok(SourceResult::UpToDate(o_file))
                 } else {
                     verboseln!("will compile '{}' (command changed)", cc.file);
-                    Ok(SourceResult::NeedCompile(cc))
+                    Ok(SourceResult::NeedCompile(cc, o_file))
                 }
             }
             None => {
                 // no previous command found, (never built), need build
                 verboseln!("will compile '{}' (never built)", cc.file);
-                Ok(SourceResult::NeedCompile(cc))
+                Ok(SourceResult::NeedCompile(cc, o_file))
             }
         }
     }
@@ -321,45 +283,7 @@ impl<'a> Builder<'a> {
 pub enum SourceResult {
     NotSource,
     UpToDate(String),
-    NeedCompile(CompileCommand),
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CompileCommand {
-    #[serde(default)]
-    directory: String,
-    pub arguments: Vec<String>,
-    pub file: String,
-    pub output: String,
-}
-
-impl CompileCommand {
-    pub fn create_child(&self) -> Command {
-        Command::new(&self.arguments[0])
-            .args(&self.arguments[1..])
-            .silence_stdout()
-            .pipe_stderr()
-    }
-}
-
-pub fn load_compile_commands(cc_json: &Path, map: &mut FxHashMap<String, CompileCommand>) {
-    verboseln!("loading '{}'", cc_json.display());
-    if !cc_json.exists() {
-        return;
-    }
-    let file = match system::buf_reader(cc_json) {
-        Ok(file) => file,
-        _ => {
-            return;
-        }
-    };
-    let ccs: Vec<CompileCommand> = match serde_json::from_reader(file) {
-        Ok(ccs) => ccs,
-        Err(_) => return,
-    };
-    for cc in ccs {
-        map.insert(cc.output.clone(), cc);
-    }
+    NeedCompile(CompileDBEntry, String),
 }
 
 fn are_deps_up_to_date(d_path: &Path, o_path: &Path) -> Result<bool, system::Error> {
