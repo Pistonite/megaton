@@ -1,4 +1,5 @@
 #pragma once
+#include <megaton/module_layout.h>
 #include <megaton/prelude.h>
 
 #include <exl/hook/lib.hpp>
@@ -34,7 +35,7 @@ public:
     inline_always_ void InstallAtOffset(ptrdiff_t address) {
         _HOOK_STATIC_CALLBACK_ASSERT();
 
-        OrigRef() = hook::Hook(util::modules::GetTargetStart() + address,
+        OrigRef() = hook::Hook(megaton::module::main_info().start() + address,
                                Derived::Callback, true);
     }
 

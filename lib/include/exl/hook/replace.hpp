@@ -1,5 +1,5 @@
 #pragma once
-#include <megaton/prelude.h>
+#include <megaton/module_layout.h>
 
 #include <exl/hook/lib.hpp>
 #include <exl/hook/macros.h>
@@ -18,7 +18,7 @@ template <typename Derived> struct ReplaceHook {
     inline_always_ void InstallAtOffset(ptrdiff_t address) {
         _HOOK_STATIC_CALLBACK_ASSERT();
 
-        hook::Hook(util::modules::GetTargetStart() + address,
+        hook::Hook(megaton::module::main_info().start() + address,
                    Derived::Callback);
     }
 

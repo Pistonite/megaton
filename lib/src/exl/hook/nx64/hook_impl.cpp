@@ -26,6 +26,7 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  SOFTWARE.
  */
+#include "megaton/__priv/mirror.h"
 #include <megaton/prelude.h>
 #define __STDC_FORMAT_MACROS
 #include <cstring>
@@ -33,8 +34,8 @@
 
 #include <switch/result.h>
 
-#include <exl/hook/util/jit.hpp>
-#include <exl/hook/util/setting.hpp>
+#include <megaton/__priv/jit.h>
+#include <megaton/align.h>
 
 #define __attribute __attribute__
 #define aligned(x) __aligned__(x)
@@ -50,12 +51,18 @@
 #define __atomic_increase(p) __sync_add_and_fetch(p, 1)
 #define __sync_cmpswap(p, v, n) __sync_bool_compare_and_swap(p, v, n)
 
+#ifndef MEGATON_JIT_SIZE
+#define MEGATON_JIT_SIZE 0x1000
+#endif
+static_assert(align_up_(MEGATON_JIT_SIZE, PAGE_SIZE) == MEGATON_JIT_SIZE,
+              "JIT_SIZE is not aligned");
+
 namespace exl::hook::nx64 {
 
 namespace {
 
 // Hooking constants
-constexpr size_t HookPoolSize = setting::JitSize;
+constexpr size_t HookPoolSize = MEGATON_JIT_SIZE;
 constexpr s64 MaxInstructions = 5;
 constexpr size_t TrampolineSize = MaxInstructions * 10;
 constexpr u64 HookMax = HookPoolSize / (TrampolineSize * sizeof(uint32_t));
@@ -66,7 +73,7 @@ typedef uint32_t HookPool[HookMax][TrampolineSize];
 static_assert(sizeof(HookPool) <= HookPoolSize, "");
 
 typedef uint32_t* __restrict* __restrict instruction;
-typedef struct {
+typedef struct context {
     struct fix_info {
         uint32_t* bprx;
         uint32_t* bprw;
@@ -233,8 +240,9 @@ bool __fix_cond_comp_test_branch(instruction inprwp, instruction inprxp,
         0xfff8001fu; // 0b11111111111110000000000000011111
     constexpr uint32_t mask2 =
         0x7f000000u; // 0b01111111000000000000000000000000
-    constexpr uint32_t op_tbz = 0x36000000u; // 0b00110110000000000000000000000000
-                                             // "tbz"  Rt, BIT_NUM, ADDR_PCREL14
+    constexpr uint32_t op_tbz =
+        0x36000000u; // 0b00110110000000000000000000000000
+                     // "tbz"  Rt, BIT_NUM, ADDR_PCREL14
     constexpr uint32_t op_tbnz =
         0x37000000u; // 0b00110111000000000000000000000000 "tbnz" Rt, BIT_NUM,
                      // ADDR_PCREL14
@@ -605,9 +613,9 @@ void __fix_instructions(uint32_t* __restrict inprw, uint32_t* __restrict inprx,
 
 //-------------------------------------------------------------------------
 
-JIT_CREATE(s_HookJit, setting::JitSize);
+make_jit_(s_HookJit, MEGATON_JIT_SIZE);
 
-void Initialize() { s_HookJit.Initialize(); }
+void Initialize() { s_HookJit.init(); }
 
 //-------------------------------------------------------------------------
 
@@ -621,8 +629,8 @@ static void AllocForTrampoline(uint32_t** rx, uint32_t** rw) {
         panic_("failed to allocate trampoline: max hook limit reached");
     }
 
-    HookPool* rwptr = (HookPool*)s_HookJit.GetRw();
-    HookPool* rxptr = (HookPool*)s_HookJit.GetRo();
+    HookPool* rwptr = (HookPool*)s_HookJit.rw_start();
+    HookPool* rxptr = (HookPool*)s_HookJit.ro_start();
     *rw = (*rwptr)[i];
     *rx = (*rxptr)[i];
 }
@@ -642,18 +650,19 @@ static bool HookFuncImpl(void* const symbol, void* const replace,
     auto pc_offset =
         static_cast<int64_t>(__intval(replace) - __intval(symbol)) >> 2;
     if (llabs(pc_offset) >= (mask >> 1)) {
-        const util::RwPages ctrl((uintptr_t)original, 5 * sizeof(uint32_t));
+        const megaton::__priv::Mirror ctrl((uintptr_t)original,
+                                           5 * sizeof(uint32_t));
 
         int32_t count =
             (reinterpret_cast<uint64_t>(original + 2) & 7u) != 0u ? 5 : 4;
 
-        original = (u32*)ctrl.GetRw();
+        original = (u32*)ctrl.rw_start();
 
         if (rxtrampoline) {
             if (TrampolineSize < count * 10u) {
                 return false;
             } // if
-            __fix_instructions(original, (u32*)ctrl.GetRo(), count,
+            __fix_instructions(original, (u32*)ctrl.ro_start(), count,
                                rwtrampoline, rxtrampoline);
         } // if
 
@@ -666,15 +675,16 @@ static bool HookFuncImpl(void* const symbol, void* const replace,
         *reinterpret_cast<int64_t*>(original + 2) = __intval(replace);
         __flush_cache(symbol, 5 * sizeof(uint32_t));
     } else {
-        const util::RwPages ctrl((uintptr_t)original, 1 * sizeof(uint32_t));
+        const megaton::__priv::Mirror ctrl((uintptr_t)original,
+                                           1 * sizeof(uint32_t));
 
-        original = (u32*)ctrl.GetRw();
+        original = (u32*)ctrl.rw_start();
 
         if (rwtrampoline) {
             if (TrampolineSize < 1u * 10u) {
                 return false;
             } // if
-            __fix_instructions(original, (u32*)ctrl.GetRo(), 1, rwtrampoline,
+            __fix_instructions(original, (u32*)ctrl.ro_start(), 1, rwtrampoline,
                                rxtrampoline);
         } // if
 
@@ -705,7 +715,7 @@ uintptr_t Hook(uintptr_t hook, uintptr_t callback, bool do_trampoline) {
         panic_("HookFuncImpl failed");
     }
 
-    s_HookJit.Flush();
+    s_HookJit.flush();
 
     return (uintptr_t)rxtrampoline;
 }

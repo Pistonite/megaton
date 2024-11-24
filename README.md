@@ -4,6 +4,9 @@
 
 Megaton is a build tool and support library for embedding Rust in a NSO binary. [(name reference)](https://www.zeldadungeon.net/wiki/Rusty_Switch)
 
+## LICENSE
+libmegaton is GPLv2. Everything else is MIT.
+
 ## Install
 TODO
 

@@ -98,7 +98,7 @@ fn build_ninja(cli: &Cli) -> Result<(), Error> {
     let includes = [&inc_root, &env.libnx_include];
 
     // let mut c_flags = flags::DEFAULT_C.to_vec();
-    let mut c_flags = vec!["-Wall", "-Werror", "-O3"];
+    let mut c_flags = vec!["-Wall", "-Werror", "-O3", "-fdiagnostics-color=always"];
     c_flags.push("-DMEGATON_LIB");
 
     let include_flag = includes

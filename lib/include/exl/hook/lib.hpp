@@ -6,7 +6,6 @@
 #include <exl/hook/nx64/impl.hpp>
 #include <exl/hook/nx64/inline_impl.hpp>
 #include <exl/hook/util/func_ptrs.hpp>
-#include <exl/hook/util/modules.hpp>
 
 namespace exl::hook {
 
@@ -16,13 +15,6 @@ namespace arch = nx64;
 namespace {
 using Entrypoint = util::GenericFuncPtr<void, void*, void*>;
 };
-
-/* inline noreturn_ CallTargetEntrypoint(void* x0, void* x1) { */
-/*     auto entrypoint =
- * reinterpret_cast<Entrypoint>(util::modules::GetTargetStart()); */
-/*     entrypoint(x0, x1); */
-/*     __builtin_unreachable(); */
-/* } */
 
 inline void Initialize() {
     arch::Initialize();
