@@ -1,8 +1,7 @@
-#include <megaton/prelude.h>
+#include <megaton/module_layout.h>
+#include <megaton/patch.h>
 
 #include <exl/hook/lib.hpp>
-#include <exl/patch/patcher_impl.hpp>
-#include <exl/util/sys/mem_layout.hpp>
 
 extern "C" {
 /**
@@ -29,18 +28,19 @@ void __init_array(void) {
 }
 
 // from libnx
-// virtmem needed for RwPages
+// virtmem needed for mapping writable memory to read-only memory
 // the setup is not in libnx's header for some reason
 void virtmemSetup(void);
 
 void __megaton_lib_init() {
-    exl::util::impl::InitMemLayout();
     virtmemSetup();
-    exl::patch::impl::InitPatcherImpl();
+    megaton::module::init_layout();
+    megaton::patch::init();
 
     __init_array();
     exl::hook::Initialize();
 }
 
+// TODO: this can probably be removed with rtld/reloc
 void __megaton_rtld_init() {}
 }

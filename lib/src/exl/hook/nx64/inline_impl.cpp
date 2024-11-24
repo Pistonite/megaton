@@ -4,15 +4,25 @@
 
 #include <exl/hook/nx64/impl.hpp>
 #include <exl/hook/nx64/inline_impl.hpp>
-#include <exl/hook/util/jit.hpp>
-#include <exl/hook/util/setting.hpp>
 #include <exl_armv8/prelude.h>
+
+#include <megaton/__priv/jit.h>
+#include <megaton/align.h>
+
+/** Size of inline JIT memory. */
+#ifndef MEGATON_INLINE_JIT_SIZE
+#define MEGATON_INLINE_JIT_SIZE 0x1000
+#endif
 
 namespace exl::hook::nx64 {
 
 /* Size of stack to reserve for the context. Adjust this along with
  * CTX_STACK_SIZE in inline_asm.s */
 static constexpr int CtxStackSize = 0x100;
+
+static constexpr usize InlinePoolSize = MEGATON_INLINE_JIT_SIZE;
+static_assert(align_up_(InlinePoolSize, PAGE_SIZE) == InlinePoolSize,
+              "InlinePoolSize is not aligned");
 
 namespace reg = exl::armv8::reg;
 namespace inst = exl::armv8::inst;
@@ -23,9 +33,10 @@ struct Entry {
 };
 
 static constexpr size_t InlinePoolCount =
-    setting::InlinePoolSize / sizeof(Entry);
+    MEGATON_INLINE_JIT_SIZE / sizeof(Entry);
 
-JIT_CREATE(s_InlineHookJit, setting::InlinePoolSize);
+make_jit_(s_InlineHookJit, MEGATON_INLINE_JIT_SIZE);
+
 static size_t s_EntryIndex = 0;
 
 extern "C" {
@@ -37,14 +48,14 @@ static uintptr_t GetImpl() {
 }
 
 static const Entry* GetEntryRx() {
-    return reinterpret_cast<const Entry*>(s_InlineHookJit.GetRo());
+    return reinterpret_cast<const Entry*>(s_InlineHookJit.ro_start());
 }
 
 static Entry* GetEntryRw() {
-    return reinterpret_cast<Entry*>(s_InlineHookJit.GetRw());
+    return reinterpret_cast<Entry*>(s_InlineHookJit.rw_start());
 }
 
-void InitializeInline() { s_InlineHookJit.Initialize(); }
+void InitializeInline() { s_InlineHookJit.init(); }
 
 void HookInline(uintptr_t hook, uintptr_t callback) {
     /* Ensure enough space in the pool. */
@@ -82,6 +93,6 @@ void HookInline(uintptr_t hook, uintptr_t callback) {
     entryRw->m_Callback = callback;
 
     /* Finally, flush caches to have RX region to be consistent. */
-    s_InlineHookJit.Flush();
+    s_InlineHookJit.flush();
 }
 } // namespace exl::hook::nx64

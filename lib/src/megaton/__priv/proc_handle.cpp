@@ -1,3 +1,9 @@
+/*
+ * This file is part of exlaunch, adapted for megaton project
+ *
+ * exlaunch is licensed under GPLv2
+ */
+
 #include <megaton/align.h>
 #include <megaton/prelude.h>
 
@@ -9,15 +15,16 @@ extern "C" {
 #include <switch/result.h>
 }
 
-#include "cur_proc_handle.hpp"
+#include <megaton/__priv/proc_handle.h>
 
-namespace exl::util::proc_handle {
+namespace megaton::__priv {
 
-namespace {
+static const u32 s_send_handle_msg[4] = {0x00000000, 0x80000000, 0x00000002,
+                                         CUR_PROCESS_HANDLE};
+static Handle s_handle = INVALID_HANDLE;
 
-Handle s_Handle = INVALID_HANDLE;
-
-void ReceiveProcessHandleThreadMain(void* session_handle_ptr) {
+/** thread that will receive the proc handle */
+static noreturn_ recv_handle_thread_main(void* session_handle_ptr) {
     // Convert the argument to a handle we can use.
     Handle session_handle = (Handle)(uintptr_t)session_handle_ptr;
 
@@ -30,7 +37,7 @@ void ReceiveProcessHandleThreadMain(void* session_handle_ptr) {
     }
 
     // Set the process handle.
-    s_Handle = ((u32*)armGetTls())[3];
+    s_handle = ((u32*)armGetTls())[3];
 
     // Close the session.
     svcCloseHandle(session_handle);
@@ -43,7 +50,7 @@ void ReceiveProcessHandleThreadMain(void* session_handle_ptr) {
         ;
 }
 
-void GetViaIpcTrick(void) {
+static void get_via_ipc_trick(void) {
     alignas(PAGE_SIZE) u8 temp_thread_stack[0x1000];
 
     // Create a new session to transfer our process handle to ourself
@@ -55,7 +62,7 @@ void GetViaIpcTrick(void) {
     // Create a new thread to receive our handle.
     Handle thread_handle;
     if (R_FAILED(svcCreateThread(
-            &thread_handle, (void*)&ReceiveProcessHandleThreadMain,
+            &thread_handle, (void*)&recv_handle_thread_main,
             (void*)(uintptr_t)server_handle,
             temp_thread_stack + sizeof(temp_thread_stack), 0x20, 2))) {
         panic_("svcCreateThread failed.");
@@ -67,10 +74,7 @@ void GetViaIpcTrick(void) {
     }
 
     // Send the message.
-    static const u32 SendProcessHandleMessage[4] = {
-        0x00000000, 0x80000000, 0x00000002, CUR_PROCESS_HANDLE};
-    memcpy(armGetTls(), SendProcessHandleMessage,
-           sizeof(SendProcessHandleMessage));
+    memcpy(armGetTls(), s_send_handle_msg, sizeof(s_send_handle_msg));
     svcSendSyncRequest(client_handle);
 
     // Close the session handle.
@@ -85,28 +89,28 @@ void GetViaIpcTrick(void) {
     svcCloseHandle(thread_handle);
 }
 
-Result GetViaMesosphere() {
+static Result get_via_mesosphere() {
     u64 handle;
     Result r = svcGetInfo(&handle, 65001 /*InfoType_MesosphereCurrentProcess*/,
                           INVALID_HANDLE, 0);
     if (R_FAILED(r)) {
         return r;
     }
-    s_Handle = handle;
+    s_handle = handle;
 
     return 0;
 }
-} // namespace
 
-Handle Get() {
-    if (s_Handle == INVALID_HANDLE) {
+Handle current_process() {
+    if (s_handle == INVALID_HANDLE) {
         /* Try to ask mesosphere for our process handle. */
-        Result r = GetViaMesosphere();
+        Result r = get_via_mesosphere();
 
         /* Fallback to an IPC trick if mesosphere is old/not present. */
-        if (R_FAILED(r))
-            GetViaIpcTrick();
+        if (R_FAILED(r)) {
+            get_via_ipc_trick();
+        }
     }
-    return s_Handle;
+    return s_handle;
 }
-}; // namespace exl::util::proc_handle
+}; // namespace megaton::__priv
