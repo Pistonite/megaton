@@ -20,6 +20,7 @@ use crate::system::Command;
 #[derive(Debug, Default, Serialize, Deserialize, Deref, DerefMut)]
 pub struct CompileDB {
     /// Map of output file path to compile command
+    #[serde(flatten)]
     entries: FxHashMap<String, CompileDBEntry>,
 }
 
