@@ -37,6 +37,11 @@ The build command also generates a `clangd`-compatible compile DB (`compile_comm
 The generated `.clangd` config already references this file, along
 with other useful settings to make it work out of the box for you
 ```
+```admonish note
+Megaton is optimized for incremental build performance, which means
+it sometimes has compromised correctness and requires a `megaton clean` build. See [Incremental Build](./incremental_build.md)
+for more information
+```
 
 ## Entrypoint
 Open `src/main.cpp` and you will see the following:

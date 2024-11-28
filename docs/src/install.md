@@ -1,4 +1,11 @@
-# Install
+# Getting Started
+
+Megaton is a build tool and library for linking and patching NX modules 
+at runtime.
+
+Credits:
+- [exlaunch](https://github.com/shadowninja108/exlaunch) for the hooking and patching framework
+  megaton is based on.
 
 ## Prerequisites
 Make sure you have these installed:

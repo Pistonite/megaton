@@ -1,7 +1,8 @@
 # Summary
 
-- [Install](./install.md)
+- [Getting Started](./install.md)
 - [Create Project](./create_project.md)
+- [Incremental Build](./incremental_build.md)
 - [Build Config](./config/module.md)
   - [Build Flags](./config/build_flags.md)
   - [Profiles](./config/profiles.md)
@@ -9,6 +10,8 @@
 - [Other Commands]()
   - [clean]()
   - [fmt]()
-- [C API]()
-  - [Defines]()
+- [C/C++ API]()
+  - [Defines](./capi/defines.md)
+  - [Module](./capi/module.md)
   - [Panic]()
+  - [Patching](./capi/patching.md)
