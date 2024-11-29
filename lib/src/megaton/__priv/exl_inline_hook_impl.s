@@ -1,3 +1,6 @@
+/*
+ * This file is part of exlaunch, which is licensed under GPLv2
+ */
 .macro CODE_BEGIN name
 	.section .text.\name, "ax", %progbits
 	.global \name
