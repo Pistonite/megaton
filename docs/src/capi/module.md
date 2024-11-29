@@ -1,4 +1,4 @@
-# C Module
+# Module (C/C++)
 
 ## Module Information
 The `<megaton/module.h>` header provides information about the module.

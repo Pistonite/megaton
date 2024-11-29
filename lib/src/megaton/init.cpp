@@ -1,7 +1,6 @@
 #include <megaton/module_layout.h>
 #include <megaton/patch.h>
-
-#include <exl/hook/lib.hpp>
+#include <megaton/hook.h>
 
 extern "C" {
 /**
@@ -38,7 +37,7 @@ void __megaton_lib_init() {
     megaton::patch::init();
 
     __init_array();
-    exl::hook::Initialize();
+    megaton::hook::init();
 }
 
 // TODO: this can probably be removed with rtld/reloc

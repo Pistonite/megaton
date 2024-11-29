@@ -26,8 +26,11 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  SOFTWARE.
  */
-#include "megaton/__priv/mirror.h"
-#include <megaton/prelude.h>
+/*
+ * This file is part of exlaunch, adapted for megaton project
+ *
+ * exlaunch is licensed under GPLv2
+ */
 #define __STDC_FORMAT_MACROS
 #include <cstring>
 #include <stdlib.h>
@@ -35,7 +38,10 @@
 #include <switch/result.h>
 
 #include <megaton/__priv/jit.h>
+#include <megaton/__priv/mirror.h>
 #include <megaton/align.h>
+#include <megaton/module_layout.h>
+#include <megaton/hook.h>
 
 #define __attribute __attribute__
 #define aligned(x) __aligned__(x)
@@ -55,9 +61,9 @@
 #define MEGATON_JIT_SIZE 0x1000
 #endif
 static_assert(align_up_(MEGATON_JIT_SIZE, PAGE_SIZE) == MEGATON_JIT_SIZE,
-              "JIT_SIZE is not aligned");
+              "MEGATON_JIT_SIZE is not page-aligned");
 
-namespace exl::hook::nx64 {
+namespace megaton::__priv::hook_impl {
 
 namespace {
 
@@ -553,11 +559,9 @@ void __fix_instructions(uint32_t* __restrict inprw, uint32_t* __restrict inprx,
     memset(ctx.dat, 0, sizeof(ctx.dat));
     static_assert(sizeof(ctx.dat) / sizeof(ctx.dat[0]) == MaxInstructions,
                   "please use MaxInstructions!");
-#ifndef NDEBUG
     if (count > MaxInstructions) {
         panic_("too many instructions to fix!");
     } // if
-#endif // NDEBUG
 
     uint32_t* const outprx_base = outrxp;
     uint32_t* const outprw_base = outrwp;
@@ -615,11 +619,9 @@ void __fix_instructions(uint32_t* __restrict inprw, uint32_t* __restrict inprx,
 
 make_jit_(s_HookJit, MEGATON_JIT_SIZE);
 
-void Initialize() { s_HookJit.init(); }
-
 //-------------------------------------------------------------------------
 
-static void AllocForTrampoline(uint32_t** rx, uint32_t** rw) {
+inline_always_ void AllocForTrampoline(uint32_t** rx, uint32_t** rw) {
     static_assert((TrampolineSize * sizeof(uint32_t)) % 8 == 0, "8-byte align");
     static volatile s32 index = -1;
 
@@ -637,7 +639,7 @@ static void AllocForTrampoline(uint32_t** rx, uint32_t** rw) {
 
 //-------------------------------------------------------------------------
 
-static bool HookFuncImpl(void* const symbol, void* const replace,
+inline_always_ bool HookFuncImpl(void* const symbol, void* const replace,
                          void* const rxtr, void* const rwtr) {
     static constexpr uint_fast64_t mask =
         0x03ffffffu; // 0b00000011111111111111111111111111
@@ -696,28 +698,31 @@ static bool HookFuncImpl(void* const symbol, void* const replace,
     return true;
 }
 
-uintptr_t Hook(uintptr_t hook, uintptr_t callback, bool do_trampoline) {
 
-    assert_(hook != 0);
-    assert_(callback != 0);
+}
 
-    /* TODO: thread safety */
-
+namespace megaton::__priv {
+void init_hook() {
+    hook_impl::s_HookJit.init();
+}
+uintptr_t do_install_hook_at_offset(ptrdiff_t main_offset, uintptr_t callback, bool is_trampoline) {
+    return do_install_hook(megaton::module::main_info().start() + main_offset, callback, is_trampoline);
+}
+uintptr_t do_install_hook(uintptr_t hook, uintptr_t callback, bool do_trampoline) {
     u32* rxtrampoline = NULL;
     u32* rwtrampoline = NULL;
     if (do_trampoline) {
-        AllocForTrampoline(&rxtrampoline, &rwtrampoline);
+        hook_impl::AllocForTrampoline(&rxtrampoline, &rwtrampoline);
     }
 
-    if (!HookFuncImpl(reinterpret_cast<void*>(hook),
+    if (!hook_impl::HookFuncImpl(reinterpret_cast<void*>(hook),
                       reinterpret_cast<void*>(callback), rxtrampoline,
                       rwtrampoline)) {
         panic_("HookFuncImpl failed");
     }
 
-    s_HookJit.flush();
+    hook_impl::s_HookJit.flush();
 
     return (uintptr_t)rxtrampoline;
 }
-
-}; // namespace exl::hook::nx64
+}

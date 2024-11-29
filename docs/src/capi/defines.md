@@ -1,4 +1,4 @@
-# C Defines
+# Defines
 
 In your project C/C++ sources, you can use these defines provided by `megaton` build tool.
 
