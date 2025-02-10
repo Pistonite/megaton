@@ -1,6 +1,6 @@
+#include <megaton/hook.h>
 #include <megaton/module_layout.h>
 #include <megaton/patch.h>
-#include <megaton/hook.h>
 
 extern "C" {
 /**

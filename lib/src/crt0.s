@@ -77,7 +77,7 @@ bss_loop:
     // Parse ELF .dynamic section (which applies relocations to our module)
     mov x0, x23
     FROM_MOD0 1, 0x4
-    bl   exl_dynamic
+    // bl   exl_dynamic
 
     mov  x0, x25
     mov  x1, x26
@@ -89,7 +89,7 @@ bss_loop:
 
 .section ".rodata.mod0","a"
 
-.hidden exl_nx_module_runtime 
+.hidden __megaton_nx_module_runtime 
 
 .align 2
 __nx_mod0:
@@ -99,4 +99,4 @@ __nx_mod0:
     .word  __bss_end__              - __nx_mod0
     .word  __eh_frame_hdr_start__   - __nx_mod0
     .word  __eh_frame_hdr_end__     - __nx_mod0
-    .word  exl_nx_module_runtime    - __nx_mod0
+    .word  __megaton_nx_module_runtime    - __nx_mod0

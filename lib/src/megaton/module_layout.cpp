@@ -3,7 +3,13 @@ extern "C" {
 #include <switch/kernel/svc.h>
 #include <switch/result.h>
 }
+#include <megaton/__priv/rtld.h>
 #include <megaton/module_layout.h>
+
+extern "C" {
+/** RTLD injects info into this */
+__attribute__((section(".bss"))) rtld::ModuleObject __megaton_nx_module_runtime;
+}
 
 namespace megaton::module {
 

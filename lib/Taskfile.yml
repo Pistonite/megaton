@@ -24,7 +24,6 @@ tasks:
   check:
     desc: Check code for errors
     cmds:
-      - clang-format -n -Werror $(find src/exl -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
       - clang-format -n -Werror $(find src/megaton -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
       - clang-format -n -Werror $(find include -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
       - clang-format -n -Werror $(find runtime -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
@@ -32,7 +31,6 @@ tasks:
   fix:
     desc: Fix code
     cmds:
-      - clang-format -i $(find src/exl -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
       - clang-format -i $(find src/megaton -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
       - clang-format -i $(find include -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
       - clang-format -i $(find runtime -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')

@@ -40,8 +40,8 @@
 #include <megaton/__priv/jit.h>
 #include <megaton/__priv/mirror.h>
 #include <megaton/align.h>
-#include <megaton/module_layout.h>
 #include <megaton/hook.h>
+#include <megaton/module_layout.h>
 
 #define __attribute __attribute__
 #define aligned(x) __aligned__(x)
@@ -640,7 +640,7 @@ inline_always_ void AllocForTrampoline(uint32_t** rx, uint32_t** rw) {
 //-------------------------------------------------------------------------
 
 inline_always_ bool HookFuncImpl(void* const symbol, void* const replace,
-                         void* const rxtr, void* const rwtr) {
+                                 void* const rxtr, void* const rwtr) {
     static constexpr uint_fast64_t mask =
         0x03ffffffu; // 0b00000011111111111111111111111111
 
@@ -698,17 +698,17 @@ inline_always_ bool HookFuncImpl(void* const symbol, void* const replace,
     return true;
 }
 
-
-}
+} // namespace megaton::__priv::hook_impl
 
 namespace megaton::__priv {
-void init_hook() {
-    hook_impl::s_HookJit.init();
+void init_hook() { hook_impl::s_HookJit.init(); }
+uintptr_t do_install_hook_at_offset(ptrdiff_t main_offset, uintptr_t callback,
+                                    bool is_trampoline) {
+    return do_install_hook(megaton::module::main_info().start() + main_offset,
+                           callback, is_trampoline);
 }
-uintptr_t do_install_hook_at_offset(ptrdiff_t main_offset, uintptr_t callback, bool is_trampoline) {
-    return do_install_hook(megaton::module::main_info().start() + main_offset, callback, is_trampoline);
-}
-uintptr_t do_install_hook(uintptr_t hook, uintptr_t callback, bool do_trampoline) {
+uintptr_t do_install_hook(uintptr_t hook, uintptr_t callback,
+                          bool do_trampoline) {
     u32* rxtrampoline = NULL;
     u32* rwtrampoline = NULL;
     if (do_trampoline) {
@@ -716,8 +716,8 @@ uintptr_t do_install_hook(uintptr_t hook, uintptr_t callback, bool do_trampoline
     }
 
     if (!hook_impl::HookFuncImpl(reinterpret_cast<void*>(hook),
-                      reinterpret_cast<void*>(callback), rxtrampoline,
-                      rwtrampoline)) {
+                                 reinterpret_cast<void*>(callback),
+                                 rxtrampoline, rwtrampoline)) {
         panic_("HookFuncImpl failed");
     }
 
@@ -725,4 +725,4 @@ uintptr_t do_install_hook(uintptr_t hook, uintptr_t callback, bool do_trampoline
 
     return (uintptr_t)rxtrampoline;
 }
-}
+} // namespace megaton::__priv
