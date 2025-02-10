@@ -50,6 +50,7 @@ SECTIONS
   /* App rodata */
   .rodata : {
     *(.rodata .rodata.*)
+    KEEP (*(.rodata.mod0))
   } :rodata
 
   /* All the symbols needed for relocation lookup */
