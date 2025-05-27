@@ -7,7 +7,7 @@ extern "C" {
 #include <megaton/patch.h>
 
 namespace megaton::patch {
-static __priv::AlignedStorage<const __priv::Mirror> s_main_rx;
+static __priv::AlignedStorage<__priv::Mirror> s_main_rx;
 
 const __priv::Mirror& main_ro() { return s_main_rx.reference(); }
 
