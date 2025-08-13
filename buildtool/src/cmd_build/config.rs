@@ -200,6 +200,10 @@ pub struct Build {
     #[serde(default)]
     pub libpaths: Vec<String>,
 
+    /// Additional Objects to link (for example .a)
+    #[serde(default)]
+    pub objects: Vec<String>,
+
     /// Additional Libraries to link with
     #[serde(default)]
     pub libraries: Vec<String>,

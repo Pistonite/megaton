@@ -20,7 +20,7 @@ pub struct Builder<'a> {
     env: &'a ProjectEnv,
     flags: Flags,
     pub source_dirs: Vec<PathBuf>,
-    lib_objects: Vec<String>,
+    lib_objects: Vec<PathBuf>,
 }
 
 error_context!(pub BuilderNew, |r| -> Error {
@@ -68,11 +68,16 @@ impl<'a> Builder<'a> {
             source_dirs.push(env.root.join(source_dir));
         }
 
+        let mut lib_objects = Vec::with_capacity(build.objects.len() + 1);
+        for obj in &build.objects {
+            lib_objects.push(env.root.join(obj));
+        }
+
         Ok(Self {
             env,
             flags,
             source_dirs,
-            lib_objects: Vec::new(),
+            lib_objects,
         })
     }
 
@@ -149,7 +154,7 @@ impl<'a> Builder<'a> {
                 return Err(report!(Error::Dependency));
             }
 
-            self.lib_objects.push(libmegaton.display().to_string());
+            self.lib_objects.push(libmegaton);
 
             let runtime_source = lib_path.into_joined("runtime");
 
@@ -267,13 +272,11 @@ impl<'a> Builder<'a> {
         // use CXX for linking
         Command::new(&self.env.cxx)
             .args(
-                self.flags
+                &self.flags
                     .ldflags
-                    .iter()
-                    .chain(objects.iter())
-                    .chain(self.lib_objects.iter())
-                    .chain(["-o".to_string(), self.env.elf.display().to_string()].iter()),
-            )
+            ).args(objects)
+            .args(&self.lib_objects)
+                    .args(["-o".to_string(), self.env.elf.display().to_string()].iter())
             .silence_stdout()
             .pipe_stderr()
             .spawn()
