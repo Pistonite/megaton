@@ -1,0 +1,12 @@
+[package]
+name = "megaton-abi"
+version = "0.0.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+description = "Implementation of the hermit abi that binds to nnsdk"
+publish = false
+
+[dependencies.nn]
+package = "megaton-nnsdk-sys"
+path = "../sys"
+

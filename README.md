@@ -1,5 +1,9 @@
 # megaton
 
+NOTE: If you were using the megaton tool for build C projects,
+please continue using the `old` branch while the new tool is being developed
+(to support Rust, etc). ETA for the new tool is July 2026.
+
 **In Development and VERY unstable**
 
 Megaton is a build tool and support library for embedding Rust in a NSO binary. [(name reference)](https://www.zeldadungeon.net/wiki/Rusty_Switch)

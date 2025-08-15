@@ -1,11 +1,34 @@
 version: '3'
 
 includes:
-  docs:
-    taskfile: ./docs
-    dir: ./docs
+  common:
+    taskfile: packages/mono-dev/task/common.yaml
+    optional: true
+    flatten: true
+
+  # docs:
+  #   taskfile: ./docs
+  #   dir: ./docs
 
 tasks:
+  install-mono:
+    - rm -rf packages/mono-dev
+    - git clone https://github.com/Pistonight/mono-dev --depth 1 packages/mono-dev
+
+  install-cargo-extra-tools:
+    aliases: [icets]
+    cmds:
+      - task: cargo-binstall
+        vars:
+          PACKAGES: lisensor
+
+  check-license:
+    - lisensor
+
+  fix-license:
+    - lisensor -f
+
+
   rustc:
     desc: Install custom rustc toolchain
     cmds:

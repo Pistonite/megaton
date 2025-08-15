@@ -1,0 +1,9 @@
+[package]
+name = "megaton-nnsdk-sys"
+version = "0.0.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+description = "User-created, hand-crafted system bindings for nnsdk"
+publish = false
+
+[dependencies]

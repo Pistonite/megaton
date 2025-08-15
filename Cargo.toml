@@ -1,9 +1,16 @@
 [workspace]
 resolver = "2"
 members = [
-    "buildcommon",
-    "buildtool",
-    "librs/macros",
-    "librs/runtime",
-    "lib/build",
+    # old
+    "OLD/buildcommon",
+    "OLD/buildtool",
+    "OLD/librs/macros",
+    "OLD/librs/runtime",
+    # "packages/clib/build",
+
+    # new
+    # "packages/cli", 
+    "packages/sys",
+    "packages/abi",
+    "packages/lib",
 ]
