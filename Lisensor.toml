@@ -1,8 +1,11 @@
 ["Megaton contributors"]
-"packages/lib/src/nx/impl/**/*.{s,cpp,c}" = "GPL-3.0-or-later"
-"packages/lib/src/megaton/**/*.{s,cpp,c}" = "GPL-3.0-or-later"
 "packages/lib/include/megaton/**/*" = "GPL-3.0-or-later"
-
+"packages/lib/src/nx/impl/**/*.s" = "GPL-3.0-or-later"
+"packages/lib/src/nx/impl/**/*.cpp" = "GPL-3.0-or-later"
+"packages/lib/src/nx/impl/**/*.c" = "GPL-3.0-or-later"
+"packages/lib/src/megaton/**/*.s" = "GPL-3.0-or-later"
+"packages/lib/src/megaton/**/*.cpp" = "GPL-3.0-or-later"
+"packages/lib/src/megaton/**/*.c" = "GPL-3.0-or-later"
+"packages/lib/src/**/*.rs" = "GPL-3.0-or-later"
 "packages/sys/src/**/*.rs" = "GPL-3.0-or-later"
 "packages/abi/src/**/*.rs" = "GPL-3.0-or-later"
-"packages/lib/src/**/*.rs" = "GPL-3.0-or-later"

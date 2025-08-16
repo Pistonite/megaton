@@ -1,8 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2025 Megaton contributors
+
 // This file has been modified from exlaunch, the project where
 // it's taken from. See the license information below
 //
-// SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) shadowninja
 .macro CODE_BEGIN name
 	.section .text.\name, "ax", %progbits
 	.global \name
