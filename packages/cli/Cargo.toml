@@ -9,7 +9,7 @@ publish = false
 [dependencies.cu]
 package = "pistonite-cu"
 version = "0.4.0"
-features = ["cli"]
+features = ["cli", "process", "prompt"]
 
 [build-dependencies.cu]
 package = "pistonite-cu"
@@ -17,3 +17,13 @@ version = "0.4.0"
 features = ["process"]
 
 [dependencies]
+flate2 = "1.1.2"
+tar = "0.4.44"
+#
+# [build-dependencies]
+# flate2 = "1.1.2"
+# tar = "0.4.44"
+
+[[bin]]
+name = "megaton"
+path = "src/main.rs"

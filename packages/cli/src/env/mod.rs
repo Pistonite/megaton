@@ -6,10 +6,17 @@ use std::sync::OnceLock;
 
 use cu::pre::*;
 
+// mod megaton_repo;
+
 pub struct Environment {
-    megaton_home: PathBuf
+    megaton_home: PathBuf,
 }
 impl Environment {
+    fn new(megaton_home: PathBuf) -> Self {
+        Self {
+            megaton_home,
+        }
+    }
     /// Get the home of the megaton cache directory
     pub fn home(&self) -> &Path {
         &self.megaton_home
@@ -36,14 +43,14 @@ pub unsafe fn init_env() -> cu::Result<()> {
         cu::debug!("MEGATON_HOME not specified, using default path ~/.cache/megaton");
         let mut home = std::env::home_dir().context("failed to get user's home directory")?;
         home.extend([".cache", "megaton"]);
-        home
+        home.normalize()?
     } else {
-        megaton_home.into()
+        Path::new(&megaton_home).normalize()?
     };
 
-    let env = Environment {
-        megaton_home
-    };
+    cu::debug!("megaton_home: {}", megaton_home.display());
+
+    let env = Environment::new(megaton_home);
     if ENVIRONMENT.set(env).is_err() {
         cu::bail!("unexpected: environment was already set before init_env()");
     }
