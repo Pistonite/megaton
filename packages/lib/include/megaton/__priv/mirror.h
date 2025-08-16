@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2025 Megaton contributors
-
-// This file has been modified from exlaunch, the project where
-// it's taken from. See the license information below
+// * * * * *
+// This file was taken from the exlaunch project and modified.
+// See original license information below
 //
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) shadowninja
+
 #pragma once
 #include <megaton/align.h>
 #include <megaton/prelude.h>

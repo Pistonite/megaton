@@ -22,11 +22,10 @@ tasks:
         vars:
           PACKAGES: lisensor
 
-  check-license:
-    - lisensor
-
-  fix-license:
-    - lisensor -f
+  license:
+    desc: check or fix license notices (-- -f to fix)
+    cmds:
+      - lisensor {{.CLI_ARGS}}
 
 
   rustc:

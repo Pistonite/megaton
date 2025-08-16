@@ -2,14 +2,14 @@
 resolver = "2"
 members = [
     # old
-    "OLD/buildcommon",
-    "OLD/buildtool",
-    "OLD/librs/macros",
-    "OLD/librs/runtime",
+    # "OLD/buildcommon",
+    # "OLD/buildtool",
+    # "OLD/librs/macros",
+    # "OLD/librs/runtime",
     # "packages/clib/build",
 
     # new
-    # "packages/cli", 
+    "packages/cli", 
     "packages/sys",
     "packages/abi",
     "packages/lib",

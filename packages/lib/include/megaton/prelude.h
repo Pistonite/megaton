@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2025 Megaton contributors
-
-// This file has been modified from libnx, the project where
-// it's taken from. See the license information below
+// * * * * *
+// This file was taken from the exlaunch project and modified.
+// See original license information below
 //
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) shadowninja
+// SPDX-License-Identifier: ISC
+// Copyright (c) libnx Authors
 
 /**
  * prelude.h should be included by all source files.
