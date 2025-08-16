@@ -1,8 +1,19 @@
 ["Megaton contributors"]
-"packages/lib/src/nx/impl/**/*.{s,cpp,c}" = "GPL-3.0-or-later"
-"packages/lib/src/megaton/**/*.{s,cpp,c}" = "GPL-3.0-or-later"
+# C files
 "packages/lib/include/megaton/**/*" = "GPL-3.0-or-later"
+"packages/lib/src/nximpl/**/*.s" = "GPL-3.0-or-later"
+"packages/lib/src/nximpl/**/*.cpp" = "GPL-3.0-or-later"
+"packages/lib/src/nximpl/**/*.c" = "GPL-3.0-or-later"
+"packages/lib/src/megaton/**/*.s" = "GPL-3.0-or-later"
+"packages/lib/src/megaton/**/*.cpp" = "GPL-3.0-or-later"
+"packages/lib/src/megaton/**/*.c" = "GPL-3.0-or-later"
 
-"packages/sys/src/**/*.rs" = "GPL-3.0-or-later"
-"packages/abi/src/**/*.rs" = "GPL-3.0-or-later"
-"packages/lib/src/**/*.rs" = "GPL-3.0-or-later"
+# Rust files
+"packages/lib/**/*.rs" = "GPL-3.0-or-later"
+"packages/sys/**/*.rs" = "GPL-3.0-or-later"
+"packages/abi/**/*.rs" = "GPL-3.0-or-later"
+"packages/cli/**/*.rs" = "MIT"
+
+# Unmodified files
+# ["libnx Authors"]
+# "packages/lib/src/external/libnx/*.s" = "ISC"

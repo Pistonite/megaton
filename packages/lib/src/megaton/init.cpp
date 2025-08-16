@@ -1,3 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2025 Megaton contributors
+// * * * * *
+// Parts of this file was taken from the exlaunch project and modified.
+// See original license information below
+//
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) shadowninja
+
 #include <megaton/hook.h>
 #include <megaton/module_layout.h>
 #include <megaton/patch.h>

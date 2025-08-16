@@ -1,0 +1,19 @@
+[package]
+name = "megaton-cmd"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "The `megaton` CLI command"
+publish = false
+
+[dependencies.cu]
+package = "pistonite-cu"
+version = "0.4.0"
+features = ["cli"]
+
+[build-dependencies.cu]
+package = "pistonite-cu"
+version = "0.4.0"
+features = ["process"]
+
+[dependencies]

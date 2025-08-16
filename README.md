@@ -8,8 +8,11 @@ please continue using the `old` branch while the new tool is being developed
 
 Megaton is a build tool and support library for embedding Rust in a NSO binary. [(name reference)](https://www.zeldadungeon.net/wiki/Rusty_Switch)
 
-## LICENSE
-libmegaton is GPLv2. Everything else is MIT.
+## License
+The `megaton` CLI tool is MIT licensed. The `megaton` framework is GPL-3.0-or-later.
+See [Lisensor.toml](./Lisensor.toml) for more information.
+
+Note that this means projects based on `megaton` framework needs to use a GPLv3 compatible license.
 
 ## Install
 TODO
