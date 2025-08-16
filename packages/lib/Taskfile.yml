@@ -1,36 +1,44 @@
 version: '3'
 
 tasks:
-  configure:
-    desc: (Re)-configure ninja build.
-    dir: build
-    cmds:
-      - cargo run --bin megaton-lib-configure -- -o build.ninja
-      - ninja -t compdb as cc cxx | cargo run --bin megaton-lib-configure -- -o compile_commands.json --compdb
 
-  build:
-    desc: Execute incremental builds
+  pack:
+    desc: pack lib into a tar.gz
     cmds:
-      - ninja -C build
-
-  clean:
-    desc: Clean build directory
-    cmds:
-      - rm -rf build/bin build/.cache
-      - rm -f build/.ninja*
-      - rm -f build/compile_commands.json
+      - $(which mkdir) -p ../../target/libmegaton
+      - tar -czvf ../../target/libmegaton/libmegaton.tar.gz .
 
 
-  check:
-    desc: Check code for errors
-    cmds:
-      - clang-format -n -Werror $(find src/megaton -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
-      - clang-format -n -Werror $(find include -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
-      - clang-format -n -Werror $(find runtime -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
-
-  fix:
-    desc: Fix code
-    cmds:
-      - clang-format -i $(find src/megaton -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
-      - clang-format -i $(find include -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
-      - clang-format -i $(find runtime -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
+  # configure:
+  #   desc: (Re)-configure ninja build.
+  #   dir: build
+  #   cmds:
+  #     - cargo run --bin megaton-lib-configure -- -o build.ninja
+  #     - ninja -t compdb as cc cxx | cargo run --bin megaton-lib-configure -- -o compile_commands.json --compdb
+  #
+  # build:
+  #   desc: Execute incremental builds
+  #   cmds:
+  #     - ninja -C build
+  #
+  # clean:
+  #   desc: Clean build directory
+  #   cmds:
+  #     - rm -rf build/bin build/.cache
+  #     - rm -f build/.ninja*
+  #     - rm -f build/compile_commands.json
+  #
+  #
+  # check:
+  #   desc: Check code for errors
+  #   cmds:
+  #     - clang-format -n -Werror $(find src/megaton -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
+  #     - clang-format -n -Werror $(find include -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
+  #     - clang-format -n -Werror $(find runtime -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
+  #
+  # fix:
+  #   desc: Fix code
+  #   cmds:
+  #     - clang-format -i $(find src/megaton -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
+  #     - clang-format -i $(find include -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')
+  #     - clang-format -i $(find runtime -name '*.cpp' -o -name '*.hpp' -o -name '*.c' -o -name '*.h')

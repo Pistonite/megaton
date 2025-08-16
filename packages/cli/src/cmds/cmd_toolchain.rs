@@ -6,88 +6,56 @@ use cu::pre::*;
 static TOOLCHAIN_NAME: &str = "megaton";
 /// The Rust compiler repo
 static RUST_REPO: &str = "https://github.com/rust-lang/rust";
+/// The "blessed" commit hash to use (i.e. tested and will work)
+static RUST_COMMIT: &str = "1ae7c4907275f10b3db9e886bc8809ec063e45ee";
 
-#[derive(Debug, Clone, clap::Parser)]
-struct Args {
-    #[clap(subcommand)]
-    command: ArgCommand,
-}
-
+/// Manage the custom `megaton` Rust toolchain
 #[derive(Debug, Clone, clap::Subcommand)]
-enum ArgCommand {
+pub enum CmdToolchain {
     /// Check the installation status of the toolchain
     Check(cu::cli::Flags),
     /// Build and install the toolchain
-    Install(cu::cli::Flags),
+    Install {
+        /// Keep the rustc/llvm build output. This may consume a lot of disk space,
+        /// but might make it faster when upgrading the toolchain
+        #[clap(short, long)]
+        keep: bool,
+
+        /// Clean build rustc/llvm
+        #[clap(short, long)]
+        clean: bool,
+
+        #[clap(flatten)]
+        common: cu::cli::Flags
+    },
     /// Uninstall the toolchain
     Remove(cu::cli::Flags),
     /// Uninstall and remove any build artifacts
     Clean(cu::cli::Flags),
 }
 
-impl AsRef<cu::cli::Flags> for Args {
+impl AsRef<cu::cli::Flags> for CmdToolchain {
     fn as_ref(&self) -> &cu::cli::Flags {
-        match &self.command {
-            ArgCommand::Check(args) => args,
-            ArgCommand::Install(args) => args,
-            ArgCommand::Remove(args) => args,
-            ArgCommand::Clean(args) => args,
+        match &self{
+            Self::Check(args) => args,
+            Self::Install{common, ..} => common,
+            Self::Remove(args) => args,
+            Self::Clean(args) => args,
         }
     }
 }
 
-#[cu::cli]
-fn main(args: Args) -> cu::Result<()> {
-    match args.command {
-        ArgCommand::Check(_) => check(),
-        ArgCommand::Install(_) => install(),
-        ArgCommand::Remove(_) => remove(),
-        ArgCommand::Clean(_) => clean(),
+impl CmdToolchain {
+    pub fn run(self) -> cu::Result<()> {
+        match self {
+            Self::Check(_) => check(),
+            Self::Install{..} => self.install(),
+            Self::Remove(_) => remove(),
+            Self::Clean(_) => clean(),
+        }
     }
-}
-
-fn clean() -> cu::Result<()> {
-    remove()?;
-    {
-        let _bar = cu::progress_unbounded("removing rust repo");
-        cu::fs::remove_dir(get_rust_clone_path()?)?;
-    }
-    Ok(())
-}
-
-fn check() -> cu::Result<()> {
-    let installed = check_toolchain()?;
-    if !installed {
-        cu::warn!("{TOOLCHAIN_NAME} toolchain is not found!");
-        cu::hint!("run `megaton toolchain install` to install the toolchain");
-    } else {
-        cu::hint!("run `megaton toolchain remove` to remove the toolchain");
-    }
-    Ok(())
-}
-
-fn remove() -> cu::Result<()> {
-    if let Ok(false) = check_toolchain() {
-        cu::info!("toolchain is not installed, nothing to do.");
-        return Ok(());
-    }
-    cu::info!("uninstalling megaton toolchain");
-    cu::which("rustup")?
-        .command()
-        .args(["toolchain", "uninstall", TOOLCHAIN_NAME])
-        .stdout(cu::lv::P)
-        .stdie_null()
-        .wait_nz()?;
-    if check_toolchain()? {
-        cu::bailand!(warn!(
-            "rustup succeeded, but the toolchain was not uninstalled"
-        ));
-    }
-    Ok(())
-}
-
-fn install() -> cu::Result<()> {
-    cu::which("rustup").context("rustup is required")?;
+fn install(self) -> cu::Result<()> {
+    cu::which("rustup").context("rustup is required to manage rust toolchains. Please install it")?;
 
     if let Ok(true) = check_toolchain() {
         cu::hint!(
@@ -194,6 +162,48 @@ target = ["{host_triple}", "aarch64-unknown-hermit", "aarch64-nintendo-switch-fr
 
     Ok(())
 }
+}
+
+fn clean() -> cu::Result<()> {
+    remove()?;
+    {
+        let _bar = cu::progress_unbounded("removing rust repo");
+        cu::fs::remove_dir(get_rust_clone_path()?)?;
+    }
+    Ok(())
+}
+
+fn check() -> cu::Result<()> {
+    let installed = check_toolchain()?;
+    if !installed {
+        cu::warn!("{TOOLCHAIN_NAME} toolchain is not found!");
+        cu::hint!("run `megaton toolchain install` to install the toolchain");
+    } else {
+        cu::hint!("run `megaton toolchain remove` to remove the toolchain");
+    }
+    Ok(())
+}
+
+fn remove() -> cu::Result<()> {
+    if let Ok(false) = check_toolchain() {
+        cu::info!("toolchain is not installed, nothing to do.");
+        return Ok(());
+    }
+    cu::info!("uninstalling megaton toolchain");
+    cu::which("rustup")?
+        .command()
+        .args(["toolchain", "uninstall", TOOLCHAIN_NAME])
+        .stdout(cu::lv::P)
+        .stdie_null()
+        .wait_nz()?;
+    if check_toolchain()? {
+        cu::bailand!(warn!(
+            "rustup succeeded, but the toolchain was not uninstalled"
+        ));
+    }
+    Ok(())
+}
+
 
 /// Get rustc host triple by running `rustc -vV`, like `x86_64-unknown-linux-gnu`
 fn get_rustc_host_triple() -> cu::Result<String> {
