@@ -6,16 +6,12 @@ use std::sync::OnceLock;
 
 use cu::pre::*;
 
-// mod megaton_repo;
-
 pub struct Environment {
     megaton_home: PathBuf,
 }
 impl Environment {
     fn new(megaton_home: PathBuf) -> Self {
-        Self {
-            megaton_home,
-        }
+        Self { megaton_home }
     }
     /// Get the home of the megaton cache directory
     pub fn home(&self) -> &Path {

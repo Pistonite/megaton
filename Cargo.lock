@@ -105,9 +105,9 @@ dependencies = [
 
 [[package]]
 name = "bitflags"
-version = "2.9.1"
+version = "2.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b8e56985ec62d17e9c1001dc89c88ecd7dc08e47eba5ec7c29c7b5eeecde967"
+checksum = "6a65b545ab31d687cff52899d4890855fec459eb6afe0da6417b8a18da87aa29"
 
 [[package]]
 name = "bytes"
@@ -405,9 +405,9 @@ checksum = "3b3cff922bd51709b605d9ead9aa71031d81447142d828eb4a6eba76fe619f9b"
 
 [[package]]
 name = "pistonite-cu"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "163a2781c4d85531640453d137aed327771c4736f558bd2c0abd77c0e1f32d22"
+checksum = "6087544fcd736737ad18b7835740b44579aa8c1cbf7c2776e7e7a5ddb0fa4920"
 dependencies = [
  "anyhow",
  "clap",
@@ -429,18 +429,18 @@ dependencies = [
 
 [[package]]
 name = "pistonite-cu-proc-macros"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "477dbad27fb7c9678fb86993054c5478b6e994e846e32056034dc97dda83c221"
+checksum = "6322079ae92df4f8b5b981bd9d3bb88ecad057d6800d0cfe77fb92cac23705c4"
 dependencies = [
  "pistonite-pm",
 ]
 
 [[package]]
 name = "pistonite-pm"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "911fffec7165bb8cc1424d4c70e1f7d211ff4b6210fa6746bfefb3afc71c8b35"
+checksum = "54b8e4107c622fe3342c88a6230cf08c2b30c7f00ae0d4eb26f2e8eca05dc2c2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -449,9 +449,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.97"
+version = "1.0.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d61789d7719defeb74ea5fe81f2fdfdbd28a803847077cecce2ff14e1472f6f1"
+checksum = "89ae43fd86e4158d6db51ad8e2b80f313af9cc74f5c0e03ccb87de09998732de"
 dependencies = [
  "unicode-ident",
 ]

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2025 Megaton contributors
+
 mod cmd_toolchain;
 use cmd_toolchain::*;
 
@@ -5,11 +8,16 @@ use cu::pre::*;
 
 use crate::env;
 
-// #[doc = concat!("Megaton Build Tool CLI (", env!("MEGATON_COMMIT"), ")")]
-/// Megaton Build Tool CLI
-///
-/// Hello
+static LOGO: &str = r#"
+ __    __ ______ ______ ______ ______ ______ __   __  
+/\ "-./  \\  ___\\  ___\\  __ \\__  _\\  __ \\ "-.\ \ 
+\ \ \-./\ \\  __\ \ \__ \\  __ \_/\ \/ \ \/\ \\ \-.  \
+ \ \_\ \ \_\\_____\\_____\\_\ \_\\ \_\\ \_____\\_\\"\_\
+  \/_/  \/_//_____//_____//_/\/_/ \/_/ \/_____//_/ \/_/"#;
+
+/// Megaton Build Tool
 #[derive(clap::Parser, Clone)]
+#[clap(before_help(LOGO))]
 pub struct CmdMegaton {
     #[clap(subcommand)]
     sub: CmdMegatonSub,
@@ -27,11 +35,12 @@ impl AsRef<cu::cli::Flags> for CmdMegaton {
 
 #[derive(clap::Subcommand, Clone)]
 pub enum CmdMegatonSub {
+    /// Print the version and build information
     Version(cu::cli::Flags),
-    Toolchain{
+    Toolchain {
         #[clap(subcommand)]
-        cmd: CmdToolchain
-    }
+        cmd: CmdToolchain,
+    },
 }
 
 impl AsRef<cu::cli::Flags> for CmdMegatonSub {
@@ -45,18 +54,23 @@ impl AsRef<cu::cli::Flags> for CmdMegatonSub {
 
 /// Main entry point to running the `megaton` command
 pub fn main(cmd: CmdMegaton) -> cu::Result<()> {
-    if cmd.version || matches!(cmd.sub, CmdMegatonSub::Version(_)){
+    if cmd.version || matches!(cmd.sub, CmdMegatonSub::Version(_)) {
         print_version();
-        return Ok(())
+        return Ok(());
     }
+    // safety: program is single threaded at this point
     unsafe { env::init_env()? };
     match cmd.sub {
         CmdMegatonSub::Version(_) => unreachable!(),
-        CmdMegatonSub::Toolchain { cmd } => cmd.run()
+        CmdMegatonSub::Toolchain { cmd } => cmd.run(),
     }
 }
 
 fn print_version() {
-    cu::init_print_options(cu::lv::Color::Auto, cu::lv::Print::QuietQuiet, None);
-    println!("megaton v{} ({})", env!("CARGO_PKG_VERSION"), &env::commit()[0..8]);
+    println!(
+        "megaton v{} ({})",
+        env!("CARGO_PKG_VERSION"),
+        &env::commit()[0..8]
+    );
+    cu::disable_print_time();
 }

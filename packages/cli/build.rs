@@ -1,8 +1,11 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2025 Megaton contributors
+
 use cu::pre::*;
 
 fn main() -> cu::Result<()> {
-
-    let (child, commit_hash) = cu::which("git")?.command()
+    let (child, commit_hash) = cu::which("git")?
+        .command()
         .args(["rev-parse", "HEAD"])
         .stdout(cu::pio::string())
         .stdie_null()

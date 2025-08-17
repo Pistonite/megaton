@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2025 Megaton contributors
+
 use std::path::{Path, PathBuf};
 
 use cu::pre::*;
@@ -19,7 +22,7 @@ pub enum CmdToolchain {
     /// Build and install the toolchain
     Install {
         /// Keep the rustc/llvm build output. This may consume a lot of disk space,
-        /// but might make it faster when upgrading the toolchain
+        /// but makes it faster when debugging the toolchain
         #[clap(short, long)]
         keep: bool,
 
@@ -28,19 +31,19 @@ pub enum CmdToolchain {
         clean: bool,
 
         #[clap(flatten)]
-        common: cu::cli::Flags
+        common: cu::cli::Flags,
     },
     /// Uninstall the toolchain
     Remove(cu::cli::Flags),
-    /// Remove build artifacts from building Rust compiler
+    /// Remove artifacts from building Rust compiler
     Clean(cu::cli::Flags),
 }
 
 impl AsRef<cu::cli::Flags> for CmdToolchain {
     fn as_ref(&self) -> &cu::cli::Flags {
-        match &self{
+        match &self {
             Self::Check(args) => args,
-            Self::Install{common, ..} => common,
+            Self::Install { common, .. } => common,
             Self::Remove(args) => args,
             Self::Clean(args) => args,
         }
@@ -50,17 +53,18 @@ impl AsRef<cu::cli::Flags> for CmdToolchain {
 impl CmdToolchain {
     pub fn run(self) -> cu::Result<()> {
         match self {
-            Self::Install{keep, clean, ..} => install(keep, clean),
+            Self::Install { keep, clean, .. } => install(keep, clean),
             Self::Check(_) => check(),
             Self::Remove(_) => remove(),
             Self::Clean(_) => clean(),
         }
     }
-
 }
 fn install(keep: bool, clean: bool) -> cu::Result<()> {
-    cu::which("rustup").context("rustup is required to manage Rust toolchains. Please install Rust")?;
-    cu::which("rustc").context("rustc is required to manage Rust toolchains. Please install Rust")?;
+    cu::which("rustup")
+        .context("rustup is required to manage Rust toolchains. Please install Rust")?;
+    cu::which("rustc")
+        .context("rustc is required to manage Rust toolchains. Please install Rust")?;
 
     match check_toolchain(false) {
         Err(e) => {
@@ -75,20 +79,26 @@ fn install(keep: bool, clean: bool) -> cu::Result<()> {
                     cu::warn!("existing toolchain found with unknown commit hash");
                     match cu::yesno!("do you want to reinstall from the blessed commit?") {
                         Err(e) => {
-                            cu::hint!("prompt is disabled. you can remove the toolchain with 'megaton toolchain remove', then try install again.");
+                            cu::hint!(
+                                "prompt is disabled. you can remove the toolchain with 'megaton toolchain remove', then try install again."
+                            );
                             cu::rethrow!(e);
                         }
                         Ok(false) => {
-                            cu::bail!("aborted by user");
+                            cu::bailfyi!("aborted by user");
                         }
                         Ok(true) => {}
                     }
                 }
                 Some(hash) => {
                     if hash == RUST_COMMIT {
-                        cu::warn!("found existing toolchain installation that matched blessed commit hash");
-                        cu::hint!("if you want to reinstall it, remove it first with 'megaton toolchain remove'.");
-                        cu::bail!("toolchain already installed");
+                        cu::warn!(
+                            "found existing toolchain installation that matched blessed commit hash"
+                        );
+                        cu::hint!(
+                            "if you want to reinstall it, remove it first with 'megaton toolchain remove'."
+                        );
+                        cu::bailfyi!("toolchain already installed");
                     }
                     // older toolchain installed, proceed with reinstallment
                     cu::info!("found older toolchain installation with commit hash: {hash}");
@@ -115,7 +125,9 @@ fn install(keep: bool, clean: bool) -> cu::Result<()> {
                 if hash == RUST_COMMIT {
                     cu::info!("blessed commit is already checkout, skipping update");
                 } else {
-                    cu::info!("current commit is not the blessed commit, checking out the blessed commit");
+                    cu::info!(
+                        "current commit is not the blessed commit, checking out the blessed commit"
+                    );
                     checkout_blessed_commit(&rust_path)?;
                 }
             }
@@ -128,7 +140,8 @@ fn install(keep: bool, clean: bool) -> cu::Result<()> {
     }
 
     // verify the blessed commit is checked out
-    let actual_commit = try_get_rust_source_commit(&rust_path).context("failed to verify the blessed commit is checked out")?;
+    let actual_commit = try_get_rust_source_commit(&rust_path)
+        .context("failed to verify the blessed commit is checked out")?;
     if actual_commit != RUST_COMMIT {
         cu::bail!("failed to checkout the blessed commit.");
     }
@@ -158,21 +171,33 @@ fn install(keep: bool, clean: bool) -> cu::Result<()> {
     // stage 2 compiler will be newer, but doubly slow to build
     // (basically fresh built from stage 1 compiler)
     bootstrap_toml += "build.build-stage = 1\n";
-    // bootstrap_toml += "build.test-stage = 1\n";
-    // bootstrap_toml += "build.dist-stage = 1\n";
-    // bootstrap_toml += "build.install-stage = 1\n";
-    // bootstrap_toml += "build.compiletest-use-stage0-libtest = true\n";
     bootstrap_toml += &format!("build.host = ['{host_triple}']\n");
     // TODO: building nintendo switch target just for testing, when hermit is mature, can remove
-    // the other
-    bootstrap_toml += &format!("build.target = ['{host_triple}', 'aarch64-unknown-hermit', 'aarch64-nintendo-switch-freestanding']\n");
+    // the other, to make it build faster
+    bootstrap_toml += &format!(
+        "build.target = ['{host_triple}', 'aarch64-unknown-hermit', 'aarch64-nintendo-switch-freestanding']\n"
+    );
 
     // install configs
     let install_location = toolchain_install_location();
-    cu::fs::make_dir_empty(&install_location).context("failed to create toolchain install location")?;
-    let install_location = install_location.normalize_exists().context("failed to create toolchain install location")?;
-    bootstrap_toml += &format!("install.prefix = '{}'\n", install_location.as_utf8().context("install location must be UTF-8")?);
-    bootstrap_toml += &format!("install.sysconfdir = '{}'\n", install_location.join("etc").into_utf8().context("install location must be UTF-8")?);
+    cu::fs::make_dir_empty(&install_location)
+        .context("failed to create toolchain install location")?;
+    let install_location = install_location
+        .normalize_exists()
+        .context("failed to create toolchain install location")?;
+    bootstrap_toml += &format!(
+        "install.prefix = '{}'\n",
+        install_location
+            .as_utf8()
+            .context("install location must be UTF-8")?
+    );
+    bootstrap_toml += &format!(
+        "install.sysconfdir = '{}'\n",
+        install_location
+            .join("etc")
+            .into_utf8()
+            .context("install location must be UTF-8")?
+    );
 
     // rust build configs
     bootstrap_toml += "rust.debug-logging = false\n";
@@ -195,12 +220,13 @@ fn install(keep: bool, clean: bool) -> cu::Result<()> {
         bootstrap_toml += "rust.lto = 'thin'\n";
     }
 
-    cu::fs::write(rust_path.join("bootstrap.toml"), bootstrap_toml).context("failed to write bootstrap config")?;
+    cu::fs::write(rust_path.join("bootstrap.toml"), bootstrap_toml)
+        .context("failed to write bootstrap config")?;
 
     cu::info!("building and installing rust");
     cu::hint!(" - this may take a while, please be patient.");
     {
-    let debug_log = cu::log_enabled(cu::lv::D);
+        let debug_log = cu::log_enabled(cu::lv::D);
         let command = cu::bin::resolve("rust-x", rust_path.join("x"))?
             .command()
             .current_dir(&rust_path)
@@ -208,10 +234,9 @@ fn install(keep: bool, clean: bool) -> cu::Result<()> {
             .args(["--stage", "1", "install", "compiler/rustc", "library/std"])
             .stdin_null();
         let code = if debug_log {
-            command.stdoe(cu::pio::inherit())
-                .wait()?
+            command.stdoe(cu::pio::inherit()).wait()?
         } else {
-            command.stdoe( cu::pio::spinner("")).wait()?
+            command.stdoe(cu::pio::spinner("")).wait()?
         };
 
         if !code.success() {
@@ -222,13 +247,24 @@ fn install(keep: bool, clean: bool) -> cu::Result<()> {
         }
     }
 
-    cu::which("rustup")?.command()
-        .add(cu::args!["toolchain", "link", TOOLCHAIN_NAME, toolchain_install_location()])
+    cu::which("rustup")?
+        .command()
+        .add(cu::args![
+            "toolchain",
+            "link",
+            TOOLCHAIN_NAME,
+            toolchain_install_location()
+        ])
         .all_null()
-        .wait_nz().context("failed to link built toolchain")?;
+        .wait_nz()
+        .context("failed to link built toolchain")?;
 
-    let toolchain_info = check_toolchain(true).context("failed to get toolchain, installation might have failed.")?;
-    let toolchain_info = cu::check!(toolchain_info, "failed to get toolchain, installation might have failed.")?;
+    let toolchain_info = check_toolchain(true)
+        .context("failed to get toolchain, installation might have failed.")?;
+    let toolchain_info = cu::check!(
+        toolchain_info,
+        "failed to get toolchain, installation might have failed."
+    )?;
     match toolchain_info.commit_hash {
         None => {
             cu::warn!("failed to get commit hash from installed toolchain");
@@ -303,12 +339,15 @@ fn remove_toolchain_internal() -> cu::Result<()> {
         .wait_nz()?;
     if let Ok(Some(_)) = check_toolchain(false) {
         cu::bailand!(warn!(
-        "failed to uninstall toolchain. Please run 'rustup toolchain uninstall {TOOLCHAIN_NAME}' to uninstall it manually, then try again."
-    ));
+            "failed to uninstall toolchain. Please run 'rustup toolchain uninstall {TOOLCHAIN_NAME}' to uninstall it manually, then try again."
+        ));
     }
 
     let install_path = toolchain_install_location();
-    cu::debug!("cleaning up toolchain files at '{}'", install_path.display());
+    cu::debug!(
+        "cleaning up toolchain files at '{}'",
+        install_path.display()
+    );
     cu::fs::make_dir_empty(install_path).context("failed to clean up old toolchain files")?;
     Ok(())
 }
@@ -336,12 +375,27 @@ fn clone_rust_source(path: &Path) -> cu::Result<()> {
 fn checkout_blessed_commit(path: &Path) -> cu::Result<()> {
     let git = cu::which("git")?;
     git.command()
-        .add(cu::args!["-C", &path, "fetch", "origin", RUST_COMMIT, "--progress", "--depth", "1"])
+        .add(cu::args![
+            "-C",
+            &path,
+            "fetch",
+            "origin",
+            RUST_COMMIT,
+            "--progress",
+            "--depth",
+            "1"
+        ])
         .stdoe(cu::pio::spinner("fetching rust source"))
         .stdin_null()
         .wait_nz()?;
     git.command()
-        .add(cu::args!["-C", &path, "checkout", RUST_COMMIT, "--progress"])
+        .add(cu::args![
+            "-C",
+            &path,
+            "checkout",
+            RUST_COMMIT,
+            "--progress"
+        ])
         .stdoe(cu::pio::spinner("checking-out rust source"))
         .stdin_null()
         .wait_nz()?;
@@ -354,7 +408,8 @@ fn try_get_rust_source_commit(path: &Path) -> cu::Result<String> {
     if !path.join(".git").exists() {
         cu::bail!("not a git repo");
     }
-    let (child, commit) = cu::which("git")?.command()
+    let (child, commit) = cu::which("git")?
+        .command()
         .add(cu::args!["-C", &path, "rev-parse", "HEAD"])
         .stdout(cu::pio::string())
         .stdie_null()
@@ -388,7 +443,6 @@ fn get_change_id(path: &Path) -> cu::Result<String> {
 fn rust_source_location() -> PathBuf {
     env::environment().home().join("rust")
 }
-
 
 /// Get rustc host triple by running `rustc -vV`, like `x86_64-unknown-linux-gnu`
 fn get_rustc_host_triple() -> cu::Result<String> {
@@ -441,7 +495,5 @@ fn check_toolchain(print: bool) -> cu::Result<Option<ToolchainInfo>> {
             commit_hash = Some(line.to_string());
         }
     }
-    Ok(Some(ToolchainInfo {
-        commit_hash
-    }))
+    Ok(Some(ToolchainInfo { commit_hash }))
 }
