@@ -3,9 +3,11 @@ on:
   pull_request:
     branches:
       - main
+      - stack/*
   push:
     branches:
       - main
+      - stack/*
 jobs:
   optimize-ci:
     runs-on: ubuntu-latest
