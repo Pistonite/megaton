@@ -174,6 +174,7 @@ fn install(keep: bool, clean: bool) -> cu::Result<()> {
     bootstrap_toml += &format!("build.host = ['{host_triple}']\n");
     // TODO: building nintendo switch target just for testing, when hermit is mature, can remove
     // the other, to make it build faster
+    bootstrap_toml += &format!("build.target = ['{host_triple}', 'aarch64-unknown-hermit', 'aarch64-nintendo-switch-freestanding']\n");
     bootstrap_toml += &format!(
         "build.target = ['{host_triple}', 'aarch64-unknown-hermit', 'aarch64-nintendo-switch-freestanding']\n"
     );

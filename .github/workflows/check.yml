@@ -1,0 +1,42 @@
+name: check
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+jobs:
+  optimize-ci:
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.check_skip.outputs.skip }}
+    steps:
+      - name: Optimize CI
+        id: check_skip
+        uses: withgraphite/graphite-ci-action@main
+        with:
+          graphite_token: ${{ secrets.GRAPHITE_TOKEN }}
+
+  check:
+    needs: optimize-ci
+    if: needs.optimize-ci.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Pistonight/mono-dev/actions/setup@main
+        with:
+          mono-dev: packages
+          rust: stable
+          tool-cargo-binstall: lisensor
+      - run: task check
+
+  build:
+    needs: optimize-ci
+    if: needs.optimize-ci.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: Pistonight/mono-dev/actions/setup@main
+        with:
+          mono-dev: packages
+          rust: stable
+      - run: task build

@@ -6,6 +6,8 @@ includes:
     optional: true
     flatten: true
 
+  cli: { taskfile: packages/cli, dir: packages/cli, internal: true }
+
   # docs:
   #   taskfile: ./docs
   #   dir: ./docs
@@ -22,19 +24,19 @@ tasks:
         vars:
           PACKAGES: lisensor
 
+  check:
+    desc: run ALL of the checks
+    cmds:
+      - lisensor
+      - task: cli:check
+
+  build:
+    desc: make sure everything can build
+    cmds:
+      - task: cli:build
+
   license:
     desc: check or fix license notices (-- -f to fix)
     cmds:
       - lisensor {{.CLI_ARGS}}
 
-
-  rustc:
-    desc: Install custom rustc toolchain
-    cmds:
-    - ./rustc/install.sh
-    
-  run:
-    dir: '{{.USER_WORKING_DIR}}'
-    desc: Run megaton-hammer
-    cmds:
-    - echo "TODO"
