@@ -8,12 +8,20 @@ publish = false
 
 [dependencies.cu]
 package = "pistonite-cu"
-version = "0.4.0"
-features = ["cli"]
+version = "0.4.1"
+features = ["cli", "process", "prompt"]
+# path = "../../../cu/packages/copper"
 
 [build-dependencies.cu]
 package = "pistonite-cu"
-version = "0.4.0"
+version = "0.4.1"
 features = ["process"]
+# path = "../../../cu/packages/copper"
 
 [dependencies]
+flate2 = "1.1.2"
+tar = "0.4.44"
+
+[[bin]]
+name = "megaton"
+path = "src/main.rs"
