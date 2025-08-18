@@ -36,7 +36,6 @@ pub struct Config {
     pub megaton: MegatonConfig,
 
     // TODO: add cargo config
-
     /// The `[build]` section
     ///
     /// Specify options for building C/C++/assembly project code
