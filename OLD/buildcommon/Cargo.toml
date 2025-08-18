@@ -3,6 +3,8 @@ name = "buildcommon"
 version = "0.0.0"
 edition = "2021"
 
+[workspace]
+
 [dependencies]
 error-stack = "0.5.0"
 thiserror = "1.0.66"

@@ -1,16 +1,15 @@
 [workspace]
 resolver = "2"
 members = [
-    # old
-    # "OLD/buildcommon",
-    # "OLD/buildtool",
-    # "OLD/librs/macros",
-    # "OLD/librs/runtime",
-    # "packages/clib/build",
-
-    # new
     "packages/cli", 
     "packages/sys",
     "packages/abi",
     "packages/lib",
 ]
+
+[workspace.dependencies]
+
+[workspace.dependencies.cu]
+package = "pistonite-cu"
+version = "0.4.1"
+# path = "../../../cu/packages/copper"

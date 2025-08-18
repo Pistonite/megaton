@@ -7,20 +7,19 @@ description = "The `megaton` CLI command"
 publish = false
 
 [dependencies.cu]
-package = "pistonite-cu"
-version = "0.4.1"
-features = ["cli", "process", "prompt"]
-# path = "../../../cu/packages/copper"
-
-[build-dependencies.cu]
-package = "pistonite-cu"
-version = "0.4.1"
-features = ["process"]
-# path = "../../../cu/packages/copper"
+workspace = true
+features = ["cli", "process", "prompt", "toml"]
 
 [dependencies]
+serde = "1"
 flate2 = "1.1.2"
 tar = "0.4.44"
+derive_more = { version = "2.0.1", features = ["as_ref", "deref", "deref_mut"] }
+
+[build-dependencies.cu]
+workspace = true
+features = ["process"]
+
 
 [[bin]]
 name = "megaton"
