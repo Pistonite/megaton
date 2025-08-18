@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2025 Megaton contributors
+
 use super::{CaptureUnused, ExtendProfile, FlagConfig, Validate, ValidateCtx};
 use cu::pre::*;
 

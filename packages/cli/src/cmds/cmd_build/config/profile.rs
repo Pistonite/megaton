@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2025 Megaton contributors
+
 //! Utils for managing profiles for sections in the config
 
 use std::collections::BTreeMap;
