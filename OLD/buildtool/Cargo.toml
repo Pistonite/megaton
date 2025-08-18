@@ -3,6 +3,8 @@ name = "megaton-buildtool"
 version = "0.0.0"
 edition = "2021"
 
+[workspace]
+
 [dependencies.buildcommon]
 path = "../buildcommon"
 
