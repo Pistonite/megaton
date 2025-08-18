@@ -18,6 +18,7 @@ pub struct FlagConfig {
     pub as_: Option<Vec<String>>,
     pub ld: Option<Vec<String>>,
     pub rust: Option<Vec<String>>,
+    pub cargo: Option<Vec<String>>,
 
     #[serde(flatten, default)]
     unused: CaptureUnused,
@@ -68,6 +69,7 @@ pub struct Flags {
     pub sflags: Vec<String>,
     pub ldflags: Vec<String>,
     pub rustflags: String,
+    pub cargoflags: Vec<String>,
 }
 
 /// Default flags for `build.flags.common` in Megaton.toml
@@ -130,6 +132,13 @@ pub static DEFAULT_LD: &[&str] = &[
 ];
 
 pub static DEFAULT_RUST: &[&str] = &[];
+pub static DEFAULT_CARGO: &[&str] = &[
+    // needed to strip unused symbols to pass the checker
+    "--release",
+    // set the target
+    "--target",
+    "aarch64-unknown-hermit",
+];
 
 macro_rules! create_flags {
     ($field: expr, $default: expr) => {
@@ -189,6 +198,7 @@ impl Flags {
         let ldflags = create_flags!(&config.ld, DEFAULT_LD extends common);
 
         let rustflags = create_flags!(&config.rust, DEFAULT_RUST).join(" ");
+        let cargoflags = create_flags!(&config.cargo, DEFAULT_CARGO);
 
         Self {
             cflags,
@@ -196,6 +206,7 @@ impl Flags {
             sflags,
             ldflags,
             rustflags,
+            cargoflags,
         }
     }
 

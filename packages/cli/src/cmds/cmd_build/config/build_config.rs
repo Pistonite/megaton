@@ -35,7 +35,6 @@ pub struct Build {
     #[serde(default)]
     pub flags: FlagConfig,
 
-    // TODO: add cargo flags
     #[serde(flatten, default)]
     unused: CaptureUnused,
 }
@@ -43,7 +42,6 @@ pub struct Build {
 impl Validate for Build {
     fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
         self.flags.validate_property(ctx, "flags")?;
-        cu::hint!("TODO: validate build.cargo");
         self.unused.validate(ctx)?;
         Ok(())
     }

@@ -2,35 +2,6 @@
 # if default value is not specified in the comments, whatever
 # the value is is the default
 
-[megaton]
-# version of the megaton build tool/library the project is supposed to use
-# megaton build tool should check this (if specified), and abort
-# if the project version doesn't match the build tool's version
-# 1 means it works with version number 0.1.x
-#
-# default: none (no version check)
-version = 1
-
-# if megaton library should be used
-# if false, then:
-# - megaton will not generate the megaton library in <target>/,
-#   and will not add megaton library's sources and includes
-# - megaton will also not add it's linker script
-# - rust support is not allowed (must be true if build.cargo.enabled = true)
-#
-# this allows user to use megaton build tool by itself, with another runtime library
-#
-# default: true
-library = true
-
-# the entry point (real main function) passed to the linker
-# in megaton library, this function is a shim for the megaton_main user defined
-# main function that runs additional initializations
-#
-# can only be specified in megaton = false
-#
-entry = "__megaton_module_entry"
-
 [module]
 # name of the module, which is used as the name of the finary
 # binary. only alphanumeric characters and -/_ should be allowed
@@ -80,6 +51,55 @@ allow-base = true
 # will build this profile instead of the "none" profile
 # if empty then -p PROFILE must be specified on the command line
 default = ""
+
+[megaton]
+# version of the megaton build tool/library the project is supposed to use
+# megaton build tool should check this (if specified), and abort
+# if the project version doesn't match the build tool's version
+# 1 means it works with version number 0.1.x
+#
+# default: none (no version check)
+version = 1
+
+# if megaton library should be used
+# if false, then:
+# - megaton will not generate the megaton library in <target>/,
+#   and will not add megaton library's sources and includes
+# - megaton will also not add it's linker script
+# - rust support is not allowed (must be true if build.cargo.enabled = true)
+#
+# this allows user to use megaton build tool by itself, with another runtime library
+#
+# default: true
+library = true
+
+# the entry point (real main function) passed to the linker
+# in megaton library, this function is a shim for the megaton_main user defined
+# main function that runs additional initializations
+#
+# can only be specified in megaton = false
+#
+entry = "__megaton_module_entry"
+
+[cargo]
+# if Rust (cargo build) is enabled
+#
+# megaton build tool will only generate and do rust related stuff if this is enabled
+#
+# default: true if cargo.manifest is specified, or Cargo.toml is found in the directory
+# Megaton.toml is in
+enabled = true
+
+# the manifest file path (passed to --manifest-path to cargo)
+# relative to the directory Megaton.toml is in
+manifest = "Cargo.toml"
+
+# suffix to generated headers.
+# for example lib.rs will become lib.rs.h
+# user can put empty string here for example, then they
+# can do #include <foo/lib.rs> for the immersion
+header-suffix = ".h"
+
 
 # *profile enabled* means the user can define overrides in a profile
 # for example build.profiles.foo for the build configuration in the foo profile
@@ -137,48 +157,15 @@ as = ["<default>"]
 ld = ["<default>"]
 
 # corresponds to RUSTFLAGS environment variable, values are concatenated and not escaped
-# can only be specified if build.cargo.enabled = true
+# (note a cargo config.toml file also allows specifying rust flags,
+# but specifying it this way allows integration with megaton's profile system
+# can only be specified if megaton.cargo.enabled = true
 rust = ["<default>"]
 
-[build.cargo] # this is also profile enabled since it's part of [build]
-# if Rust is enabled
-#
-# build tool will only generate and do rust related stuff if this is enabled
-#
-# default: true if manifest is specified, or Cargo.toml is found in the directory
-# Megaton.toml is in
-enabled = true
-
-# the manifest file path (passed to --manifest-path to cargo)
-# relative to the directory Megaton.toml is in
-# default: Cargo.toml
-manifest = "Cargo.toml"
-
-# the source tree to scan for cxxbridge
-# relative to directory that Megaton.toml is in
-# default: the "src" directory in the directory Cargo.toml is in
-src = "src"
-
-# the directory name to put under include/ for generated headers
-# for example, "foo" means user will include generated headers
-# like #include <foo/lib.rs.h>
-# 
-# default is same as the crate name found in Cargo.toml
-header-target = ""
-
-# suffix to generated headers.
-# for example lib.rs will become lib.rs.h
-# user can put empty string here for example, then they
-# can do #include <foo/lib.rs> for the immersion
-header-suffix = ".h"
-
-# if debug info should be kept in release mode
-# correspond to CARGO_PROFILE_RELEASE_DEBUG=true environment variable
-debug-info = false
-
 # extra build flags to pass to cargo (like feature flags)
+# can only be specified if megaton.cargo.enabled = true
 # <default> is: --release --target aarch64-unknown-hermit
-args = ["<default>"]
+cargo = ["<default>"]
 
 [check] # *profile enabled*
 

@@ -35,7 +35,7 @@ impl CmdBuild {
 }
 
 fn run_build(args: CmdBuild) -> cu::Result<()> {
-    let config = config::load_config(&args.config)?;
+    let config = config::load_config(&args.config).context("failed to load config")?;
     cu::hint!("run with -v to see additional output");
     // TODO: do the actual build
     // these prints are just as example to show you what the config
