@@ -18,12 +18,6 @@ pub fn load_config(path: impl AsRef<Path>) -> cu::Result<Config> {
 /// Config data read from Megaton.toml
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Config {
-    /// The `[megaton]` section
-    ///
-    /// Metadata for megaton build tool
-    #[serde(default)]
-    pub megaton: MegatonConfig,
-
     /// The `[module]` section
     ///
     /// Basic module info
@@ -34,6 +28,14 @@ pub struct Config {
     /// Configure behavior when selecting profile from command line
     #[serde(default)]
     pub profile: ProfileConfig,
+
+    /// The `[megaton]` section
+    ///
+    /// Metadata for megaton build tool
+    #[serde(default)]
+    pub megaton: MegatonConfig,
+
+    // TODO: add cargo config
 
     /// The `[build]` section
     ///
@@ -50,15 +52,15 @@ pub struct Config {
 
 impl Validate for Config {
     fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
-        self.megaton.validate_property(ctx, "megaton")?;
         self.module.validate_property(ctx, "module")?;
         self.profile.validate_property(ctx, "profile")?;
+        self.megaton.validate_property(ctx, "megaton")?;
+        cu::hint!("TODO: add cargo config");
         self.build.validate_property(ctx, "build")?;
         if let Some(check) = &self.check {
             check.validate_property(ctx, "check")?;
         }
 
-        cu::hint!("TODO: implement checks for cargo (when megaton.library = false)");
         self.unused.validate(ctx)
     }
 }
