@@ -236,7 +236,8 @@ fn install(keep: bool, clean: bool) -> cu::Result<()> {
         let code = if debug_log {
             command.stdoe(cu::pio::inherit()).wait()?
         } else {
-            command.stdoe(cu::pio::spinner("")).wait()?
+            let (child, _, _) = command.stdoe(cu::pio::spinner("")).spawn()?;
+            child.wait()?
         };
 
         if !code.success() {
@@ -387,7 +388,7 @@ fn checkout_blessed_commit(path: &Path) -> cu::Result<()> {
         ])
         .stdoe(cu::pio::spinner("fetching rust source"))
         .stdin_null()
-        .wait_nz()?;
+        .spawn()?.0.wait()?;
     git.command()
         .add(cu::args![
             "-C",
@@ -398,7 +399,7 @@ fn checkout_blessed_commit(path: &Path) -> cu::Result<()> {
         ])
         .stdoe(cu::pio::spinner("checking-out rust source"))
         .stdin_null()
-        .wait_nz()?;
+        .spawn()?.0.wait()?;
     Ok(())
 }
 
