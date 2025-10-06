@@ -8,5 +8,5 @@ publish = false
 
 [dependencies.nn]
 package = "megaton-nnsdk-sys"
-path = "../sys"
+path = "../../nx/rs"
 

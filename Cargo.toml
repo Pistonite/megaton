@@ -2,9 +2,9 @@
 resolver = "2"
 members = [
     "packages/cli", 
-    "packages/sys",
-    "packages/abi",
-    "packages/lib",
+    "packages/abi/rs",
+    "packages/lib/rs",
+    "packages/nx/rs",
 ]
 
 [workspace.dependencies]
