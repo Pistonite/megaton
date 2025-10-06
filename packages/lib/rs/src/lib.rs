@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2025 Megaton contributors
+
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
 }
