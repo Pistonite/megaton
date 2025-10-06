@@ -6,4 +6,7 @@ license = "GPL-3.0-or-later"
 description = "User-created, hand-crafted system bindings for nnsdk"
 publish = false
 
+[lib]
+crate-type = ["staticlib"]
+
 [dependencies]
