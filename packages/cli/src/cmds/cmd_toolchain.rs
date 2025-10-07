@@ -388,7 +388,9 @@ fn checkout_blessed_commit(path: &Path) -> cu::Result<()> {
         ])
         .stdoe(cu::pio::spinner("fetching rust source"))
         .stdin_null()
-        .spawn()?.0.wait()?;
+        .spawn()?
+        .0
+        .wait()?;
     git.command()
         .add(cu::args![
             "-C",
@@ -399,7 +401,9 @@ fn checkout_blessed_commit(path: &Path) -> cu::Result<()> {
         ])
         .stdoe(cu::pio::spinner("checking-out rust source"))
         .stdin_null()
-        .spawn()?.0.wait()?;
+        .spawn()?
+        .0
+        .wait()?;
     Ok(())
 }
 
