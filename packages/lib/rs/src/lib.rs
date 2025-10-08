@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2025 Megaton contributors
 
+pub use abi::sys_abort;
 // mod ffi {
 //
 //     // essentially becomes "visible" to foreign code

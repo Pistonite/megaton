@@ -225,7 +225,7 @@ end
 
 # build rust projects
 rust_dirs.each do |f|
-  `cd #{f}; cargo +megaton build --release #{user_cargo_flags}`
+  `cd #{f}; cargo +megaton build --release --target=aarch64-unknown-hermit`
 end
 
 # compile object files into libmegaton_c.a
@@ -233,7 +233,7 @@ obj_files = `find build/o -iname '*.o'`.split("\n")
 `#{ar} rcs build/a/libmegaton_c.a #{obj_files.join(' ')}`
 
 # copy libmegaton_rs.a and create libmegaton.a
-`cp target/release/libmegaton.a build/a/libmegaton_rs.a`
+`cp target/aarch64-unknown-hermit/release/libmegaton.a build/a/libmegaton_rs.a`
 `#{ar} cqT build/a/libmegaton.a build/a/libmegaton_c.a build/a/libmegaton_rs.a`
 `echo -e 'create build/a/libmegaton.a\\naddlib build/a/libmegaton.a\\nsave\\nend' | #{ar} -M`
 
