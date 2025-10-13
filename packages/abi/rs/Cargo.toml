@@ -7,7 +7,10 @@ description = "Implementation of the hermit abi that binds to nnsdk"
 publish = false
 
 [lib]
-crate-type = ["staticlib"]
+crate-type = ["rlib"]
+
+[dependencies]
+cxx = "1.0.186"
 
 [dependencies.nn]
 package = "megaton-nnsdk-sys"
