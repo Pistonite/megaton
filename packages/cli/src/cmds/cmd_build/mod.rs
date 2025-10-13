@@ -7,6 +7,9 @@ use derive_more::AsRef;
 mod config;
 use config::Flags;
 
+mod stages;
+
+
 /// Manage the custom `megaton` Rust toolchain
 #[derive(Debug, Clone, AsRef, clap::Parser)]
 pub struct CmdBuild {
@@ -55,6 +58,14 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     let mut build_flags = Flags::from_config(&build_config.flags);
     cu::debug!("build flags: {build_flags:#?}");
+
+
+let stage_out: stages::StageOutputs = crate::cmds::cmd_build::stages::run_all(&config, &args, &mut build_flags)?;
+cu::debug!("stage objects: {}", stage_out.objects.len());
+
+
+// TODO (future): pass stage_out.objects into your final link step
+
 
     // here are just suppressing the unused warning
     build_flags.add_defines(["-Dfoo"]);

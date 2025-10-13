@@ -1,0 +1,22 @@
+[module]
+name = "demo_mod"
+title-id = 0x0100DEADCAFEF00D
+
+[profile]
+default = "none"
+allow_base = true
+
+[megaton]
+library = true
+rust_enabled = true
+
+[build.none]
+[build.none.flags]
+defines   = []
+includes  = []
+cflags    = []
+cxxflags  = []
+ldflags   = []
+libpaths  = []
+libraries = []
+ldscripts = []

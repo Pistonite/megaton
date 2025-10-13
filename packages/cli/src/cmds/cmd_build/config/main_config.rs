@@ -72,6 +72,13 @@ pub struct MegatonConfig {
     /// `N` means the build tool must be version `0.N.x` (x can be anything)
     pub version: Option<u32>,
 
+
+    /// Master switch: enable Rust/CXX interop stages (default: true)
+    /// If false, the cxxbridge stage will be skipped entirely.
+    #[serde(default = "default_true")]
+    pub rust_enabled: bool,
+
+
     /// Whether to use libmegaton (default is true)
     ///
     /// If false, the module won't link with libmegaton
@@ -98,6 +105,7 @@ impl Default for MegatonConfig {
             library: true,
             entry: None,
             unused: Default::default(),
+            rust_enabled: true,
         }
     }
 }

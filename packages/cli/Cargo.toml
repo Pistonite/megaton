@@ -1,10 +1,11 @@
 [package]
 name = "megaton-cmd"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 license = "MIT"
 description = "The `megaton` CLI command"
 publish = false
+
 
 [dependencies.cu]
 workspace = true
@@ -15,11 +16,14 @@ serde = "1"
 flate2 = "1.1.2"
 tar = "0.4.44"
 derive_more = { version = "2.0.1", features = ["as_ref", "deref", "deref_mut"] }
+walkdir = "2.5.0"
+pathdiff = "0.2.3"
+which   = "8.0.0"
+cxx     = "1"
 
 [build-dependencies.cu]
 workspace = true
 features = ["process"]
-
 
 [[bin]]
 name = "megaton"
