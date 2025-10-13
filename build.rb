@@ -56,6 +56,11 @@ do_output = false
 do_mod = false
 do_yuzu = false
 
+# formatting colors
+red_bold = "\e[31m\e[1m"
+green_bold = "\e[32m\e[1m"
+reset = "\e[0m"
+
 # some of the cmdline options (see end of file)
 opts.each do |opt, arg|
   case opt
@@ -167,6 +172,7 @@ cxx_query = '#\\[cxx::bridge\\]'
 cxx_rs = `grep -rl '#{cxx_query}' #{rust_src_dirs.join(' ')}`.split("\n")
 
 # run cxxbridge on each rust cxx file
+puts "#{green_bold}creating cxx headers/.cc files#{reset}"
 cxx_rs.each do |f|
   output_path = f.split('/')
   output_path.delete_at(0)
@@ -175,10 +181,27 @@ cxx_rs.each do |f|
   `mkdir -p build/cxxbridge/include/#{output_path.join('/')}`
   `mkdir -p build/cxxbridge/src/#{output_path.join('/')}`
   `cxxbridge #{f} --header > build/cxxbridge/include/#{output_path.join('/')}/#{output_name}.h`
+  unless Process.last_status.success?
+    puts "#{red_bold}Error running 'cxxbridge --header' on #{f}. Exiting...#{reset}"
+    `rm -rf build`
+    exit(-1)
+  end
   `cxxbridge #{f} > build/cxxbridge/src/#{output_path.join('/')}/#{output_name}.cc`
+  unless Process.last_status.success?
+    puts "#{red_bold}Error running 'cxxbridge' on #{f}. Exiting...#{reset}"
+    `rm -rf build`
+    exit(-1)
+  end
 end
 `mkdir -p build/cxxbridge/include/rust/`
 `cxxbridge --header > build/cxxbridge/include/rust/cxx.h`
+unless Process.last_status.success?
+  puts "#{red_bold}Error running 'cxxbridge --header'. Exiting...#{reset}"
+  `rm -rf build`
+  exit(-1)
+end
+puts "#{green_bold}Successfully created cxxbridge headers and .cc files#{reset}"
+puts ''
 
 # find all as/c/c++ source files
 as_files = `find #{cxx_source_dirs.join(' ')} -iname '*.s'`.split("\n")
@@ -186,12 +209,13 @@ c_files = `find #{cxx_source_dirs.join(' ')} -iname '*.c'`.split("\n")
 cpp_files = `find #{cxx_source_dirs.join(' ')} \\( -iname '*.cpp' -o -iname '*.cc' \\)`.split("\n")
 
 # (re)create object and staticlib directories
-`rm -r build/a`
-`rm -r build/o`
+`rm -r build/a 2>/dev/null`
+`rm -r build/o 2>/dev/null`
 `mkdir -p build/o`
 `mkdir -p build/a`
 
 # build as/c/c++ files into objects
+puts "#{green_bold}compiling assembly files#{reset}"
 as_files.each do |f|
   output_path = f.split('/')
   output_path.delete('packages')
@@ -200,8 +224,17 @@ as_files.each do |f|
   output_name = output_path.pop
   output_path = output_path.join('/')
   `mkdir -p build/o/#{output_path}`
-    `#{cxx} #{common_flags} #{as_flags} -c #{f} -o build/o/#{output_path}/#{output_name}.o`
+  `#{cxx} #{common_flags} #{as_flags} -c #{f} -o build/o/#{output_path}/#{output_name}.o`
+  unless Process.last_status.success?
+    puts "#{red_bold}Error building #{f} with g++. Exiting...#{reset}"
+    `rm -rf build`
+    exit(-1)
+  end
 end
+puts "#{green_bold}Successfully built assembly files into objects#{reset}"
+puts ''
+
+puts "#{green_bold}compiling c files#{reset}"
 c_files.each do |f|
   output_path = f.split('/')
   output_path.delete('packages')
@@ -210,8 +243,17 @@ c_files.each do |f|
   output_name = output_path.pop
   output_path = output_path.join('/')
   `mkdir -p build/o/#{output_path}`
-    `#{cc} #{common_flags} #{c_flags} -c #{f} -o build/o/#{output_path}/#{output_name}.o`
+  `#{cc} #{common_flags} #{c_flags} -c #{f} -o build/o/#{output_path}/#{output_name}.o`
+  unless Process.last_status.success?
+    puts "#{red_bold}Error building #{f} with gcc. Exiting...#{reset}"
+    `rm -rf build`
+    exit(-1)
+  end
 end
+puts "#{green_bold}Successfully built c files into objects#{reset}"
+puts ''
+
+puts "#{green_bold}compiling c++ files#{reset}"
 cpp_files.each do |f|
   output_path = f.split('/')
   output_path.delete('packages')
@@ -220,30 +262,74 @@ cpp_files.each do |f|
   output_name = output_path.pop
   output_path = output_path.join('/')
   `mkdir -p build/o/#{output_path}`
-    `#{cxx} #{common_flags} #{cxx_flags} -c #{f} -o build/o/#{output_path}/#{output_name}.o`
+  `#{cxx} #{common_flags} #{cxx_flags} -c #{f} -o build/o/#{output_path}/#{output_name}.o`
+  unless Process.last_status.success?
+    puts "#{red_bold}Error building #{f} with g++. Exiting...#{reset}"
+    `rm -rf build`
+    exit(-1)
+  end
 end
+puts "#{green_bold}Successfully built c++ files into objects#{reset}"
+puts ''
 
 # build rust projects
+puts "#{green_bold}compiling rust projects#{reset}"
 rust_dirs.each do |f|
   `cd #{f}; cargo +megaton build --release --target=aarch64-unknown-hermit`
+  unless Process.last_status.success?
+    puts "#{red_bold}Error building #{f} with cargo. Exiting...#{reset}"
+    `rm -rf build`
+    `cargo clean`
+    exit(-1)
+  end
 end
+puts "#{green_bold}Successfully built rust packages#{reset}"
+puts ''
 
 # compile object files into libmegaton_c.a
+puts "#{green_bold}creating libmegaton_c.a#{reset}"
 obj_files = `find build/o -iname '*.o'`.split("\n")
 `#{ar} rcs build/a/libmegaton_c.a #{obj_files.join(' ')}`
+puts "#{green_bold}libmegaton_c.a created successfully#{reset}"
+puts ''
 
 # copy libmegaton_rs.a and create libmegaton.a
+puts "#{green_bold}creating libmegaton.a#{reset}"
 `cp target/aarch64-unknown-hermit/release/libmegaton.a build/a/libmegaton_rs.a`
 `#{ar} cqT build/a/libmegaton.a build/a/libmegaton_c.a build/a/libmegaton_rs.a`
+unless Process.last_status.success?
+  puts "#{red_bold}Error creating libmegaton.a thin archive. Exiting...#{reset}"
+  `rm -rf build`
+  `cargo clean`
+  exit(-1)
+end
 `echo -e 'create build/a/libmegaton.a\\naddlib build/a/libmegaton.a\\nsave\\nend' | #{ar} -M`
+unless Process.last_status.success?
+  puts "#{red_bold}Error building #{f} with cargo. Exiting...#{reset}"
+  `rm -rf build`
+  `cargo clean`
+  exit(-1)
+end
+puts "#{green_bold}successfully created libmegaton.a#{reset}"
+puts ''
 
 # act on the cmdline options
 if do_output
+  puts "#{green_bold}copying library to old megaton...#{reset}"
   `cp build/a/libmegaton.a #{output}/lib/build/bin/libmegaton.a`
 end
 if do_mod
+  puts "#{green_bold}building example mod#{reset}"
   `cd #{mod}/packages/example-mod/; #{task_exe} build`
+  unless Process.last_status.success?
+    puts "#{red_bold}Error building example mod. Exiting...#{reset}"
+    `rm -rf build`
+    `cargo clean`
+    exit(-1)
+  end
+  puts "#{green_bold}Example mod build success#{reset}"
 end
 if do_yuzu
+  puts "#{green_bold}copying mod to eden/yuzu#{reset}"
   `cp #{mod}/packages/example-mod/target/megaton/none/example.nso #{yuzu}/sdmc/atmosphere/contents/01007EF00011E000/exefs/subsdk9`
 end
