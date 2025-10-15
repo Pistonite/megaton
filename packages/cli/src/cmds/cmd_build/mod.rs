@@ -4,7 +4,7 @@
 use cu::pre::*;
 use derive_more::AsRef;
 
-mod cxx_build;
+mod build_src;
 
 mod config;
 use config::Flags;
@@ -67,11 +67,7 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     build_flags.add_libraries(["foo"]);
     build_flags.add_ldscripts(["foo"]);
 
-    let files_to_build = cxx_build::source_scan(&build_config.sources);
-
-    for file in files_to_build {
-        cu::info!("need to compile source file: {file}");
-    }
+    build_src::scan_and_compile_sources(&build_config.sources, &build_flags);
 
     Ok(())
 }
