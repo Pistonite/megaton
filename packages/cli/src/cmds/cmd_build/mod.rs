@@ -67,7 +67,7 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     build_flags.add_libraries(["foo"]);
     build_flags.add_ldscripts(["foo"]);
 
-    build_src::scan_and_compile_sources(&build_config.sources, &build_flags);
+    build_src::scan_and_compile_sources(&build_config.sources, &build_flags)?;
 
     Ok(())
 }

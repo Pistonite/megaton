@@ -5,9 +5,9 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use cu::fs::{WalkEntry, walk};
-use cu::{Command, CommandBuilder, Result};
+use cu::{args, lv, pio, Command, CommandBuilder, Context, Result, Spawn};
 
-use crate::cmds::cmd_build::config::Flags;
+use super::Flags;
 use crate::env::environment;
 
 pub fn scan_and_compile_sources(sources: &Vec<String>, build_flags: &Flags) -> Result<()> {
@@ -18,7 +18,7 @@ pub fn scan_and_compile_sources(sources: &Vec<String>, build_flags: &Flags) -> R
                     match walk_result {
                         Ok(entry) => {
                             if needs_recompile(&entry) {
-                                compile_src(entry.rel_path(), build_flags)?;
+                                compile_src(entry.path(), build_flags)?;
                             }
                         }
                         Err(_) => {
@@ -45,10 +45,12 @@ fn compile_src(src: PathBuf, build_flags: &Flags) -> Result<()> {
     let extention = src.extension().and_then(OsStr::to_str).unwrap_or_default();
     match extention {
         "c" => {
+            cu::info!("Compiling {} with gcc", src_file.to_str().unwrap());
             let command = CompileCommand::new(Compiler::Cc, src_file, out_file, &build_flags.cflags);
             command.execute()?;
         }
         "cc" | "cpp" | "cxx" | "c++" => {
+            cu::info!("Compiling {} with g++", src_file.to_str().unwrap());
             let command = CompileCommand::new(Compiler::Cxx, src_file, out_file, &build_flags.cxxflags);
             command.execute()?;
         }
@@ -77,7 +79,7 @@ enum Compiler {
 }
 
 struct CompileCommand {
-    command: Command<(), (), ()>
+    command: Command<lv::Lv, lv::Lv, pio::Null>
 }
 
 impl CompileCommand {
@@ -87,11 +89,19 @@ impl CompileCommand {
             Compiler::Cxx => environment().cxx_path(),
         };
         let command = CommandBuilder::new(compiler_path)
-            .
+            .stdout(lv::I)
+            .stderr(lv::E)
+            .stdin_null()
+            .args(flags)
+            .add(args![
+                "-o", out_file,
+                src_file,
+            ]);
+
         CompileCommand { command }
     }
-    fn execute(&self) -> Result<()> {
-        self.command.
+    fn execute(self) -> Result<()> {
+        self.command.spawn().context("Compiler command failed")?;
         Ok(())
     }
 }
