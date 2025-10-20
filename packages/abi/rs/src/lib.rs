@@ -10,39 +10,14 @@ pub extern "C" fn sys_abort() {
     return;
 }
  
-// #[cxx::bridge]
-// mod ffi {
-//     #[namespace = "futex"] 
-//     // ^ this means everything inside is in namespace futex { ... }
-//     unsafe extern "C++" {
-//         // this includes include/example-mod/my_mod.h
-//         // the include path is defined in the build script
-//         include!("../cxx/include/futex.h");
-
-//         // declaring it here makes the function "visible" to Rust
-//         // as you can see, this function is also declared in my_mod.h
-//         unsafe fn futex_wake_impl(address: *mut u32, count: i32) -> i32;
-//     }
-// }
-
-/*
-Questions:
-
-- What am I able to call?
-    - Can I call libnx stuff from Rust?
-- How can I make nx syscalls?
-- 
-
-*/
-
-
-// #[unsafe(no_mangle)]
-// pub unsafe extern "C" fn sys_futex_wake(address: *mut u32, count: i32) -> i32 {
-//     unsafe {
-//         return crate::ffi::futex_wake_impl(address, count);
-
-//     }
-// }
+#[cxx::bridge]
+mod ffi {
+    // #[namespace = "futex"] 
+    // unsafe extern "C++" {
+        // include!("../../cxx/include/futex.h");
+        // unsafe fn sys_futex_wake(address: *mut u32, count: i32) -> i32;
+    // }
+}
 
 
 // #[cfg(test)]
