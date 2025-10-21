@@ -12,6 +12,10 @@ mod link;
 mod scan;
 
 use config::Flags;
+use compile::{compile, compile_rust};
+use generate::generate_cxx_bridge_src;
+use scan::{discover_crate, discover_source};
+
 
 // A source file that can be compiled into a .o file
 struct SourceFile {
@@ -93,11 +97,6 @@ impl CmdBuild {
 fn run_build(args: CmdBuild) -> cu::Result<()> {
     let config = config::load_config(&args.config).context("failed to load config")?;
     cu::hint!("run with -v to see additional output");
-    // TODO: do the actual build
-    // these prints are just as example to show you what the config
-    // looks like. when you implement the build tool,
-    // replace these prints with the actual build tool output
-    // (which you get to decide what the output looks like)
     cu::debug!("{config:#?}");
     let profile = config.profile.resolve(&args.profile)?;
     // you can mess with different -p flags and config combination
@@ -120,6 +119,28 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     build_flags.add_libpaths(["foo"]);
     build_flags.add_libraries(["foo"]);
     build_flags.add_ldscripts(["foo"]);
+
+    // TODO: Init build environment, load needed stuff from config
+
+    // TODO: Discover the rust crate (if rust enabled)
+    // let rust_crate = discover_crate(top_level_source_dir);
+    
+    // TODO: Build rust crate
+    // compile_rust(rust_crate);
+
+    // TODO: Generate cxxbridge headers and sources
+    // generate_cxx_bridge_src(rust_crate.src_dir, module_target_path)
+    
+    // TODO: Find all our other source code
+    // for source_dir in build_config.sources:
+    // let sources = discover_source(source_dir)
+
+    // TODO: Compile all c/cpp/s
+    // for source in sources:
+    // compile(sources, source_o_name, build_flags)
+    
+    // TODO: Link all our artifacts and make the nso
+    // link(??)
 
     Ok(())
 }

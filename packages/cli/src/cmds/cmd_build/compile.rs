@@ -22,3 +22,7 @@ pub fn compile_rust(rust_crate: RustCrate) -> Result<()> {
     // TODO: Implement
     Ok(todo!())
 }
+
+fn check_needs_recompile() -> bool {
+    false
+}
