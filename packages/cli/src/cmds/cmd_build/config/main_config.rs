@@ -37,7 +37,7 @@ pub struct Config {
 
     /// The `[cargo]` section
     ///
-    /// Specify customizations for managed crates
+    /// Specify customizations for crates
     #[serde(default)]
     pub cargo: CargoConfig,
 
