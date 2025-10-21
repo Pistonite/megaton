@@ -3,9 +3,65 @@
 
 use cu::pre::*;
 use derive_more::AsRef;
+use std::path::{Path, PathBuf};
 
+mod compile;
 mod config;
+mod generate;
+mod link;
+mod scan;
+
 use config::Flags;
+
+// A source file that can be compiled into a .o file
+struct SourceFile {
+    path: PathBuf,
+    lang: Lang,
+}
+
+// Specifies source language (rust is managed separately)
+enum Lang {
+    C,
+    Cpp,
+    S,
+}
+
+impl SourceFile {
+    pub fn new(lang: Lang, path: PathBuf) -> Self {
+        Self {
+            path,
+            lang,
+        }
+    }
+}
+
+// A rust crate that will be built as a component of the megaton lib or the mod
+struct RustCrate {
+    path: PathBuf,
+    manifest: RustManifest,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct RustManifest {
+    // TODO: Implement
+
+}
+
+impl RustManifest {
+    fn load(crate_path: &Path) -> Self {
+        // TODO: Implement
+        Self {}
+   }
+}
+
+impl RustCrate {
+    pub fn new(path: PathBuf) -> Self {
+        Self {
+            path: path.clone(),
+            manifest: RustManifest::load(&path)
+        }
+    }
+}
 
 /// Manage the custom `megaton` Rust toolchain
 #[derive(Debug, Clone, AsRef, clap::Parser)]
@@ -67,3 +123,4 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     Ok(())
 }
+
