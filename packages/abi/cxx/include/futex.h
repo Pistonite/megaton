@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <atomic>
+#include <optional>
 extern "C" {
     #include <switch/kernel/svc.h>
 }
