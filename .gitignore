@@ -3,4 +3,4 @@
 /.cache
 /build
 /compile_commands.json
-.vscode2
+.vscode
