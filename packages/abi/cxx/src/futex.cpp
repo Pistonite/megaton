@@ -1,5 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2025 Megaton contributors
+
 #include "futex.h"
 #include <errno.h>
+#include <optional>
+
 
 static std::optional<int64_t> to_usec(const timespec& timespec) {
     int64_t res;
@@ -22,18 +27,12 @@ extern "C" int32_t sys_futex_wait(uint32_t *address, uint32_t expected, const ti
     if (address == nullptr)
         return -EINVAL;
 
-    std::atomic_uint32_t *atomic_address = (std::atomic_uint32_t *)address;
-
     int64_t timeout_usec;
     std::optional<uint64_t> t = to_usec(*timeout);
     if (!t.has_value())
         return -EINVAL;
     timeout_usec = t.value();
-    if ((flags & 0b01) == 0) { // absolute timeout -- convert to relative
-        uint64_t current_time_usec = 0;
-        timeout_usec -= current_time_usec;
-    }
 
-    uint32_t result = svcWaitForAddress(atomic_address, ArbitrationType_WaitIfEqual, expected, timeout_usec);
+    uint32_t result = svcWaitForAddress((std::atomic_uint32_t *) address, ArbitrationType_WaitIfEqual, expected, timeout_usec);
     return result;
 }
