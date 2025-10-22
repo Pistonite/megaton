@@ -12,7 +12,7 @@ pub fn discover_source(dir: impl AsRef<Path>) -> Result<Vec<SourceFile>> {
 }
 
 // Find a rust crate in the given directory, if one exists
-pub fn discover_crate(dir: impl AsRef<Path>) -> Option<RustCrate> {
+pub fn discover_crates(dir: impl AsRef<Path>) -> Result<Vec<RustCrate>> {
     // TODO: Implement
-    Some(todo!())
+    Ok(todo!())
 }

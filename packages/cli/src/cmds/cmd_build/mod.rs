@@ -14,7 +14,7 @@ mod scan;
 use config::Flags;
 use compile::{compile, compile_rust};
 use generate::generate_cxx_bridge_src;
-use scan::{discover_crate, discover_source};
+use scan::{discover_crates, discover_source};
 
 
 // A source file that can be compiled into a .o file
