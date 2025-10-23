@@ -35,7 +35,12 @@ pub struct Config {
     #[serde(default)]
     pub megaton: MegatonConfig,
 
-    // TODO: add cargo config
+    /// The `[cargo]` section
+    ///
+    /// Specify customizations for crates
+    #[serde(default)]
+    pub cargo: CargoConfig,
+
     /// The `[build]` section
     ///
     /// Specify options for building C/C++/assembly project code
@@ -61,6 +66,19 @@ impl Validate for Config {
         }
 
         self.unused.validate(ctx)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CargoConfig {
+    // TODO: implement
+}
+
+impl Default for CargoConfig {
+    fn default() -> Self {
+        Self {
+            // TODO: Implement
+        }
     }
 }
 
