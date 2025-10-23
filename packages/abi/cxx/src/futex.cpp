@@ -5,6 +5,10 @@
 #include <errno.h>
 #include <optional>
 
+extern "C" {
+    #include <switch/kernel/svc.h>
+}
+
 
 static std::optional<int64_t> to_usec(const timespec& timespec) {
     int64_t res;
