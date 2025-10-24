@@ -1,3 +1,5 @@
 /target
 /packages/mono-dev
-
+/.cache
+/build
+/compile_commands.json

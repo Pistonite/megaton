@@ -7,6 +7,7 @@ description = "User-created, hand-crafted system bindings for nnsdk"
 publish = false
 
 [lib]
-crate-type = ["staticlib"]
+crate-type = ["rlib"]
 
 [dependencies]
+cxx = "1.0.186"
