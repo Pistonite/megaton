@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2025 Megaton contributors
+
 #include <alloc.hpp>
 #include <toolkit/tcp.hpp>
 
@@ -7,7 +10,7 @@ static nn::mem::StandardAllocator sa = nn::mem::StandardAllocator();
 extern "C" u8* sys_malloc(u64 size, u64 align) {
     botw::tcp::sendf("calling malloc for %d bytes with alignment %d\n", size, align);
     if (!sa.mIsInitialized) {
-        sa.Initialize(&bss_alloc, BSS_ALLOC_SIZE);
+        sa.Initialize(bss_alloc, BSS_ALLOC_SIZE);
     }
     void* ptr = sa.Allocate(size, align);
     if (ptr != NULL) {
