@@ -14,6 +14,7 @@ mod scan;
 use config::Flags;
 use compile::{compile, compile_rust};
 use generate::generate_cxx_bridge_src;
+
 use scan::{discover_crates, discover_source};
 
 
@@ -130,6 +131,18 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     // TODO: Generate cxxbridge headers and sources
     // generate_cxx_bridge_src(rust_crate.src_dir, module_target_path)
+
+    let rust_crate = RustCrate::new(PathBuf::from("packages/mod"));
+    let module_target_path: PathBuf = config
+    .module
+    .target
+    .as_ref()
+    .map(|s| PathBuf::from(s))
+    .unwrap_or_else(|| PathBuf::from("target/_test_module"));
+
+    generate_cxx_bridge_src(rust_crate, &module_target_path)?;
+
+
     
     // TODO: Find all our other source code
     // for source_dir in build_config.sources:
