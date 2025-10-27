@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2025 Megaton contributors
+
 // This modules handles compiling c/c++/asm/rust code
 
 use cu::Result;
