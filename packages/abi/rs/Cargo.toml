@@ -8,6 +8,7 @@ publish = false
 
 [lib]
 crate-type = ["rlib"]
+panic = "abort"
 
 [dependencies]
 cxx = "1.0.186"
