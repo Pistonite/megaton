@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2025 Megaton contributors
+
 // This module handles scanning the mod/library source
 
 use cu::{Error, Result};
