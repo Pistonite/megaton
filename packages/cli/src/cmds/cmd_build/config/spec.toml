@@ -23,10 +23,13 @@ title-id = 0x0
 #         - rust/cxx.h: header from cxxbridge
 #         - megaton/: megaton headers
 #       - src/: megaton's C/C++/S/RS source files
+#         - cxxbridge/: 
 #       - dep/*: megaton's dependent Rust crates
 #       - Cargo.toml: generate Cargo.toml workspace shim (this needs a [workspace] section)
 #     - <module>/: per-module build files
 #       - include/: generated header files
+#         - rust/cxx.h: 
+#       - src/cxxbridge: 
 #       - o/: output object files
 #       - <module>.elf
 #       - <module>.nso
