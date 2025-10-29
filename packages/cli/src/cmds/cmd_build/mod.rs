@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025 Megaton contributors
 
-use cu::pre::*;
-use derive_more::AsRef;
-use std::{path::{Path, PathBuf}, str::FromStr};
-
 mod compile;
 mod config;
 mod generate;
 mod link;
 mod scan;
+
+use cu::pre::*;
+use derive_more::AsRef;
+use std::{path::{Path, PathBuf}, str::FromStr};
+
 
 use config::Flags;
 use compile::{compile, compile_rust};
@@ -42,7 +43,7 @@ impl SourceFile {
     }
 
     pub fn up_to_date(&self) -> bool {
-        // TODO: Check if we can skip recomipling
+
         false
     }
 }
@@ -142,7 +143,6 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     for source_dir in build_config.sources {
         // Find all c/cpp/s source code
         let sources = discover_source(source_dir).context("Failed to scan for sources in {source_dir}")?;
-
 
         for source in sources {
             compile(&source, &build_flags)?;

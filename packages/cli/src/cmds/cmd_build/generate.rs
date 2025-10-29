@@ -1,11 +1,11 @@
 use std::path::Path;
 
-use cu::Result;
+use cu::pre::*;
 
 use super::RustCrate;
 
 
-pub fn generate_cxx_bridge_src(rust_crate: RustCrate, module_target_path: impl AsRef<Path>) -> Result<()> {
+pub fn generate_cxx_bridge_src(rust_crate: RustCrate, module_target_path: impl AsRef<Path>) -> cu::Result<()> {
     // TODO: Parse rust crate for cxxbridge files 
     //
     // TODO: Place generated headers in {module}/include/rust/
