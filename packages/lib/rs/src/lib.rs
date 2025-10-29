@@ -2,6 +2,7 @@
 // Copyright (c) 2025 Megaton contributors
 
 pub use abi::sys_abort;
+// pub use abi::{sys_futex_wait};
 // mod ffi {
 //
 //     // essentially becomes "visible" to foreign code
@@ -35,6 +36,7 @@ pub use abi::sys_abort;
 //     //input + 42
 // }
 //
+
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
 }
