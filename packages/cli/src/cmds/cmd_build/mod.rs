@@ -3,7 +3,7 @@
 
 use cu::pre::*;
 use derive_more::AsRef;
-use std::path::{Path, PathBuf};
+use std::{path::{Path, PathBuf}, str::FromStr};
 
 mod compile;
 mod config;
@@ -19,8 +19,9 @@ use scan::{discover_crates, discover_source};
 
 // A source file that can be compiled into a .o file
 struct SourceFile {
-    path: PathBuf,
     lang: Lang,
+    path: PathBuf,
+    o_path: PathBuf,
 }
 
 // Specifies source language (rust is managed separately)
@@ -32,10 +33,17 @@ enum Lang {
 
 impl SourceFile {
     pub fn new(lang: Lang, path: PathBuf) -> Self {
+        let o_path = PathBuf::from_str("").unwrap();
         Self {
-            path,
             lang,
+            path,
+            o_path,
         }
+    }
+
+    pub fn up_to_date(&self) -> bool {
+        // TODO: Check if we can skip recomipling
+        false
     }
 }
 
@@ -131,13 +139,16 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     // TODO: Generate cxxbridge headers and sources
     // generate_cxx_bridge_src(rust_crate.src_dir, module_target_path)
     
-    // TODO: Find all our other source code
-    // for source_dir in build_config.sources:
-    // let sources = discover_source(source_dir)
+    for source_dir in build_config.sources {
+        // Find all c/cpp/s source code
+        let sources = discover_source(source_dir).context("Failed to scan for sources in {source_dir}")?;
 
-    // TODO: Compile all c/cpp/s
-    // for source in sources:
-    // compile(sources, source_o_name, build_flags)
+
+        for source in sources {
+            compile(&source, &build_flags)?;
+        }
+    }
+
     
     // TODO: Link all our artifacts and make the nso
     // link(??)
