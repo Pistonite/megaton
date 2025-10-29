@@ -9,6 +9,16 @@
 pub extern "C" fn sys_abort() {
     return;
 }
+ 
+#[cxx::bridge]
+mod ffi {
+    // #[namespace = "futex"] 
+    // unsafe extern "C++" {
+        // include!("../../cxx/include/futex.h");
+        // unsafe fn sys_futex_wake(address: *mut u32, count: i32) -> i32;
+    // }
+}
+
 
 // #[cfg(test)]
 // mod tests {
