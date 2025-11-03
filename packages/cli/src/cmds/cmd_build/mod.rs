@@ -7,16 +7,18 @@ mod generate;
 mod link;
 mod scan;
 
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
+
 use cu::pre::*;
 use derive_more::AsRef;
-use std::{path::{Path, PathBuf}, str::FromStr};
 
-
-use config::Flags;
 use compile::{compile, compile_rust};
+use config::Flags;
 use generate::generate_cxx_bridge_src;
 use scan::{discover_crates, discover_source};
-
 
 // A source file that can be compiled into a .o file
 struct SourceFile {
@@ -35,15 +37,10 @@ enum Lang {
 impl SourceFile {
     pub fn new(lang: Lang, path: PathBuf) -> Self {
         let o_path = PathBuf::from_str("").unwrap();
-        Self {
-            lang,
-            path,
-            o_path,
-        }
+        Self { lang, path, o_path }
     }
 
     pub fn up_to_date(&self) -> bool {
-
         false
     }
 }
@@ -57,21 +54,20 @@ struct RustCrate {
 #[derive(Serialize, Deserialize, Debug)]
 struct RustManifest {
     // TODO: Implement
-
 }
 
 impl RustManifest {
     fn load(crate_path: &Path) -> Self {
         // TODO: Implement
         Self {}
-   }
+    }
 }
 
 impl RustCrate {
     pub fn new(path: PathBuf) -> Self {
         Self {
             path: path.clone(),
-            manifest: RustManifest::load(&path)
+            manifest: RustManifest::load(&path),
         }
     }
 }
@@ -133,26 +129,25 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     // TODO: Discover the rust crate (if rust enabled)
     // let rust_crate = discover_crate(top_level_source_dir);
-    
+
     // TODO: Build rust crate
     // compile_rust(rust_crate);
 
     // TODO: Generate cxxbridge headers and sources
     // generate_cxx_bridge_src(rust_crate.src_dir, module_target_path)
-    
+
     for source_dir in build_config.sources {
         // Find all c/cpp/s source code
-        let sources = discover_source(source_dir).context("Failed to scan for sources in {source_dir}")?;
+        let sources =
+            discover_source(source_dir).context("Failed to scan for sources in {source_dir}")?;
 
         for source in sources {
             compile(&source, &build_flags)?;
         }
     }
 
-    
     // TODO: Link all our artifacts and make the nso
     // link(??)
 
     Ok(())
 }
-

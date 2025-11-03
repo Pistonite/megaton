@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2025 Megaton contributors
+
 use cu::pre::*;
 
 // Link build artifacts into a shared object elf

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2025 Megaton contributors
+
 use std::path::Path;
 
 use cu::pre::*;
