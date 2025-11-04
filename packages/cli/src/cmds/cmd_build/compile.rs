@@ -20,7 +20,10 @@ pub fn compile(src: &SourceFile, flags: &Flags) -> cu::Result<()> {
         Lang::S => (environment().cc_path(), &flags.sflags),
     };
 
-    let comp_command = CompileCommand::new(comp_path, &src.path, &src.o_path, comp_flags);
+    // TODO: This should be created in the target path with the name (source_file_name)-(file_hash)-.o 
+    // A .d file will also be created here
+
+    let comp_command = CompileCommand::new(comp_path, &src.path, &o_path, comp_flags);
 
     comp_command.execute()?;
 

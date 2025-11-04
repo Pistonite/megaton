@@ -8,23 +8,23 @@ mod link;
 mod scan;
 
 use std::{
+    fs::{metadata, File, Metadata},
     path::{Path, PathBuf},
-    str::FromStr,
 };
 
-use cu::pre::*;
+use cu::{pre::*};
 use derive_more::AsRef;
 
-use compile::{compile, compile_rust};
+use compile::compile;
+use config::Config;
 use config::Flags;
-use generate::generate_cxx_bridge_src;
-use scan::{discover_crates, discover_source};
+use scan::discover_source;
 
-// A source file that can be compiled into a .o file
+// A source file and its corresponding artifacts
 struct SourceFile {
     lang: Lang,
     path: PathBuf,
-    o_path: PathBuf,
+    metadata: Metadata
 }
 
 // Specifies source language (rust is managed separately)
@@ -35,13 +35,8 @@ enum Lang {
 }
 
 impl SourceFile {
-    pub fn new(lang: Lang, path: PathBuf) -> Self {
-        let o_path = PathBuf::from_str("").unwrap();
-        Self { lang, path, o_path }
-    }
-
-    pub fn up_to_date(&self) -> bool {
-        false
+    pub fn new(lang: Lang, path: PathBuf, metadata: Metadata) -> Self {
+        Self { lang, path, metadata }
     }
 }
 
@@ -138,8 +133,8 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     for source_dir in build_config.sources {
         // Find all c/cpp/s source code
-        let sources =
-            discover_source(source_dir).context("Failed to scan for sources in {source_dir}")?;
+        let sources = discover_source(PathBuf::from(source_dir).as_ref(), &config)
+            .context("Failed to scan for sources in {source_dir}")?;
 
         for source in sources {
             compile(&source, &build_flags)?;
