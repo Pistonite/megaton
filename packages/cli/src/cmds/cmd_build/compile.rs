@@ -8,26 +8,62 @@ use cu::pre::*;
 use super::{Flags, Lang, RustCrate, SourceFile};
 use crate::env::environment;
 
+pub fn need_to_recompile(src, compdb) -> Option<comp_record> {
+    let o_file = get_object(src);
+    if o_file == None {
+        return true;
+    } 
+    
+    let d_file = get_depfile(src);
+    if d_file == None {
+        return true;
+    } 
+
+    if compdb[src.name].compiletime < src.metadata.modifiedtime {
+        return true;
+    }
+
+    if compdb[src.name].compiletime < o_file.metadata.modifiedtime {
+        return true;
+    }
+
+    if compdb[src.name].compiletime < d_file.metadata.modifiedtime {
+        return true;
+    }
+    
+    for dep in d_file {
+        if compdb[src.name].compiletime < dep.metadata.modifiedtime {
+            return true;
+        }
+    } 
+
+    let comp_comm = CompileCommand::new();
+
+    if compdb[src.name].command != comp_comm {
+        return true
+    }
+
+    if compdb.comp_ver != environment.comp_ver {
+        return true
+    }
+
+    false
+}
+
 // Compiles the given source file and writes it to `out`
 pub fn compile(src: &SourceFile, flags: &Flags) -> cu::Result<()> {
-    if src.up_to_date() {
-        cu::debug!("{} up to date, skipping", src.path.to_str().unwrap());
-        return Ok(());
+
+
+    if let Some(cc) = need_to_recompile(, compdb) {
+        let timefinished = cc.execute()
+        compdb.update(cc, timefinsihed)
     }
-    let (comp_path, comp_flags) = match src.lang {
-        Lang::C => (environment().cc_path(), &flags.cflags),
-        Lang::Cpp => (environment().cxx_path(), &flags.cxxflags),
-        Lang::S => (environment().cc_path(), &flags.sflags),
-    };
 
-    // TODO: This should be created in the target path with the name (source_file_name)-(file_hash)-.o 
-    // A .d file will also be created here
 
-    let comp_command = CompileCommand::new(comp_path, &src.path, &o_path, comp_flags);
 
-    comp_command.execute()?;
 
-    Ok(())
+
+
 }
 
 // Builds the give rust crate and places the binary in the target as specified in the rust manifest
@@ -41,7 +77,7 @@ struct CompileCommand {
 }
 
 impl CompileCommand {
-    fn new(compiler_path: &Path, src_file: &Path, out_file: &Path, flags: &Vec<String>) -> Self {
+    fn new(compiler_path: &Path, src_file: &Path, out_file: &Path, flags: &Vec<String>, build_env) -> Self {
         let command = cu::CommandBuilder::new(compiler_path)
             .stdout(cu::lv::I)
             .stderr(cu::lv::E)
