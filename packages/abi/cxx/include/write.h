@@ -15,7 +15,9 @@ struct iovec {
     usize iov_len;
 };
 
-
+namespace fs {
+    uint64_t open_file(const int8_t *name, int flags, int32_t mode);
+}
 
 extern "C" isize sys_write(FileDescriptor fd, const uint8_t* buf, usize len);
 
