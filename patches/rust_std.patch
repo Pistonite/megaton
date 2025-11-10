@@ -1,0 +1,17 @@
+diff --git a/library/std/src/sys/env/hermit.rs b/library/std/src/sys/env/hermit.rs
+index 445ecdeb..5e54ccfe 100644
+--- a/library/std/src/sys/env/hermit.rs
++++ b/library/std/src/sys/env/hermit.rs
+@@ -9,6 +9,12 @@
+ 
+ static ENV: Mutex<Option<HashMap<OsString, OsString>>> = Mutex::new(None);
+ 
++#[unsafe(no_mangle)]
++pub extern "C" fn init_env() {
++    let env = [c"".as_ptr() as *const c_char];
++    init(env.as_ptr());
++}
++
+ pub fn init(env: *const *const c_char) {
+     let mut guard = ENV.lock().unwrap();
+     let map = guard.insert(HashMap::new());

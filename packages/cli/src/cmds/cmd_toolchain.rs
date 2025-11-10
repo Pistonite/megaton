@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025 Megaton contributors
 
-use std::path::{Path, PathBuf};
+use std::{io::stdout, path::{Path, PathBuf}};
 
 use cu::pre::*;
 
@@ -13,6 +13,9 @@ static TOOLCHAIN_NAME: &str = "megaton";
 static RUST_REPO: &str = "https://github.com/rust-lang/rust";
 /// The "blessed" commit hash to use (i.e. tested and will work)
 static RUST_COMMIT: &str = "caadc8df3519f1c92ef59ea816eb628345d9f52a";
+// This is a patch for the rust stdlib
+// static PATCH_FILE: &'static str = "../../../../patches/rust_std.patch";
+static PATCH_FILE: &'static str = include_str!("../../../../patches/rust_std.patch");
 
 /// Manage the custom `megaton` Rust toolchain
 #[derive(Debug, Clone, clap::Subcommand)]
@@ -23,6 +26,7 @@ pub enum CmdToolchain {
     Install {
         /// Keep the rustc/llvm build output. This may consume a lot of disk space,
         /// but makes it faster when debugging the toolchain
+        ///
         #[clap(short, long)]
         keep: bool,
 
@@ -138,12 +142,18 @@ fn install(keep: bool, clean: bool) -> cu::Result<()> {
             }
         }
     }
-
     // verify the blessed commit is checked out
     let actual_commit = try_get_rust_source_commit(&rust_path)
         .context("failed to verify the blessed commit is checked out")?;
     if actual_commit != RUST_COMMIT {
         cu::bail!("failed to checkout the blessed commit.");
+    }
+
+    match patch_rust_std(&rust_path) {
+        Ok(_) => {},
+        Err(_) => {
+            cu::bail!("failed to apply patches");
+        }
     }
 
     let mut bootstrap_toml = String::new();
@@ -403,6 +413,23 @@ fn checkout_blessed_commit(path: &Path) -> cu::Result<()> {
         .stdin_null()
         .spawn()?
         .0
+        .wait()?;
+    Ok(())
+}
+
+// patch our rust stdlib to do all the things we want
+fn patch_rust_std(path: &Path) -> cu::Result<()> {
+    let git = cu::which("git")?;
+    git.command()
+        .add(cu::args![
+            "-C",
+            &path,
+            "apply",
+            "-"
+        ])
+        .stdoe(cu::lv::W)
+        .stdin(cu::pio::write(PATCH_FILE))
+        .spawn()?
         .wait()?;
     Ok(())
 }
