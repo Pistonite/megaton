@@ -8,11 +8,11 @@ mod link;
 mod scan;
 
 use std::{
-    fs::{metadata, File, Metadata},
+    fs::{File, Metadata, metadata},
     path::{Path, PathBuf},
 };
 
-use cu::{pre::*};
+use cu::pre::*;
 use derive_more::AsRef;
 
 use compile::compile;
@@ -24,10 +24,11 @@ use scan::discover_source;
 struct SourceFile {
     lang: Lang,
     path: PathBuf,
-    metadata: Metadata
+    metadata: Metadata,
 }
 
 // Specifies source language (rust is managed separately)
+#[derive(PartialEq, Eq)]
 enum Lang {
     C,
     Cpp,
@@ -35,8 +36,12 @@ enum Lang {
 }
 
 impl SourceFile {
-    pub fn new(lang: Lang, path: PathBuf, metadata: Metadata) -> Self {
-        Self { lang, path, metadata }
+    fn new(lang: Lang, path: PathBuf, metadata: Metadata) -> Self {
+        Self {
+            lang,
+            path,
+            metadata,
+        }
     }
 }
 
@@ -64,6 +69,43 @@ impl RustCrate {
             path: path.clone(),
             manifest: RustManifest::load(&path),
         }
+    }
+}
+
+// Stores all the info needed for the build process. Things in here would
+// otherwise be accessible from the configuration or in the global environment.
+// This should be fast so it should just get initialized once and have
+// immutable references to it passed where needed.
+struct BuildEnvironment {
+    target: String,
+    module: String,
+    profile: String,
+    compdb_clangd: String,
+    cc_version: String,
+    cxx_version: String,
+}
+
+impl BuildEnvironment {
+    // Initalize a new copy of the environment
+    fn init(config: &Config) -> cu::Result<Self> {
+        let profile = if config.profile.allow_base {
+            String::from("none")
+        } else {
+            match &config.profile.default {
+                Some(name) => name.clone(),
+                None => return Err(cu::Error::msg("Failed to get profile name")),
+            }
+        };
+        Ok(Self {
+            target: config.module.target.clone().unwrap_or(String::from("target")),
+            module: config.module.name.clone(),
+            profile,
+            compdb_clangd: config.module.compdb.clone().unwrap_or(String::from("compile_commands.json")),
+
+            // TODO: Figure out how to get these at runtime
+            cc_version: todo!(),
+            cxx_version: todo!(),
+        })
     }
 }
 
@@ -120,7 +162,14 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     build_flags.add_libraries(["foo"]);
     build_flags.add_ldscripts(["foo"]);
 
-    // TODO: Init build environment, load needed stuff from config
+    // Init build environment, load needed stuff from config
+    let build_env = BuildEnvironment::init(&config)?;
+
+    // TODO: Load cached compdb (or generate a new one)
+    let comp_db_cache_path = todo!();
+
+    // Where is serde json?
+    let compile_db = json::parse(comp_db_cache_path);
 
     // TODO: Discover the rust crate (if rust enabled)
     // let rust_crate = discover_crate(top_level_source_dir);
@@ -133,11 +182,13 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     for source_dir in build_config.sources {
         // Find all c/cpp/s source code
-        let sources = discover_source(PathBuf::from(source_dir).as_ref(), &config)
-            .context("Failed to scan for sources in {source_dir}")?;
 
+        // TODO: Combine these into a single step so sources are compiled (or skipped)
+        // as they are discovered.
+        let sources = discover_source(PathBuf::from(source_dir).as_ref())
+            .context("Failed to scan for sources in {source_dir}")?;
         for source in sources {
-            compile(&source, &build_flags)?;
+            compile(&source, &build_flags, &build_env, &mut compile_db)?;
         }
     }
 
