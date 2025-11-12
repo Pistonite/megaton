@@ -1,17 +1,58 @@
 diff --git a/library/std/src/sys/env/hermit.rs b/library/std/src/sys/env/hermit.rs
-index 445ecdeb..5e54ccfe 100644
+index 445ecdeb..bcf3aeb4 100644
 --- a/library/std/src/sys/env/hermit.rs
 +++ b/library/std/src/sys/env/hermit.rs
-@@ -9,6 +9,12 @@
+@@ -1,17 +1,20 @@
+ use core::slice::memchr;
  
- static ENV: Mutex<Option<HashMap<OsString, OsString>>> = Mutex::new(None);
+ pub use super::common::Env;
+-use crate::collections::HashMap;
++use crate::collections::BTreeMap;
++// use crate::collections::HashMap;
+ use crate::ffi::{CStr, OsStr, OsString, c_char};
+ use crate::io;
+ use crate::os::hermit::ffi::OsStringExt;
+ use crate::sync::Mutex;
  
-+#[unsafe(no_mangle)]
-+pub extern "C" fn init_env() {
-+    let env = [c"".as_ptr() as *const c_char];
-+    init(env.as_ptr());
-+}
-+
+-static ENV: Mutex<Option<HashMap<OsString, OsString>>> = Mutex::new(None);
++static ENV: Mutex<BTreeMap<OsString, OsString>> = Mutex::new(BTreeMap::new());
++// static ENV: Mutex<Option<HashMap<OsString, OsString>>> = Mutex::new(None);
+ 
  pub fn init(env: *const *const c_char) {
      let mut guard = ENV.lock().unwrap();
-     let map = guard.insert(HashMap::new());
+-    let map = guard.insert(HashMap::new());
++    let map = &mut guard;
++    // let map = guard.insert(HashMap::new());
+ 
+     if env.is_null() {
+         return;
+@@ -49,7 +52,8 @@ fn parse(input: &[u8]) -> Option<(OsString, OsString)> {
+ /// environment variables of the current process.
+ pub fn env() -> Env {
+     let guard = ENV.lock().unwrap();
+-    let env = guard.as_ref().unwrap();
++    let env = &guard;
++    // let env = guard.as_ref().unwrap();
+ 
+     let result = env.iter().map(|(key, value)| (key.clone(), value.clone())).collect();
+ 
+@@ -57,16 +61,16 @@ pub fn env() -> Env {
+ }
+ 
+ pub fn getenv(k: &OsStr) -> Option<OsString> {
+-    ENV.lock().unwrap().as_ref().unwrap().get(k).cloned()
++    ENV.lock().unwrap().get(k).cloned()
+ }
+ 
+ pub unsafe fn setenv(k: &OsStr, v: &OsStr) -> io::Result<()> {
+     let (k, v) = (k.to_owned(), v.to_owned());
+-    ENV.lock().unwrap().as_mut().unwrap().insert(k, v);
++    ENV.lock().unwrap().insert(k, v);
+     Ok(())
+ }
+ 
+ pub unsafe fn unsetenv(k: &OsStr) -> io::Result<()> {
+-    ENV.lock().unwrap().as_mut().unwrap().remove(k);
++    ENV.lock().unwrap().remove(k);
+     Ok(())
+ }
