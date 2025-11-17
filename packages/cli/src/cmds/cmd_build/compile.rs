@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025 Megaton contributors
 
-use std::path::{Path, PathBuf};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 
 use cu::pre::*;
 use fxhash::hash;
@@ -11,7 +14,7 @@ use crate::{cmds::cmd_build::BuildEnvironment, env::environment};
 
 #[derive(Serialize, Deserialize)]
 pub struct CompileDB {
-    commands: Vec<CompileRecord>,
+    commands: BTreeMap<String, CompileRecord>,
     cc_version: String,
     cxx_version: String,
 }
@@ -25,7 +28,6 @@ impl CompileDB {
 
 #[derive(Serialize, Deserialize)]
 struct CompileRecord {
-    src_basename: String,
     command: CompileCommand,
 }
 
@@ -45,14 +47,15 @@ impl CompileCommand {
     ) -> cu::Result<Self> {
         let mut argv = flags.clone();
         argv.push(
-            cu::PathExtension::as_utf8(src_file)
+            src_file
+                .as_utf8()
                 .context("failed to parse utf-8")?
                 .to_string(),
         );
         argv.push(String::from("-c"));
         argv.push(format!(
             "-o{}",
-            cu::PathExtension::as_utf8(out_file).context("failed to parse utf-8")?
+            out_file.as_utf8().context("failed to parse utf-8")?
         ));
 
         Ok(Self {
@@ -121,7 +124,7 @@ impl SourceFile {
 
         let comp_command = CompileCommand::new(comp_path, &self.path, &o_path, &comp_flags)?;
 
-        if self.need_recompile(compile_db, build_env, &o_path, &d_path)? {
+        if self.need_recompile(compile_db, build_env, &o_path, &d_path, &comp_command)? {
             // Compile and update record
             comp_command.execute()?;
 
@@ -143,13 +146,10 @@ impl SourceFile {
         build_env: &BuildEnvironment,
         o_path: &Path,
         d_path: &Path,
+        command: &CompileCommand
     ) -> cu::Result<bool> {
         // Check if record exists
-        let comp_record = match compile_db
-            .commands
-            .iter()
-            .find(|r| r.src_basename == self.basename)
-        {
+        let comp_record = match compile_db.commands.get(&self.basename) {
             Some(record) => record,
             None => return Ok(true),
         };
@@ -160,31 +160,35 @@ impl SourceFile {
         }
 
         // Check if artifacts are up to date
-        if cu::fs::get_mtime(o_path)? != cu::fs::get_mtime(self.path)?
-            || cu::fs::get_mtime(d_path)? != cu::fs::get_mtime(self.path)?
+        if cu::fs::get_mtime(o_path)? != cu::fs::get_mtime(&self.path)?
+            || cu::fs::get_mtime(d_path)? != cu::fs::get_mtime(&self.path)?
         {
             return Ok(true);
         }
 
-        let d_file =
-            match depfile::parse(&cu::fs::read_string(d_path).context("Failed to read depfile")?) {
+        let d_file_contents = cu::fs::read_string(d_path)?;
+        let depfile =
+            match depfile::parse(&&d_file_contents) {
                 Ok(depfile) => depfile,
 
                 // Make sure our errors are all cu compatible
-                Err(byte) => return Err(cu::Error::msg("Failed to parse depfile")),
+                Err(_) => return Err(cu::Error::msg("Failed to parse depfile")),
             };
 
-        if d_file.dependencies.iter().all(|dep| {
-            let dep_meta = dep.metadata().unwrap();
-            dep_meta.modified().unwrap() < comp_record.last_comp_time
-        }) {
-            if comp_command == comp_record.command {
-                if (compile_db.cc_version == build_env.cc_version)
-                    || (src.lang == Lang::Cpp && compile_db.cc_version == build_env.cc_version)
-                {
-                    return Ok(false);
-                }
+        for dep in depfile.recurse_deps(o_path.as_utf8()?) {
+            if cu::fs::get_mtime(PathBuf::from(dep))? != cu::fs::get_mtime(&self.path)? {
+                return Ok(true);
             }
+        }
+
+        if command != &comp_record.command {
+            return Ok(true);
+        }
+
+        if (self.lang == Lang::Cpp && compile_db.cxx_version != build_env.cxx_version)
+            || compile_db.cc_version != build_env.cc_version
+        {
+            return Ok(true);
         }
 
         // No need to recompile!
