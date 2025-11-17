@@ -7,10 +7,31 @@ use std::{
     time::SystemTime,
 };
 
-use cu::pre::*;
+use cu::{pre::*};
 
 use super::{Flags, Lang, RustCrate, SourceFile};
 use crate::{cmds::cmd_build::BuildEnvironment, env::environment};
+
+#[derive(Serialize, Deserialize)]
+pub struct CompileDB {
+    commands: Vec<CompileRecord>,
+    cc_version: String,
+    cxx_version: String,
+}
+
+impl CompileDB {
+    // Creates a new compile record and adds it to the db
+    fn update(&mut self, command: CompileCommand) -> cu::Result<()> {
+        todo!()
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct CompileRecord {
+    src_basename: String,
+    command: CompileCommand,
+    last_comp_time: SystemTime,
+}
 
 #[derive(Serialize, Deserialize, PartialEq, Eq)]
 struct CompileCommand {
@@ -20,17 +41,29 @@ struct CompileCommand {
 }
 
 impl CompileCommand {
-    fn new(compiler_path: &Path, src_file: &Path, out_file: &Path, flags: &Vec<String>) -> Self {
+    fn new(
+        compiler_path: &Path,
+        src_file: &Path,
+        out_file: &Path,
+        flags: &Vec<String>,
+    ) -> cu::Result<Self> {
         let mut argv = flags.clone();
-        argv.push(src_file.to_string_lossy().into_owned());
+        argv.push(
+            cu::PathExtension::as_utf8(src_file)
+                .context("failed to parse utf-8")?
+                .to_string(),
+        );
         argv.push(String::from("-c"));
-        argv.push(format!("-o {}", out_file.to_string_lossy()));
+        argv.push(format!(
+            "-o{}",
+            cu::PathExtension::as_utf8(out_file).context("failed to parse utf-8")?
+        ));
 
-        Self {
+        Ok(Self {
             compiler: compiler_path.to_path_buf(),
             source: src_file.to_path_buf(),
             args: argv,
-        }
+        })
     }
 
     fn execute(&self) -> cu::Result<()> {
@@ -43,27 +76,6 @@ impl CompileCommand {
     // and the format will be different for each
     fn to_clangd_json(&self) -> String {
         // TODO: Implement
-        todo!()
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct CompileRecord {
-    src_basename: String,
-    command: CompileCommand,
-    last_comp_time: SystemTime,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct CompileDB {
-    commands: Vec<CompileRecord>,
-    cc_version: String,
-    cxx_version: String,
-}
-
-impl CompileDB {
-    // Creates a new compile record and adds it to the db
-    fn update(&mut self, command: CompileCommand) -> cu::Result<()> {
         todo!()
     }
 }
@@ -105,7 +117,7 @@ pub fn compile(
         Lang::S => (environment().cc_path(), &flags.sflags),
     };
 
-    let comp_command = CompileCommand::new(comp_path, &src.path, &o_path, &comp_flags);
+    let comp_command = CompileCommand::new(comp_path, &src.path, &o_path, &comp_flags)?;
 
     // Check if record exists
     if let Some(comp_record) = compile_db.commands.iter().find(|r| r.src_basename == name) {
