@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025 Megaton contributors
 
-use std::{
-    path::{Path, PathBuf},
-    str::FromStr,
-    time::SystemTime,
-};
+use std::path::{Path, PathBuf};
 
-use cu::{pre::*};
+use cu::pre::*;
+use fxhash::hash;
 
-use super::{Flags, Lang, RustCrate, SourceFile};
+use super::{Flags, RustCrate};
 use crate::{cmds::cmd_build::BuildEnvironment, env::environment};
 
 #[derive(Serialize, Deserialize)]
@@ -30,7 +27,6 @@ impl CompileDB {
 struct CompileRecord {
     src_basename: String,
     command: CompileCommand,
-    last_comp_time: SystemTime,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq)]
@@ -80,88 +76,128 @@ impl CompileCommand {
     }
 }
 
-struct DFile {
-    dependent: PathBuf,
-    dependencies: Vec<PathBuf>,
+// A source file and its corresponding artifacts
+pub struct SourceFile {
+    lang: Lang,
+    path: PathBuf,
+    basename: String,
+    hash: usize,
 }
 
-impl DFile {
-    // Maybe can do this easier with serde??
-    fn load(path: &Path) -> Self {
-        todo!()
+impl SourceFile {
+    pub fn new(lang: Lang, path: PathBuf) -> cu::Result<Self> {
+        let basename = cu::PathExtension::file_name_str(&path)
+            .context("path is not utf-8")?
+            .to_owned();
+        let hash = hash(&cu::fs::read(&path).context("Failed to read source file")?);
+        Ok(Self {
+            lang,
+            path,
+            basename,
+            hash,
+        })
     }
-}
 
-// Compiles the given source file and writes it to `out`
-pub fn compile(
-    src: &SourceFile,
-    flags: &Flags,
-    build_env: &BuildEnvironment,
-    compile_db: CompileDB,
-) -> cu::Result<()> {
-    let name = src.path.file_stem().unwrap().to_str().unwrap();
-    let hash = todo!(); // Hash the file
+    pub fn compile(
+        &self,
+        flags: &Flags,
+        build_env: &BuildEnvironment,
+        compile_db: &mut CompileDB,
+    ) -> cu::Result<()> {
+        let o_path = PathBuf::from(format!(
+            "{}/{}/{}/o/{}-{}.o",
+            build_env.target, build_env.profile, build_env.module, self.basename, self.hash
+        ));
+        let d_path = PathBuf::from(format!(
+            "{}/{}/{}/o/{}-{}.d",
+            build_env.target, build_env.profile, build_env.module, self.basename, self.hash
+        ));
 
-    let o_path = PathBuf::from(format!(
-        "{}/{}/{}/o/{name}-{hash}.o",
-        build_env.target, build_env.profile, build_env.module
-    ));
-    let d_path = PathBuf::from(format!(
-        "{}/{}/{}/o/{name}-{hash}.d",
-        build_env.target, build_env.profile, build_env.module
-    ));
+        let (comp_path, comp_flags) = match self.lang {
+            Lang::C => (environment().cc_path(), &flags.cflags),
+            Lang::Cpp => (environment().cxx_path(), &flags.cxxflags),
+            Lang::S => (environment().cc_path(), &flags.sflags),
+        };
 
-    let (comp_path, comp_flags) = match src.lang {
-        Lang::C => (environment().cc_path(), &flags.cflags),
-        Lang::Cpp => (environment().cxx_path(), &flags.cxxflags),
-        Lang::S => (environment().cc_path(), &flags.sflags),
-    };
+        let comp_command = CompileCommand::new(comp_path, &self.path, &o_path, &comp_flags)?;
 
-    let comp_command = CompileCommand::new(comp_path, &src.path, &o_path, &comp_flags)?;
+        if self.need_recompile(compile_db, build_env, &o_path, &d_path)? {
+            // Compile and update record
+            comp_command.execute()?;
 
-    // Check if record exists
-    if let Some(comp_record) = compile_db.commands.iter().find(|r| r.src_basename == name) {
-        let src_meta = src
-            .path
-            .metadata()
-            .context("Failed to get src file metadata")?;
-        let o_meta = o_path
-            .metadata()
-            .context("Failed to get .o file metadata")?;
-        let d_meta = d_path
-            .metadata()
-            .context("Failed to get .d file metadata")?;
+            // Ensure source and artifacts have the same timestamp
+            let now = cu::fs::Time::now();
+            cu::fs::set_mtime(o_path, now)?;
+            cu::fs::set_mtime(d_path, now)?;
+            cu::fs::set_mtime(&self.path, now)?;
 
-        // Check if src or artifacts have been modified since last compile
-        if o_path.exists()
-            && o_meta.modified().unwrap() < comp_record.last_comp_time
-            && d_path.exists()
-            && d_meta.modified().unwrap() < comp_record.last_comp_time
-            && src_meta.modified().unwrap() < comp_record.last_comp_time
+            compile_db.update(comp_command)?;
+        }
+
+        Ok(())
+    }
+
+    fn need_recompile(
+        &self,
+        compile_db: &CompileDB,
+        build_env: &BuildEnvironment,
+        o_path: &Path,
+        d_path: &Path,
+    ) -> cu::Result<bool> {
+        // Check if record exists
+        let comp_record = match compile_db
+            .commands
+            .iter()
+            .find(|r| r.src_basename == self.basename)
         {
-            // Check if any dependency has been modified
-            let d_file = DFile::load(&d_path);
-            if d_file.dependencies.iter().all(|dep| {
-                let dep_meta = dep.metadata().unwrap();
-                dep_meta.modified().unwrap() < comp_record.last_comp_time
-            }) {
-                if comp_command == comp_record.command {
-                    if (compile_db.cc_version == build_env.cc_version)
-                        || (src.lang == Lang::Cpp && compile_db.cc_version == build_env.cc_version)
-                    {
-                        // No need to recompile!
-                        return Ok(());
-                    }
+            Some(record) => record,
+            None => return Ok(true),
+        };
+
+        // Check if artifacts exist
+        if !o_path.exists() || !d_path.exists() {
+            return Ok(true);
+        }
+
+        // Check if artifacts are up to date
+        if cu::fs::get_mtime(o_path)? != cu::fs::get_mtime(self.path)?
+            || cu::fs::get_mtime(d_path)? != cu::fs::get_mtime(self.path)?
+        {
+            return Ok(true);
+        }
+
+        let d_file =
+            match depfile::parse(&cu::fs::read_string(d_path).context("Failed to read depfile")?) {
+                Ok(depfile) => depfile,
+
+                // Make sure our errors are all cu compatible
+                Err(byte) => return Err(cu::Error::msg("Failed to parse depfile")),
+            };
+
+        if d_file.dependencies.iter().all(|dep| {
+            let dep_meta = dep.metadata().unwrap();
+            dep_meta.modified().unwrap() < comp_record.last_comp_time
+        }) {
+            if comp_command == comp_record.command {
+                if (compile_db.cc_version == build_env.cc_version)
+                    || (src.lang == Lang::Cpp && compile_db.cc_version == build_env.cc_version)
+                {
+                    return Ok(false);
                 }
             }
         }
+
+        // No need to recompile!
+        Ok(false)
     }
+}
 
-    // Compile and update record
-    comp_command.execute()?;
-    compile_db.update(comp_command)?;
-
-    Ok(())
+// Specifies source language (rust is managed separately)
+#[derive(PartialEq, Eq)]
+pub enum Lang {
+    C,
+    Cpp,
+    S,
 }
 
 // Builds the give rust crate and places the binary in the target as specified in the rust manifest

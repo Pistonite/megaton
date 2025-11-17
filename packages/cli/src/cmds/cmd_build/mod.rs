@@ -20,31 +20,6 @@ use config::Config;
 use config::Flags;
 use scan::discover_source;
 
-// A source file and its corresponding artifacts
-struct SourceFile {
-    lang: Lang,
-    path: PathBuf,
-    metadata: Metadata,
-}
-
-// Specifies source language (rust is managed separately)
-#[derive(PartialEq, Eq)]
-enum Lang {
-    C,
-    Cpp,
-    S,
-}
-
-impl SourceFile {
-    fn new(lang: Lang, path: PathBuf, metadata: Metadata) -> Self {
-        Self {
-            lang,
-            path,
-            metadata,
-        }
-    }
-}
-
 // A rust crate that will be built as a component of the megaton lib or the mod
 struct RustCrate {
     path: PathBuf,

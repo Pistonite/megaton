@@ -8,7 +8,8 @@ use std::path::Path;
 
 use cu::pre::*;
 
-use super::{Lang, RustCrate, SourceFile};
+use crate::cmds::cmd_build::compile::{Lang, SourceFile};
+use super::RustCrate;
 
 // Get every source file in the given directory, recursivly
 // Skips entrys with an unknown extension
@@ -27,8 +28,7 @@ pub fn discover_source(dir: &Path) -> cu::Result<Vec<SourceFile>> {
                     _ => None,
                 };
                 if let Some(lang) = lang {
-                    let metadata = entry.metadata().context("Failed to get metadata")?;
-                    let source = SourceFile::new(lang, path, metadata);
+                    let source = SourceFile::new(lang, path);
                     sources.push(source);
                 } else {
                     cu::debug!(
