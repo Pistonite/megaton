@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-use cu::{Context, pre::*};
+use cu::pre::*;
 
 // Core environment variables needed to run the tool
 // Includes paths to build/debug utilities and caches
@@ -73,7 +73,7 @@ pub fn commit() -> &'static str {
 /// # Safety
 /// Only safe to call when only one thread exists
 pub unsafe fn init_env() -> cu::Result<()> {
-    let megaton_home = std::env::var("MEGATON_HOME").unwrap_or_default();
+    let megaton_home = cu::env_var("MEGATON_HOME").unwrap_or_default();
     let megaton_home = if megaton_home.is_empty() {
         cu::debug!("MEGATON_HOME not specified, using default path ~/.cache/megaton");
         let mut home = std::env::home_dir().context("failed to get user's home directory")?;
@@ -83,7 +83,7 @@ pub unsafe fn init_env() -> cu::Result<()> {
         Path::new(&megaton_home).normalize()?
     };
 
-    let devkitpro = std::env::var("DEVKITPRO").context("DEVKITPRO environment variable not set")?;
+    let devkitpro = cu::env_var("DEVKITPRO").context("DEVKITPRO environment variable not set")?;
     let devkitpro = Path::new(&devkitpro).normalize()?;
 
     cu::debug!("megaton_home: {}", megaton_home.display());

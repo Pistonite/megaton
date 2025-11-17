@@ -146,7 +146,7 @@ impl SourceFile {
         build_env: &BuildEnvironment,
         o_path: &Path,
         d_path: &Path,
-        command: &CompileCommand
+        command: &CompileCommand,
     ) -> cu::Result<bool> {
         // Check if record exists
         let comp_record = match compile_db.commands.get(&self.basename) {
@@ -167,13 +167,12 @@ impl SourceFile {
         }
 
         let d_file_contents = cu::fs::read_string(d_path)?;
-        let depfile =
-            match depfile::parse(&&d_file_contents) {
-                Ok(depfile) => depfile,
+        let depfile = match depfile::parse(&&d_file_contents) {
+            Ok(depfile) => depfile,
 
-                // Make sure our errors are all cu compatible
-                Err(_) => return Err(cu::Error::msg("Failed to parse depfile")),
-            };
+            // Make sure our errors are all cu compatible
+            Err(_) => return Err(cu::Error::msg("Failed to parse depfile")),
+        };
 
         for dep in depfile.recurse_deps(o_path.as_utf8()?) {
             if cu::fs::get_mtime(PathBuf::from(dep))? != cu::fs::get_mtime(&self.path)? {

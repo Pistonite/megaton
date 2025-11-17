@@ -8,8 +8,8 @@ use std::path::Path;
 
 use cu::pre::*;
 
-use crate::cmds::cmd_build::compile::{Lang, SourceFile};
 use super::RustCrate;
+use crate::cmds::cmd_build::compile::{Lang, SourceFile};
 
 // Get every source file in the given directory, recursivly
 // Skips entrys with an unknown extension
@@ -18,29 +18,23 @@ pub fn discover_source(dir: &Path) -> cu::Result<Vec<SourceFile>> {
     let mut sources = Vec::new();
     let mut walk = cu::fs::walk(dir)?;
     while let Some(walk_result) = walk.next() {
-        match walk_result {
-            Ok(entry) => {
-                let path = entry.path();
-                let lang = match path.extension().and_then(OsStr::to_str).unwrap_or_default() {
-                    "c" => Some(Lang::C),
-                    "cpp" | "c++" | "cc" | "cxx" => Some(Lang::Cpp),
-                    "s" | "asm" => Some(Lang::S),
-                    _ => None,
-                };
-                if let Some(lang) = lang {
-                    let source = SourceFile::new(lang, path);
-                    sources.push(source);
-                } else {
-                    cu::debug!(
-                        "Unrecognized extension: {}, skipping",
-                        path.to_str().unwrap_or("illegible filename")
-                    );
-                }
-            }
-            Err(e) => {
-                cu::warn!("{e}");
-            }
+        let entry = walk_result.context("failed to walk source directory")?;
+        let path = entry.path();
+        let lang = match path.extension().and_then(OsStr::to_str).unwrap_or_default() {
+            "c" => Some(Lang::C),
+            "cpp" | "c++" | "cc" | "cxx" => Some(Lang::Cpp),
+            "s" | "asm" => Some(Lang::S),
+            _ => None,
         };
+        if let Some(lang) = lang {
+            let source = SourceFile::new(lang, path).context("failed to create source object")?;
+            sources.push(source);
+        } else {
+            cu::debug!(
+                "Unrecognized extension: {}, skipping",
+                path.to_str().unwrap_or("illegible filename")
+            );
+        }
     }
     Ok(sources)
 }
