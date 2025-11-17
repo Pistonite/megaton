@@ -8,13 +8,15 @@ publish = false
 
 [dependencies.cu]
 workspace = true
-features = ["cli", "process", "prompt", "toml", "json"]
+features = ["cli", "process", "prompt", "toml", "json", "fs"]
 
 [dependencies]
 serde = "1"
 flate2 = "1.1.2"
 tar = "0.4.44"
 derive_more = { version = "2.0.1", features = ["as_ref", "deref", "deref_mut"] }
+fxhash = "0.2.1"
+depfile = "0.1.1"
 
 [build-dependencies.cu]
 workspace = true
