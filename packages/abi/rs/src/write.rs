@@ -6,7 +6,7 @@
 // use std::sync::LazyLock;
 // use nn::fs::
 
-use std::sync::{LazyLock, Mutex};
+use std::{ffi::{CStr, c_char}, sync::{LazyLock, Mutex}};
 
 mod abi {
 
@@ -58,10 +58,15 @@ mod abi {
 #[cxx::bridge]
 mod ffi {
 
+    // type Result = u64;
+
     #[namespace = "fs"] 
     unsafe extern "C++" {
         include!("write.h");
-        unsafe fn open_file(name: *const i8, flags: i32, mode: i32) -> u64;
+        unsafe fn open_file(name: &str, flags: i32, mode: i32) -> u64;
+        // unsafe fn close_directory(handle: u64);
+        fn close_file(handle: u64);
+        fn open_dir(name: &str) -> u64;
     }
 }
 
@@ -94,20 +99,47 @@ impl Into<i32> for OpenMode {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum FD {
-    FILE(u32),
-    TCP(u32),
-    STDIO(u32),
+    FILE(u64),
+    TCP(u64),
+    STDIN,
+    STDOUT,
+    STDERR,
     UNUSED,
 }
-
+// TODO: Separate into multiple lists
+// Uhyve, Fuse: probably don't need to implement these
+// eventfd: Not used in rust stdlib
+// 
 
 struct FDList([FD; NUM_FDS]);
-pub const NUM_FDS: usize = 1000;
-type FDLock = LazyLock<Mutex<FDList>>;
+pub const NUM_FDS: usize = 1024;
+type FDLock = LazyLock<Mutex<FDList>>; // TODO: init at initialization time, dont use lazylock
 static FDS: FDLock = LazyLock::new(|| {
-    Mutex::new(FDList([FD::UNUSED; NUM_FDS]))
+    let mut fdlist = [FD::UNUSED; NUM_FDS];
+    fdlist[0] = FD::STDIN;
+    fdlist[1] = FD::STDOUT;
+    fdlist[2] = FD::STDERR;
+    Mutex::new(FDList(fdlist))
 });
 
+fn add_fd(fd: FD) -> usize {
+    let mut fds = FDS.lock().expect("Unable to acquire FDList mutex lock!");
+    let new_fd_index = fds.0.iter().position(|fd| *fd == FD::UNUSED ).expect("FDList is full!");
+    fds.0[new_fd_index] = fd;
+
+    new_fd_index
+}
+
+fn remove_fd(fd: usize) {
+    let mut fds = FDS.lock().expect("Unable to acquire FDList mutex lock!");
+    let new_fd_index = fds.0.iter().position(|fd| *fd == FD::UNUSED ).expect("FDList is full!");
+    fds.0[new_fd_index] = FD::UNUSED;
+}
+
+fn get_fd(user_fd: usize) -> FD {
+    let fds = FDS.lock().expect("Unable to acquire FDList mutex lock!");
+    fds.0[user_fd].clone() // todo: replace with reference?
+}
 
 type FileDescriptor = i32;
 
@@ -125,26 +157,32 @@ fn get_mode(unix_mode: i32) -> i32 {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn sys_open(name: *const i8, flags: i32, mode: i32) -> i32 {
-    let mut new_filefd: Option<FD> = None;
+pub extern "C" fn sys_open(name: *const c_char, flags: i32, mode: i32) -> i32 {
+    let new_filefd: FD;
     let flags = get_flags(flags);
     let mode = get_mode(mode);
-    unsafe {
-        // todo: instrument code to mock out open_file for testing purposes
-        // let res = 64; // used in testing
-        let res = ffi::open_file(name, flags, mode);
-        new_filefd = Some(FD::FILE(res as u32));
-    }
-    if let Some(new_fd) = new_filefd {
-        let mut fds = FDS.lock().expect("Unable to acquire mutex lock!");
-        let new_fd_index = 0;
-        fds.0[new_fd_index] = new_filefd.unwrap();
-
-        new_fd_index as i32 // future calls to sys_write referencing new_fd will be handled by new_filefd
-    } else {
-        0
-    }
+    if let Ok(name) = unsafe { CStr::from_ptr(name) }.to_str() {
+		let res = unsafe { ffi::open_file(name, flags, mode) };
+        new_filefd = FD::FILE(res);
+        add_fd(new_filefd) as i32
+	} else {
+        // TODO: Import Errno from hermit kernel https://github.com/hermit-os/kernel/blob/main/src/errno.rs#L126
+		-22 // Errno::INVAL 
+	}
+    
 }
+
+// #[unsafe(no_mangle)]
+// pub extern "C" fn sys_open(name: *const i8, flags: i32, mode: i32) -> i32 {
+//     let new_filefd: FD;
+//     let flags = get_flags(flags);
+//     let mode = get_mode(mode);
+//     unsafe {
+//         let res = ffi::open_file(name, flags, mode);
+//         new_filefd = FD::FILE(res);
+//     }
+//     add_fd(new_filefd) as i32
+// }
 
 
 #[unsafe(no_mangle)]
@@ -159,7 +197,19 @@ pub extern "C" fn sys_lseek(fd: FileDescriptor, offset: isize, whence: i32) -> i
 
 #[unsafe(no_mangle)]
 pub extern "C" fn sys_close(fd: FileDescriptor) -> i32 {
-    todo!()
+    let elem = get_fd(fd as usize);
+    match elem {
+        FD::FILE(i) => {
+            ffi::close_file(i as u64);
+        }
+        FD::TCP(i) => todo!(),
+        FD::STDIN => todo!(),
+        FD::STDOUT => todo!(),
+        FD::STDERR => todo!(),
+        FD::UNUSED => panic!("Tried to close unallocated FD #{:?} : {:?}", fd, elem),
+    }
+
+    return 0;
 }
 
 #[unsafe(no_mangle)]
@@ -169,43 +219,19 @@ pub extern "C" fn sys_rmdir(_name: *const i8) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    // use std::fd::{OpenOption, AccessPermission};
-    use std::{ffi::{CStr, CString}, path::PathBuf};
-    // use std::fs::OpenOptions;
-
-    // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
 
     #[test]
-    fn test_init() {
-        // TODO: How to stub out the call to ffi::open_file
-        {
-            let f = &FDS;
-            let f = f.lock().unwrap();
-            println!("{:#<1?}", f.0);
-            let mut p = PathBuf::new();
-            p.push("foobar.txt");
+    fn test_add_fd() {
+        let fd = FD::FILE(92);
 
-        }
+        let res = add_fd(fd);
+        assert!(res == 3);
 
-        let mut fd: Option<i32> = None;
-        unsafe {
-            let f = CString::new("hello.txt").unwrap();
-            let file_name: *const i8 = f.into_raw();
-            // let flags = OpenOption::O_RDWR;
-            // let perms = AccessPermission::default();
-            let res = sys_open(file_name, 0o02, OpenMode::READ as i32 | OpenMode::WRITE as i32 );
-            fd = Some(res);
-        }
-
-        assert!(fd.is_some());
-        {
-            let f = &FDS;
-            let f = f.lock().unwrap();
-            let inserted = f.0[fd.unwrap() as usize];
-            println!("{:#<1?}", f.0);
-            println!("{:?}", inserted);
-            assert!(inserted == FD::FILE(64));
-        }
+        let f = &FDS;
+        let f = f.lock().unwrap();
+        let inserted = get_fd(res);
+        assert_eq!(inserted, fd, "{:#<1?}\n Contents of FDList are above.", f.0);
     }
+
 }
