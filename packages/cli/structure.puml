@@ -1,6 +1,6 @@
 @startuml
-package cmd_build {
 
+package cmd_build {
 
 struct _ {
     + run_build(args: CmdBuild): Result<()>
@@ -10,15 +10,17 @@ struct _ {
 }
 
 
+
 struct CmdBuild {
     +profile: String
     +configure_only: bool
     +config: String
     +common: cu::cli::Flags
 }
-
+_..up>env
+_..up>config
+_..up>CmdBuild
 package config{
-
 
 struct Config {
 // Subsections defined similarly
@@ -48,13 +50,11 @@ package generate {
         generate_cxxbridge_source(config): Result
     }
 }
-generate .[hidden].> scan
 package scan {
     struct _ {
         discover_sources(source_dir: &Path): Vec<SourceFile>
     }
 }
-scan .[hidden].> compile
 
 package compile {
     struct SourceFile {
@@ -84,12 +84,24 @@ package compile {
         execute(): Result<()>
     }
 }
-compile .[hidden]d.> link
 package link {
     struct _ {
+        make_nso(config: Config)    
     }
 }
 
+package build_rust {
+struct RustCrate {
+    build_flags: Flags
+    build(): Result<bool>
+    has_changed(): bool
+}
+}
 
+_..down.> compile
+_..down> link
+_..down> generate
+_..down.> build_rust
+_..down> scan
 }
 @enduml

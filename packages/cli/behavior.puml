@@ -1,0 +1,81 @@
+@startuml behavior
+mainframe sd CmdBuild(profile: String, config_file: &Path, configure_only: bool, build_lib: bool common: Flags) : Result<()>
+
+box "Build Tool" #White
+participant CmdBuild
+participant Environment
+participant Config
+participant CompileDB
+participant SourceScanner
+end box
+
+box "External Tools" #LightYellow
+participant compiler
+participant cxxbridge
+end box
+
+box "Artifacts" #Lavender
+participant compdb.cache
+participant compile_commands.json
+participant ".o / .d"
+end box
+
+box "Sources" #Lavender
+participant "Library C"
+participant "Mod C"
+participant "Library Rust"
+participant "ModRust Rust"
+end box
+
+
+[->CmdBuild : run()
+
+==Config==
+
+CmdBuild -> Environment : get_build_env()
+activate Environment
+Environment -> Environment : init()
+Environment -> Environment : verify_tooling()
+Environment -> compiler: $ CXX --version
+activate compiler
+return "X.X.X"
+return &BuildEnv
+
+CmdBuild -> Config : load_from_file(config_file)
+activate Config
+Config -> Config : parse(config_file)
+return &Config
+
+CmdBuild -> CompileDB: load()
+activate CompileDB
+CompileDB -> compdb.cache : parse()
+alt cache exists
+compdb.cache --> CompileDB : cached CompileDB
+else file not found
+CompileDB -> CompileDB : new()
+end
+return &CompileDB
+
+CmdBuild -> CmdBuild : init_build_dir()
+
+==Build Rust ==
+
+
+
+==CxxBridge==
+
+
+
+==Compile==
+
+
+
+==Link==
+
+
+
+==Check==
+
+
+[<-- CmdBuild : Result<()> 
+@enduml
