@@ -143,12 +143,10 @@ cxx_include_dirs = cxx_dirs.map { |x| "#{x}/include" }
 cxx_bridge_include = 'build/cxxbridge/include'
 cxx_include_dirs.push(cxx_bridge_include)
 devkitpro_include = '/opt/devkitpro/libnx/include'
-nnheaders_include = '../nnheaders/include'
 
 # convert paths to include flags
 include_path = cxx_include_dirs.map { |x| "#{pwd}/#{x}"}
 include_path.push(devkitpro_include)
-include_path.push(nnheaders_include)
 include_flags = include_path.map { |p| "-I#{p}"}
 
 # create any directories that might not already exist
@@ -185,13 +183,13 @@ cxx_rs.each do |f|
   `cxxbridge #{f} --header > build/cxxbridge/include/#{output_path.join('/')}/#{output_name}.h`
   unless Process.last_status.success?
     puts "#{red_bold}Error running 'cxxbridge --header' on #{f}. Exiting...#{reset}"
-    # # `rm -rf build`
+    `rm -rf build`
     exit(-1)
   end
   `cxxbridge #{f} > build/cxxbridge/src/#{output_path.join('/')}/#{output_name}.cc`
   unless Process.last_status.success?
     puts "#{red_bold}Error running 'cxxbridge' on #{f}. Exiting...#{reset}"
-    # # `rm -rf build`
+    `rm -rf build`
     exit(-1)
   end
 end
@@ -199,7 +197,7 @@ end
 `cxxbridge --header > build/cxxbridge/include/rust/cxx.h`
 unless Process.last_status.success?
   puts "#{red_bold}Error running 'cxxbridge --header'. Exiting...#{reset}"
-  # # `rm -rf build`
+  `rm -rf build`
   exit(-1)
 end
 puts "#{green_bold}Successfully created cxxbridge headers and .cc files#{reset}"
@@ -229,7 +227,7 @@ as_files.each do |f|
   `#{cxx} #{common_flags} #{as_flags} -c #{f} -o build/o/#{output_path}/#{output_name}.o`
   unless Process.last_status.success?
     puts "#{red_bold}Error building #{f} with g++. Exiting...#{reset}"
-    # # `rm -rf build`
+    `rm -rf build`
     exit(-1)
   end
 end
@@ -248,7 +246,7 @@ c_files.each do |f|
   `#{cc} #{common_flags} #{c_flags} -c #{f} -o build/o/#{output_path}/#{output_name}.o`
   unless Process.last_status.success?
     puts "#{red_bold}Error building #{f} with gcc. Exiting...#{reset}"
-    # `rm -rf build`
+    `rm -rf build`
     exit(-1)
   end
 end
@@ -267,7 +265,7 @@ cpp_files.each do |f|
   `#{cxx} #{common_flags} #{cxx_flags} -c #{f} -o build/o/#{output_path}/#{output_name}.o`
   unless Process.last_status.success?
     puts "#{red_bold}Error building #{f} with g++. Exiting...#{reset}"
-    # # `rm -rf build`
+    `rm -rf build`
     exit(-1)
   end
 end
@@ -280,8 +278,8 @@ rust_dirs.each do |f|
   `cd #{f}; cargo +megaton build --release --target=aarch64-unknown-hermit`
   unless Process.last_status.success?
     puts "#{red_bold}Error building #{f} with cargo. Exiting...#{reset}"
-    # `rm -rf build`
-    # `cargo clean`
+    `rm -rf build`
+    `cargo clean`
     exit(-1)
   end
 end
@@ -301,15 +299,15 @@ puts "#{green_bold}creating libmegaton.a#{reset}"
 `#{ar} cqT build/a/libmegaton.a build/a/libmegaton_c.a build/a/libmegaton_rs.a`
 unless Process.last_status.success?
   puts "#{red_bold}Error creating libmegaton.a thin archive. Exiting...#{reset}"
-  # `rm -rf build`
-  # `cargo clean`
+  `rm -rf build`
+  `cargo clean`
   exit(-1)
 end
 `echo -e 'create build/a/libmegaton.a\\naddlib build/a/libmegaton.a\\nsave\\nend' | #{ar} -M`
 unless Process.last_status.success?
   puts "#{red_bold}Error building #{f} with cargo. Exiting...#{reset}"
-  # `rm -rf build`
-  # `cargo clean`
+  `rm -rf build`
+  `cargo clean`
   exit(-1)
 end
 puts "#{green_bold}successfully created libmegaton.a#{reset}"
@@ -325,8 +323,8 @@ if do_mod
   `cd #{mod}/packages/example-mod/; #{task_exe} build`
   unless Process.last_status.success?
     puts "#{red_bold}Error building example mod. Exiting...#{reset}"
-    # `rm -rf build`
-    # `cargo clean`
+    `rm -rf build`
+    `cargo clean`
     exit(-1)
   end
   puts "#{green_bold}Example mod build success#{reset}"

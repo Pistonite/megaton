@@ -21,6 +21,7 @@ namespace fs {
     uint64_t open_dir(rust::Str path);
     uint64_t write_file(uint64_t fd, int64_t pos, uint8_t* buf, usize len);
     void close_file(uint64_t fd);
+    void close_dir(uint64_t fd);
 }
 
 extern "C" isize sys_write(FileDescriptor fd, const uint8_t* buf, usize len);
