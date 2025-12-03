@@ -70,7 +70,7 @@ mod ffi {
         // unsafe fn close_directory(handle: u64);
         fn close_file(handle: u64);
         fn open_dir(name: &str) -> u64;
-        fn close_dir(handle: u64) -> u64;
+        fn close_dir(handle: u64);
     }
 }
 

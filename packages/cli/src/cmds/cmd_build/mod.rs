@@ -88,6 +88,18 @@ pub struct CmdBuild {
     common: cu::cli::Flags,
 }
 
+#[cfg(test)]
+impl CmdBuild {
+    pub fn new(config: String) -> Self {
+        Self { 
+            profile: "test".to_string(),
+            configure: false, 
+            config: config,
+            common: cu::cli::Flags::default()
+        }
+    }
+}
+
 impl CmdBuild {
     pub fn run(self) -> cu::Result<()> {
         run_build(self)

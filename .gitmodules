@@ -1,0 +1,3 @@
+[submodule "nnheaders"]
+	path = nnheaders
+	url = git@github.com:open-ead/nnheaders.git

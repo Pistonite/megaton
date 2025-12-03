@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025 Megaton contributors
 
+
+
 use cu::pre::*;
 
 use crate::env;
@@ -27,6 +29,14 @@ pub struct CmdMegaton {
     /// Print the version
     #[clap(short, long)]
     version: bool,
+}
+
+#[cfg(test)]
+impl CmdMegaton {
+    pub fn new_build(config: String) -> Self {
+        let sub = CmdBuild::new(config);
+        Self { sub: CmdMegatonSub::Build(sub), version: false }
+    }
 }
 
 impl AsRef<cu::cli::Flags> for CmdMegaton {
@@ -78,4 +88,26 @@ fn print_version() {
         &env::commit()[0..8]
     );
     cu::disable_print_time();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{env::set_current_dir, str::FromStr};
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_build() {
+        let mut mod_base_path = PathBuf::new();
+        mod_base_path.push(env!("CARGO_MANIFEST_DIR")); // megaton/packages/cli
+        mod_base_path = PathBuf::from(mod_base_path.parent().expect("Failed to cd to mod_base path!")); // megaton/packages
+        mod_base_path.push("mod_base"); // megaton/packages/mod_base/example_mod
+        mod_base_path.push("example-mod");
+        let res = set_current_dir(mod_base_path.clone());
+        assert!(res.is_ok(), "Failed to cd to mod_base path {:?}! Error: {:?}", mod_base_path, res.unwrap_err());
+        println!("Changed directory to: {:?}", std::env::current_dir());
+        let cmd = CmdMegaton::new_build("Megaton.toml".to_string());
+        let res = main(cmd);
+        assert!(res.is_ok(), "{:?}", res.unwrap_err());
+    }
 }

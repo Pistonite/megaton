@@ -2,8 +2,9 @@
 #include <string.h>
 #include <nn/fs/fs_directories.h>
 #include <nn/fs/fs_files.h>
+
 #include <toolkit/tcp.hpp>
-#include <switch/types.h>
+#include <nn/types.h>
 
 
 namespace fs {
