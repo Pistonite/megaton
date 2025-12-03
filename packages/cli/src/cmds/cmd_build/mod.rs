@@ -132,7 +132,7 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     // TODO: Generate cxxbridge headers and sources
     // generate_cxx_bridge_src(rust_crate.src_dir, module_target_path)
 
-    let rust_crate = RustCrate::new(PathBuf::from("packages/mod"));
+    let rust_crate = RustCrate::new(PathBuf::from("packages/modules"));
     let module_target_path: PathBuf = config
     .module
     .target
