@@ -42,27 +42,12 @@ impl SourceFile {
 // A rust crate that will be built as a component of the megaton lib or the mod
 struct RustCrate {
     path: PathBuf,
-    manifest: RustManifest,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct RustManifest {
-    // TODO: Implement
-
-}
-
-impl RustManifest {
-    fn load(crate_path: &Path) -> Self {
-        // TODO: Implement
-        Self {}
-   }
 }
 
 impl RustCrate {
     pub fn new(path: PathBuf) -> Self {
         Self {
             path: path.clone(),
-            manifest: RustManifest::load(&path)
         }
     }
 }

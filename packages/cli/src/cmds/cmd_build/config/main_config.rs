@@ -71,14 +71,40 @@ impl Validate for Config {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CargoConfig {
-    // TODO: implement
+    #[serde(default = "default_true")]
+    enabled: bool,
+    #[serde(default = "default_manifest")]
+    manifest: Option<String>,
+    #[serde(flatten, default)]
+    unused: CaptureUnused,
 }
 
 impl Default for CargoConfig {
     fn default() -> Self {
         Self {
-            // TODO: Implement
+            enabled: true,
+            manifest: Some("Cargo.toml".to_string()),
+            unused: Default::default(),
         }
+    }
+}
+
+fn default_manifest() -> Option<String> {
+    Some("Cargo.toml".to_string())
+}
+
+impl Validate for CargoConfig {
+    fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
+        if self.enabled {
+            if self.manifest.as_ref().is_none_or(|x| x.is_empty()) {
+                cu::error!("Must have manifest if cargo is enabled");
+                ctx.bail()?
+            }
+         } else if self.manifest.is_some() {
+             cu::error!("Cargo must be enabled for manifest");
+             ctx.bail()?
+         }
+        self.unused.validate(ctx)
     }
 }
 
