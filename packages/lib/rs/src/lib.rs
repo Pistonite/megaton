@@ -7,7 +7,7 @@ pub use abi::sys_abort;
 //     // essentially becomes "visible" to foreign code
 //
 //
-//     #[namespace = "example"] 
+//     #[namespace = "example"]
 //     // ^ this means everything inside is in namespace example { ... }
 //     unsafe extern "C++" {
 //         // this includes include/example-mod/my_mod.h

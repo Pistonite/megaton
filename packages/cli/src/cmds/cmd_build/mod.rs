@@ -17,7 +17,6 @@ use generate::generate_cxx_bridge_src;
 
 // use scan::{discover_crates, discover_source};
 
-
 // A source file that can be compiled into a .o file
 // struct SourceFile {
 //     path: PathBuf,
@@ -50,21 +49,20 @@ struct RustCrate {
 #[derive(Serialize, Deserialize, Debug)]
 struct RustManifest {
     // TODO: Implement
-
 }
 
 impl RustManifest {
     fn load(_crate_path: &Path) -> Self {
         // TODO: Implement
         Self {}
-   }
+    }
 }
 
 impl RustCrate {
     pub fn new(path: PathBuf) -> Self {
         Self {
             path: path.clone(),
-            manifest: RustManifest::load(&path)
+            manifest: RustManifest::load(&path),
         }
     }
 }
@@ -126,7 +124,7 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     // TODO: Discover the rust crate (if rust enabled)
     // let rust_crate = discover_crate(top_level_source_dir);
-    
+
     // TODO: Build rust crate
     // compile_rust(rust_crate);
 
@@ -135,16 +133,14 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     let rust_crate = RustCrate::new(PathBuf::from("packages/modules"));
     let module_target_path: PathBuf = config
-    .module
-    .target
-    .as_ref()
-    .map(PathBuf::from)
-    .unwrap_or_else(|| PathBuf::from("target/_test_module"));
+        .module
+        .target
+        .as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("target/_test_module"));
 
     generate_cxx_bridge_src(rust_crate, &module_target_path)?;
 
-
-    
     // TODO: Find all our other source code
     // for source_dir in build_config.sources:
     // let sources = discover_source(source_dir)
@@ -152,10 +148,9 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     // TODO: Compile all c/cpp/s
     // for source in sources:
     // compile(sources, source_o_name, build_flags)
-    
+
     // TODO: Link all our artifacts and make the nso
     // link(??)
 
     Ok(())
 }
-

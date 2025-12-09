@@ -1,60 +1,69 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025 Megaton contributors
 
-use cu::{Result, Context, Command, pio, which};
-use cu::pre::*;
 use super::RustCrate;
-use std::path::{PathBuf, Path};
-
+use cu::pre::*;
+use cu::{Command, Context, Result, pio, which};
+use std::path::{Path, PathBuf};
 
 pub fn generate_cxx_bridge_src(rust_crate: RustCrate, module_target_path: &Path) -> Result<()> {
-    // TODO: Parse rust crate for cxxbridge files 
+    // TODO: Parse rust crate for cxxbridge files
     //
     // TODO: Place generated headers in {module}/include/rust/
     //
     // TODO: Place generated source in {module}/src/cxxbridge
 
-
-
     let crate_src = rust_crate.path.join("test_mod/src");
     if !crate_src.exists() {
-        cu::debug!("generate_cxx_bridge_src: no src/ at {}", crate_src.display());
+        cu::debug!(
+            "generate_cxx_bridge_src: no src/ at {}",
+            crate_src.display()
+        );
         return Ok(());
     }
 
     let include_rust = module_target_path.join("include").join("rust");
-    let cxx_src_dir  = module_target_path.join("src").join("cxxbridge");
-    
-    
+    let cxx_src_dir = module_target_path.join("src").join("cxxbridge");
+
     cu::fs::make_dir(&include_rust)?;
     cu::fs::make_dir(&cxx_src_dir)?;
 
     let bridge_files = find_bridge_files(&crate_src)?;
     if bridge_files.is_empty() {
-        cu::debug!("cxxbridge: no #[cxx::bridge] files found under {}", crate_src.display());
+        cu::debug!(
+            "cxxbridge: no #[cxx::bridge] files found under {}",
+            crate_src.display()
+        );
         return Ok(());
     }
 
     let exe = which("cxxbridge").context("cxxbridge not found; `cargo install cxxbridge-cmd`")?;
 
     for rs in bridge_files {
-
-        let stem_os = rs.file_stem()
+        let stem_os = rs
+            .file_stem()
             .ok_or_else(|| cu::fmterr!("invalid file name: {}", rs.display()))?;
 
         let stem = stem_os.to_string_lossy();
 
-
-
-        let out_h  = include_rust.join(format!("{stem}.h"));
+        let out_h = include_rust.join(format!("{stem}.h"));
         let out_cc = cxx_src_dir.join(format!("{stem}.cc"));
 
-        if let Some(p) = out_h.parent()  { cu::fs::make_dir(p)?; }
-        if let Some(p) = out_cc.parent() { cu::fs::make_dir(p)?; }
+        if let Some(p) = out_h.parent() {
+            cu::fs::make_dir(p)?;
+        }
+        if let Some(p) = out_cc.parent() {
+            cu::fs::make_dir(p)?;
+        }
 
-        cu::debug!("cxxbridge: spawning {} -> {}, {}", rs.display(), out_h.display(), out_cc.display());
+        cu::debug!(
+            "cxxbridge: spawning {} -> {}, {}",
+            rs.display(),
+            out_h.display(),
+            out_cc.display()
+        );
 
-        let ( header_child,  h_stdout,  h_stderr) = Command::new(&exe)
+        let (header_child, h_stdout, h_stderr) = Command::new(&exe)
             .arg("--header")
             .arg(&rs)
             .stdout(pio::buffer())
@@ -77,8 +86,7 @@ pub fn generate_cxx_bridge_src(rust_crate: RustCrate, module_target_path: &Path)
 
         write_if_changed(&out_h, &h_stdout_bytes)?;
 
-
-        let ( cc_child, c_stdout, c_stderr) = Command::new(&exe)
+        let (cc_child, c_stdout, c_stderr) = Command::new(&exe)
             .arg(&rs)
             .stdout(pio::buffer())
             .stderr(pio::buffer())
@@ -90,7 +98,6 @@ pub fn generate_cxx_bridge_src(rust_crate: RustCrate, module_target_path: &Path)
         let c_stdout_bytes: Vec<u8> = c_stdout.join()??;
         let c_stderr_bytes: Vec<u8> = c_stderr.join()??;
 
-
         if !status.success() {
             cu::bail!(
                 "cxxbridge (cc) failed for {}: {}",
@@ -99,12 +106,9 @@ pub fn generate_cxx_bridge_src(rust_crate: RustCrate, module_target_path: &Path)
             );
         }
         write_if_changed(&out_cc, &c_stdout_bytes)?;
-
     }
     Ok(())
 }
-
-
 
 fn write_if_changed(path: &Path, bytes: &[u8]) -> Result<bool> {
     if let Some(parent) = path.parent() {
@@ -156,7 +160,7 @@ fn probe_has_cxxbridge(rs: &Path) -> Result<bool> {
     let exe = which("cxxbridge")
         .context("cxxbridge not found; install with `cargo install cxxbridge-cmd`")?;
 
-    let ( cmd,  _,  cmd_stderr) = Command::new(&exe)
+    let (cmd, _, cmd_stderr) = Command::new(&exe)
         .arg("--header")
         .arg(rs)
         .stdout(pio::buffer())
@@ -164,7 +168,6 @@ fn probe_has_cxxbridge(rs: &Path) -> Result<bool> {
         .stdin_null()
         .spawn()
         .with_context(|| format!("probe spawn {}", rs.display()))?;
-
 
     let status = cmd.wait()?;
     let cmd_stderr_bytes: Vec<u8> = cmd_stderr.join()??;
