@@ -12,33 +12,33 @@ mod link;
 mod scan;
 
 use config::Flags;
-use compile::{compile, compile_rust};
+// use compile::{compile, compile_rust};
 use generate::generate_cxx_bridge_src;
 
-use scan::{discover_crates, discover_source};
+// use scan::{discover_crates, discover_source};
 
 
 // A source file that can be compiled into a .o file
-struct SourceFile {
-    path: PathBuf,
-    lang: Lang,
-}
+// struct SourceFile {
+//     path: PathBuf,
+//     lang: Lang,
+// }
 
 // Specifies source language (rust is managed separately)
-enum Lang {
-    C,
-    Cpp,
-    S,
-}
+// enum Lang {
+//     C,
+//     Cpp,
+//     S,
+// }
 
-impl SourceFile {
-    pub fn new(lang: Lang, path: PathBuf) -> Self {
-        Self {
-            path,
-            lang,
-        }
-    }
-}
+// impl SourceFile {
+//     pub fn new(lang: Lang, path: PathBuf) -> Self {
+//         Self {
+//             path,
+//             lang,
+//         }
+//     }
+// }
 
 // A rust crate that will be built as a component of the megaton lib or the mod
 struct RustCrate {
@@ -137,7 +137,7 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     .module
     .target
     .as_ref()
-    .map(|s| PathBuf::from(s))
+    .map(PathBuf::from)
     .unwrap_or_else(|| PathBuf::from("target/_test_module"));
 
     generate_cxx_bridge_src(rust_crate, &module_target_path)?;
