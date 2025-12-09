@@ -41,6 +41,7 @@ use generate::generate_cxx_bridge_src;
 // }
 
 // A rust crate that will be built as a component of the megaton lib or the mod
+#[allow(dead_code)]
 struct RustCrate {
     path: PathBuf,
     manifest: RustManifest,
@@ -53,7 +54,7 @@ struct RustManifest {
 }
 
 impl RustManifest {
-    fn load(crate_path: &Path) -> Self {
+    fn load(_crate_path: &Path) -> Self {
         // TODO: Implement
         Self {}
    }
