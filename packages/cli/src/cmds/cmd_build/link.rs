@@ -1,4 +1,4 @@
-// // SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 // // Copyright (c) 2025 Megaton contributors
 
 // // This module manages linking the mod and library
