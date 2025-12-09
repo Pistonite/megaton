@@ -69,18 +69,18 @@ impl Validate for Config {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct CargoConfig {
     // TODO: implement
 }
 
-impl Default for CargoConfig {
-    fn default() -> Self {
-        Self {
-            // TODO: Implement
-        }
-    }
-}
+// impl Default for CargoConfig {
+//     fn default() -> Self {
+//         Self {
+//             // TODO: Implement
+//         }
+//     }
+// }
 
 /// The `[megaton]` section
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

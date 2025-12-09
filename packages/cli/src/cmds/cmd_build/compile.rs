@@ -1,28 +1,31 @@
-// This modules handles compiling c/c++/asm/rust code
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2025 Megaton contributors
 
-use cu::Result;
+// // This modules handles compiling c/c++/asm/rust code
 
-use super::{Flags, Lang, RustCrate, SourceFile};
+// use cu::Result;
 
-// Compiles the given source file and writes it to `out`
-pub fn compile(src: &SourceFile, out: &str, flags: Flags) -> Result<()> {
-    // TODO: Implement
+// use super::{Flags, Lang, RustCrate, SourceFile};
 
-    // match src.lang {
-    //     Lang::C => todo!(),
-    //     Lang::Cxx => todo!(),
-    //     Lang::Asm => todo!(),
-    // };
+// // Compiles the given source file and writes it to `out`
+// pub fn compile(src: &SourceFile, out: &str, flags: Flags) -> Result<()> {
+//     // TODO: Implement
 
-    Ok(todo!())
-}
+//     // match src.lang {
+//     //     Lang::C => todo!(),
+//     //     Lang::Cxx => todo!(),
+//     //     Lang::Asm => todo!(),
+//     // };
 
-// Builds the give rust crate and places the binary in the target as specified in the rust manifest
-pub fn compile_rust(rust_crate: RustCrate) -> Result<()> {
-    // TODO: Implement
-    Ok(todo!())
-}
+//     Ok(todo!())
+// }
 
-fn check_needs_recompile() -> bool {
-    false
-}
+// // Builds the give rust crate and places the binary in the target as specified in the rust manifest
+// pub fn compile_rust(rust_crate: RustCrate) -> Result<()> {
+//     // TODO: Implement
+//     Ok(todo!())
+// }
+
+// fn check_needs_recompile() -> bool {
+//     false
+// }
