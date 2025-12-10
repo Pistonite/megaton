@@ -4,8 +4,9 @@
 mod compile;
 mod config;
 mod generate;
-mod link;
 mod scan;
+mod link;
+
 
 use std::{
     fs::{File, Metadata, metadata},
@@ -169,6 +170,9 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     // TODO: Link all our artifacts and make the nso
     // link(??)
+    
+    let crate_changed = true;
+    
 
     Ok(())
 }

@@ -17,12 +17,17 @@ pub struct CompileDB {
     commands: BTreeMap<String, CompileRecord>,
     cc_version: String,
     cxx_version: String,
+    pub ld_command: String,
 }
 
 impl CompileDB {
     // Creates a new compile record and adds it to the db
     fn update(&mut self, command: CompileCommand) -> cu::Result<()> {
         todo!()
+    }
+
+    fn set_linker_command(&mut self, cmd: String) {
+        self.ld_command = cmd;
     }
 }
 
