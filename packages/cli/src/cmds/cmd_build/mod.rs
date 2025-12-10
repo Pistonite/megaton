@@ -52,7 +52,7 @@ impl RustCrate {
 // This should be fast so it should just get initialized once and have
 // immutable references to it passed where needed.
 struct BuildEnvironment {
-    target: String,
+    target: PathBuf,
     module: String,
     profile: String,
     compdb_clangd: PathBuf,
@@ -73,11 +73,11 @@ impl BuildEnvironment {
             }
         };
         let compdb_cache = PathBuf::from(format!(
-            "{}/megaton/{}/compdb.cache",
+            "{:?}/megaton/{}/compdb.cache",
             config.module.target, profile
         ));
         Ok(Self {
-            target: config.module.target.clone(),
+            target: config.module.target.clone(), // TODO: Make target a PathBuf
             module: config.module.name.clone(),
             profile,
             compdb_clangd: PathBuf::from(&config.module.compdb),
@@ -117,6 +117,7 @@ impl CmdBuild {
     }
 }
 
+
 fn run_build(args: CmdBuild) -> cu::Result<()> {
     let config = config::load_config(&args.config).context("failed to load config")?;
     cu::hint!("run with -v to see additional output");
@@ -133,6 +134,8 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     let mut build_flags = Flags::from_config(&build_config.flags);
     cu::debug!("build flags: {build_flags:#?}");
+
+    println!("obj files: {:#?}", link::get_obj_files(&config.module));
 
     // here are just suppressing the unused warning
     build_flags.add_defines(["-Dfoo"]);
@@ -172,6 +175,8 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     // link(??)
     
     let crate_changed = true;
+
+    
     
 
     Ok(())

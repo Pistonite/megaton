@@ -2,7 +2,7 @@
 // Copyright (c) 2025 Megaton contributors
 
 //! Config structures
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::{BASE_PROFILE, Build, CaptureUnused, ExtendProfile, Profile, Validate, ValidateCtx};
 use cu::pre::*;
@@ -164,7 +164,7 @@ pub struct Module {
 
     /// The target directory to put build files
     #[serde(default = "default_target")]
-    pub target: String,
+    pub target: PathBuf,
 
     /// The compile_commands.json file to put/update compile commands
     /// for other tools like clangd
@@ -204,8 +204,8 @@ impl Module {
     }
 }
 
-fn default_target() -> String {
-    "target".to_string()
+fn default_target() -> PathBuf {
+    PathBuf::from("target")
 }
 
 fn default_comp_commands() -> String {

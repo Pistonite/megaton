@@ -112,14 +112,8 @@ impl SourceFile {
         build_env: &BuildEnvironment,
         compile_db: &mut CompileDB,
     ) -> cu::Result<()> {
-        let o_path = PathBuf::from(format!(
-            "{}/{}/{}/o/{}-{}.o",
-            build_env.target, build_env.profile, build_env.module, self.basename, self.hash
-        ));
-        let d_path = PathBuf::from(format!(
-            "{}/{}/{}/o/{}-{}.d",
-            build_env.target, build_env.profile, build_env.module, self.basename, self.hash
-        ));
+        let o_path = build_env.target.join(&build_env.profile).join(&build_env.module).join(format!("{}-{}.o", self.basename, self.hash));
+        let d_path = build_env.target.join(&build_env.profile).join(&build_env.module).join(format!("{}-{}.d", self.basename, self.hash));
 
         let (comp_path, comp_flags) = match self.lang {
             Lang::C => (environment().cc_path(), &flags.cflags),
