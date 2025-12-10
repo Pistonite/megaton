@@ -69,7 +69,7 @@ impl Validate for Config {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct CargoConfig {
     #[serde(default = "default_true")]
     enabled: bool,

@@ -1,13 +1,16 @@
-// This module manages linking the mod and library
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2025 Megaton contributors
 
-use cu::Result;
+// // This module manages linking the mod and library
 
-// Link build artifacts into a shared object elf
-pub fn link() -> Result<()> {
-    Ok(todo!())
-}
+// use cu::Result;
 
-// Convert the linked mod into an nso
-pub fn make_nso() -> Result<()> {
-    Ok(todo!())
-}
+// // Link build artifacts into a shared object elf
+// pub fn link() -> Result<()> {
+//     Ok(todo!())
+// }
+
+// // Convert the linked mod into an nso
+// pub fn make_nso() -> Result<()> {
+//     Ok(todo!())
+// }
