@@ -13,26 +13,16 @@ pub fn generate_cxx_bridge_src(rust_crate: RustCrate, module_target_path: &Path)
     //
     // TODO: Place generated source in {module}/src/cxxbridge
 
-    let crate_src = rust_crate.path.join("test_mod/src");
-    if !crate_src.exists() {
-        cu::debug!(
-            "generate_cxx_bridge_src: no src/ at {}",
-            crate_src.display()
-        );
-        return Ok(());
-    }
-
     let include_rust = module_target_path.join("include").join("rust");
     let cxx_src_dir = module_target_path.join("src").join("cxxbridge");
 
     cu::fs::make_dir(&include_rust)?;
     cu::fs::make_dir(&cxx_src_dir)?;
 
-    let bridge_files = find_bridge_files(&crate_src)?;
+    let bridge_files = find_bridge_files(rust_crate)?;
     if bridge_files.is_empty() {
         cu::debug!(
-            "cxxbridge: no #[cxx::bridge] files found under {}",
-            crate_src.display()
+            "cxxbridge: no #[cxx::bridge] files found",
         );
         return Ok(());
     }
@@ -130,30 +120,16 @@ fn write_if_changed(path: &Path, bytes: &[u8]) -> Result<bool> {
     Ok(changed)
 }
 
-fn find_bridge_files(src_root: &Path) -> Result<Vec<PathBuf>> {
-    let mut out = Vec::new();
-    collect_rs(src_root, &mut out)?;
+fn find_bridge_files(rust_crate: RustCrate) -> Result<Vec<PathBuf>> {
+    let source_files = rust_crate.get_source_files()?;
 
-    let mut keep = Vec::new();
-    for p in out {
+    let mut cxxbridge_rs_files = Vec::new();
+    for p in source_files {
         if probe_has_cxxbridge(&p)? {
-            keep.push(p);
+            cxxbridge_rs_files.push(p);
         }
     }
-    Ok(keep)
-}
-
-fn collect_rs(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
-    let mut it = cu::fs::walk(dir)?;
-    while let Some(entry) = it.next() {
-        let entry = entry?;
-        let p = entry.path();
-
-        if p.extension().is_some_and(|e| e == "rs") {
-            out.push(p.to_path_buf());
-        }
-    }
-    Ok(())
+    Ok(cxxbridge_rs_files)
 }
 
 fn probe_has_cxxbridge(rs: &Path) -> Result<bool> {
