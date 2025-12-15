@@ -2,17 +2,27 @@
 // Copyright (c) 2025 Megaton contributors
 
 //! Config structures
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::{BASE_PROFILE, Build, CaptureUnused, ExtendProfile, Profile, Validate, ValidateCtx};
 use cu::pre::*;
 
 /// Load a Megaton.toml config file
-pub fn load_config(path: impl AsRef<Path>) -> cu::Result<Config> {
-    let content = cu::fs::read_string(path)?;
-    let config = toml::parse::<Config>(&content).context("failed to parse Megaton config")?;
-    config.validate_root()?;
-    Ok(config)
+pub fn load_config(manifest_path: impl AsRef<Path>) -> cu::Result<Config> {
+    let cwd = PathBuf::from(".").canonicalize().unwrap();
+    let mut ancestors = cwd.ancestors();
+
+    while let Some(path) = ancestors.next() {
+        let p = PathBuf::from(path).join(&manifest_path).canonicalize().unwrap();
+        if p.exists() {
+            std::env::set_current_dir(p.parent().unwrap()).expect("Could not open megaton project root");
+            let content = cu::fs::read_string(p)?;
+            let config = toml::parse::<Config>(&content).context("failed to parse Megaton config")?;
+            config.validate_root()?;
+            return Ok(config)
+        }
+    }
+    Err(cu::Error::msg("Failed to find Megaton config"))
 }
 
 /// Config data read from Megaton.toml
@@ -69,12 +79,12 @@ impl Validate for Config {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CargoConfig {
     #[serde(default = "default_true")]
-    enabled: bool,
+    pub enabled: bool,
     #[serde(default = "default_manifest")]
-    manifest: Option<String>,
+    pub manifest: Option<String>,
     #[serde(flatten, default)]
     unused: CaptureUnused,
 }

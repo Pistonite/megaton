@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025 Megaton contributors
 
-use cu::pre::*;
+use cu::{pre::*, Spawn};
 use derive_more::AsRef;
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 
 mod compile;
 mod config;
@@ -42,28 +42,68 @@ use generate::generate_cxx_bridge_src;
 // A rust crate that will be built as a component of the megaton lib or the mod
 #[allow(dead_code)]
 struct RustCrate {
-    path: PathBuf,
-    manifest: RustManifest,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct RustManifest {
-    // TODO: Implement
-}
-
-impl RustManifest {
-    fn load(_crate_path: &Path) -> Self {
-        // TODO: Implement
-        Self {}
-    }
+    manifest: PathBuf,
+    got_built: bool,
 }
 
 impl RustCrate {
-    pub fn new(path: PathBuf) -> Self {
+    pub fn new(manifest_path: PathBuf) -> Self {
         Self {
-            path: path.clone(),
-            manifest: RustManifest::load(&path),
+            manifest: manifest_path.clone().canonicalize().expect(format!("Could not find Cargo.toml at {:?}", manifest_path).as_str()),
+            got_built: true,
         }
+    }
+
+    pub fn build(&mut self, build: config::Build) -> cu::Result<()> {
+        let cargo = cu::which("cargo").context("cargo executable not found")?;
+        let rust_flags = match build.flags.rust {
+            Some(flags) => Some(flags.join(" ")),
+            None => None
+        };
+        let mut command = cargo.command()
+            .add(cu::args![
+                "+megaton",
+                "build",
+                "--manifest_path",
+                &self.manifest,
+            ])
+            .stdin_null()
+            .stdoe(cu::pio::inherit());
+        if let Some(cargo_flags) = build.flags.cargo {
+            command = command.args(cargo_flags);
+        }
+        if let Some(rustc_flags) = rust_flags {
+            command = command.env("RUSTFLAGS", rustc_flags);
+        }
+        let exit_code = command
+            .spawn()?
+            .wait()?;
+        if !exit_code.success() {
+            return Err(cu::Error::msg(format!("Cargo build failed with exit status {:?}", exit_code)));
+        }
+        self.got_built = true;
+            
+        Ok(())
+    }
+
+    pub fn get_source_folder(&self) -> Vec<PathBuf> {
+        vec![PathBuf::from("src")]
+    }
+
+    pub fn get_source_files(&self) -> cu::Result<Vec<PathBuf>> {
+        let source_dirs = self.get_source_folder();
+        let mut source_files: Vec<PathBuf> = vec![];
+        for dir in source_dirs {
+            let mut walk = cu::fs::walk(dir)?;
+            while let Some(entry) = walk.next() {
+                let p = entry?.path();
+                if p.extension().is_some_and(|e| e == "rs") {
+                    source_files.push(p);
+                }
+            }
+            
+        }
+        Ok(source_files)
     }
 }
 
@@ -92,6 +132,10 @@ impl CmdBuild {
     pub fn run(self) -> cu::Result<()> {
         run_build(self)
     }
+}
+
+pub fn get_project_root() -> PathBuf {
+    return PathBuf::from(".").canonicalize().unwrap()
 }
 
 fn run_build(args: CmdBuild) -> cu::Result<()> {
@@ -131,7 +175,7 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     // TODO: Generate cxxbridge headers and sources
     // generate_cxx_bridge_src(rust_crate.src_dir, module_target_path)
 
-    let rust_crate = RustCrate::new(PathBuf::from("packages/modules"));
+    let rust_crate = RustCrate::new(PathBuf::from(config.cargo.manifest.unwrap()));
     let module_target_path: PathBuf = config
         .module
         .target
