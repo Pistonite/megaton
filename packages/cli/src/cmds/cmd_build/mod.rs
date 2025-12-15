@@ -135,7 +135,7 @@ impl CmdBuild {
 }
 
 pub fn get_project_root() -> PathBuf {
-    return PathBuf::from(".").canonicalize().unwrap()
+    PathBuf::from(".").canonicalize().unwrap()
 }
 
 fn run_build(args: CmdBuild) -> cu::Result<()> {

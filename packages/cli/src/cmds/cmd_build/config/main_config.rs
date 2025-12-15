@@ -10,9 +10,9 @@ use cu::pre::*;
 /// Load a Megaton.toml config file
 pub fn load_config(manifest_path: impl AsRef<Path>) -> cu::Result<Config> {
     let cwd = PathBuf::from(".").canonicalize().unwrap();
-    let mut ancestors = cwd.ancestors();
+    let ancestors = cwd.ancestors();
 
-    while let Some(path) = ancestors.next() {
+    for path in ancestors {
         let p = PathBuf::from(path).join(&manifest_path).canonicalize().unwrap();
         if p.exists() {
             std::env::set_current_dir(p.parent().unwrap()).expect("Could not open megaton project root");
