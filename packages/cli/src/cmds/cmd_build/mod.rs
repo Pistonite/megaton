@@ -1,20 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025 Megaton contributors
 
-use derive_more::AsRef;
-use std::path::{PathBuf};
-
-mod compile;
-mod config;
-mod generate;
-mod scan;
-mod link;
-
-
-use std::{
-    fs::{File, Metadata, metadata},
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
 
 use cu::pre::*;
 use derive_more::AsRef;
@@ -23,6 +10,12 @@ use config::Config;
 use config::Flags;
 // use compile::{compile, compile_rust};
 use generate::generate_cxx_bridge_src;
+
+mod compile;
+mod config;
+mod generate;
+mod link;
+mod scan;
 
 // use scan::{discover_crates, discover_source};
 
@@ -54,29 +47,16 @@ use scan::discover_source;
 struct RustCrate {
     manifest: PathBuf,
     got_built: bool,
-    path: PathBuf,
-    manifest: RustManifest,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct RustManifest {
-    // TODO: Implement
-}
-
-impl RustManifest {
-    fn load(crate_path: &Path) -> Self {
-        // TODO: Implement
-        Self {}
-    }
 }
 
 impl RustCrate {
     pub fn new(manifest_path: PathBuf) -> Self {
         Self {
-            manifest: manifest_path.clone().canonicalize().expect(format!("Could not find Cargo.toml at {:?}", manifest_path).as_str()),
+            manifest: manifest_path
+                .clone()
+                .canonicalize()
+                .expect(format!("Could not find Cargo.toml at {:?}", manifest_path).as_str()),
             got_built: true,
-            path: path.clone(),
-            manifest: RustManifest::load(&path),
         }
     }
 
@@ -84,9 +64,10 @@ impl RustCrate {
         let cargo = cu::which("cargo").context("cargo executable not found")?;
         let rust_flags = match build.flags.rust {
             Some(flags) => Some(flags.join(" ")),
-            None => None
+            None => None,
         };
-        let mut command = cargo.command()
+        let mut command = cargo
+            .command()
             .add(cu::args![
                 "+megaton",
                 "build",
@@ -101,14 +82,15 @@ impl RustCrate {
         if let Some(rustc_flags) = rust_flags {
             command = command.env("RUSTFLAGS", rustc_flags);
         }
-        let exit_code = command
-            .spawn()?
-            .wait()?;
+        let exit_code = command.spawn()?.wait()?;
         if !exit_code.success() {
-            return Err(cu::Error::msg(format!("Cargo build failed with exit status {:?}", exit_code)));
+            return Err(cu::Error::msg(format!(
+                "Cargo build failed with exit status {:?}",
+                exit_code
+            )));
         }
         self.got_built = true;
-            
+
         Ok(())
     }
 
@@ -127,52 +109,8 @@ impl RustCrate {
                     source_files.push(p);
                 }
             }
-            
         }
         Ok(source_files)
-    }
-}
-
-// Stores all the info needed for the build process. Things in here would
-// otherwise be accessible from the configuration or in the global environment.
-// This should be fast so it should just get initialized once and have
-// immutable references to it passed where needed.
-struct BuildEnvironment {
-    target: PathBuf,
-    module: String,
-    profile: String,
-    compdb_clangd: PathBuf,
-    compdb_cache: PathBuf,
-    cc_version: String,
-    cxx_version: String,
-}
-
-impl BuildEnvironment {
-    // Initalize a new copy of the environment
-    fn init(config: &Config) -> cu::Result<Self> {
-        let profile = if config.profile.allow_base {
-            String::from("none")
-        } else {
-            match &config.profile.default {
-                Some(name) => name.clone(),
-                None => return Err(cu::Error::msg("Failed to get profile name")),
-            }
-        };
-        let compdb_cache = PathBuf::from(format!(
-            "{:?}/megaton/{}/compdb.cache",
-            config.module.target, profile
-        ));
-        Ok(Self {
-            target: config.module.target.clone(), // TODO: Make target a PathBuf
-            module: config.module.name.clone(),
-            profile,
-            compdb_clangd: PathBuf::from(&config.module.compdb),
-            compdb_cache,
-
-            // TODO: Figure out how to get these at runtime
-            cc_version: todo!(),
-            cxx_version: todo!(),
-        })
     }
 }
 
@@ -236,8 +174,6 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     build_flags.add_ldscripts(["foo"]);
 
     // Init build environment, load needed stuff from config
-    let build_env = BuildEnvironment::init(&config)?;
-
     let mut compdb = json::parse(build_env.compdb_cache.to_str().unwrap())?;
 
     // TODO: Discover the rust crate (if rust enabled)
@@ -268,23 +204,19 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     // compile(sources, source_o_name, build_flags)
 
     for source_dir in build_config.sources {
-
         // TODO: Combine these into a single step so sources are compiled (or skipped)
         // as they are discovered.
         let sources = discover_source(PathBuf::from(source_dir).as_ref())
             .context("Failed to scan for sources in {source_dir}")?;
         for source in sources {
-            source.compile(&build_flags, &build_env, &mut compdb)?;
+            source.compile(&build_flags, &mut compdb)?;
         }
     }
 
     // TODO: Link all our artifacts and make the nso
     // link(??)
-    
-    let crate_changed = true;
 
-    
-    
+    let crate_changed = true;
 
     Ok(())
 }
