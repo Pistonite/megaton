@@ -1,16 +1,25 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025 Megaton contributors
 
-use cu::{pre::*, Spawn};
 use derive_more::AsRef;
 use std::path::{PathBuf};
 
 mod compile;
 mod config;
 mod generate;
-mod link;
 mod scan;
+mod link;
 
+
+use std::{
+    fs::{File, Metadata, metadata},
+    path::{Path, PathBuf},
+};
+
+use cu::pre::*;
+use derive_more::AsRef;
+
+use config::Config;
 use config::Flags;
 // use compile::{compile, compile_rust};
 use generate::generate_cxx_bridge_src;
@@ -38,12 +47,27 @@ use generate::generate_cxx_bridge_src;
 //         }
 //     }
 // }
+use scan::discover_source;
 
 // A rust crate that will be built as a component of the megaton lib or the mod
 #[allow(dead_code)]
 struct RustCrate {
     manifest: PathBuf,
     got_built: bool,
+    path: PathBuf,
+    manifest: RustManifest,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct RustManifest {
+    // TODO: Implement
+}
+
+impl RustManifest {
+    fn load(crate_path: &Path) -> Self {
+        // TODO: Implement
+        Self {}
+    }
 }
 
 impl RustCrate {
@@ -51,6 +75,8 @@ impl RustCrate {
         Self {
             manifest: manifest_path.clone().canonicalize().expect(format!("Could not find Cargo.toml at {:?}", manifest_path).as_str()),
             got_built: true,
+            path: path.clone(),
+            manifest: RustManifest::load(&path),
         }
     }
 
@@ -107,6 +133,49 @@ impl RustCrate {
     }
 }
 
+// Stores all the info needed for the build process. Things in here would
+// otherwise be accessible from the configuration or in the global environment.
+// This should be fast so it should just get initialized once and have
+// immutable references to it passed where needed.
+struct BuildEnvironment {
+    target: PathBuf,
+    module: String,
+    profile: String,
+    compdb_clangd: PathBuf,
+    compdb_cache: PathBuf,
+    cc_version: String,
+    cxx_version: String,
+}
+
+impl BuildEnvironment {
+    // Initalize a new copy of the environment
+    fn init(config: &Config) -> cu::Result<Self> {
+        let profile = if config.profile.allow_base {
+            String::from("none")
+        } else {
+            match &config.profile.default {
+                Some(name) => name.clone(),
+                None => return Err(cu::Error::msg("Failed to get profile name")),
+            }
+        };
+        let compdb_cache = PathBuf::from(format!(
+            "{:?}/megaton/{}/compdb.cache",
+            config.module.target, profile
+        ));
+        Ok(Self {
+            target: config.module.target.clone(), // TODO: Make target a PathBuf
+            module: config.module.name.clone(),
+            profile,
+            compdb_clangd: PathBuf::from(&config.module.compdb),
+            compdb_cache,
+
+            // TODO: Figure out how to get these at runtime
+            cc_version: todo!(),
+            cxx_version: todo!(),
+        })
+    }
+}
+
 /// Manage the custom `megaton` Rust toolchain
 #[derive(Debug, Clone, AsRef, clap::Parser)]
 pub struct CmdBuild {
@@ -155,6 +224,8 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let mut build_flags = Flags::from_config(&build_config.flags);
     cu::debug!("build flags: {build_flags:#?}");
 
+    println!("obj files: {:#?}", link::get_obj_files(&config.module));
+
     // here are just suppressing the unused warning
     build_flags.add_defines(["-Dfoo"]);
     build_flags.add_includes(["-Ifoo"]);
@@ -164,7 +235,10 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     build_flags.add_libraries(["foo"]);
     build_flags.add_ldscripts(["foo"]);
 
-    // TODO: Init build environment, load needed stuff from config
+    // Init build environment, load needed stuff from config
+    let build_env = BuildEnvironment::init(&config)?;
+
+    let mut compdb = json::parse(build_env.compdb_cache.to_str().unwrap())?;
 
     // TODO: Discover the rust crate (if rust enabled)
     // let rust_crate = discover_crate(top_level_source_dir);
@@ -193,8 +267,24 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     // for source in sources:
     // compile(sources, source_o_name, build_flags)
 
+    for source_dir in build_config.sources {
+
+        // TODO: Combine these into a single step so sources are compiled (or skipped)
+        // as they are discovered.
+        let sources = discover_source(PathBuf::from(source_dir).as_ref())
+            .context("Failed to scan for sources in {source_dir}")?;
+        for source in sources {
+            source.compile(&build_flags, &build_env, &mut compdb)?;
+        }
+    }
+
     // TODO: Link all our artifacts and make the nso
     // link(??)
+    
+    let crate_changed = true;
+
+    
+    
 
     Ok(())
 }

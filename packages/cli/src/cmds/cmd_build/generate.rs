@@ -1,12 +1,23 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025 Megaton contributors
 
+use std::path::Path;
+
+use cu::pre::*;
+
 use super::RustCrate;
 use cu::pre::*;
 use cu::{Command, Context, Result, pio, which};
 use std::path::{Path, PathBuf};
 
 pub fn generate_cxx_bridge_src(rust_crate: RustCrate, module_target_path: &Path) -> Result<()> {
+    // TODO: Parse rust crate for cxxbridge files
+}
+
+pub fn generate_cxx_bridge_src(
+    rust_crate: RustCrate,
+    module_target_path: impl AsRef<Path>,
+) -> cu::Result<()> {
     // TODO: Parse rust crate for cxxbridge files
     //
     // TODO: Place generated headers in {module}/include/rust/
@@ -21,9 +32,7 @@ pub fn generate_cxx_bridge_src(rust_crate: RustCrate, module_target_path: &Path)
 
     let bridge_files = find_bridge_files(rust_crate)?;
     if bridge_files.is_empty() {
-        cu::debug!(
-            "cxxbridge: no #[cxx::bridge] files found",
-        );
+        cu::debug!("cxxbridge: no #[cxx::bridge] files found",);
         return Ok(());
     }
 

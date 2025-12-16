@@ -8,7 +8,7 @@ publish = false
 
 [dependencies.cu]
 workspace = true
-features = ["cli", "process", "prompt", "toml"]
+features = ["cli", "process", "prompt", "toml", "json", "fs"]
 
 [dependencies]
 serde = "1"
@@ -17,6 +17,8 @@ tar = "0.4.44"
 derive_more = { version = "2.0.1", features = ["as_ref", "deref", "deref_mut"] }
 which = "8.0.0"
 walkdir = "2.5.0"
+fxhash = "0.2.1"
+depfile = "0.1.1"
 
 [build-dependencies.cu]
 workspace = true

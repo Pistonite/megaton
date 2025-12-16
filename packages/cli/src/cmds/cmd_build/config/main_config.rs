@@ -199,11 +199,13 @@ pub struct Module {
     pub title_id: u64,
 
     /// The target directory to put build files
-    pub target: Option<String>,
+    #[serde(default = "default_target")]
+    pub target: PathBuf,
 
     /// The compile_commands.json file to put/update compile commands
     /// for other tools like clangd
-    pub compdb: Option<String>,
+    #[serde(default = "default_comp_commands")]
+    pub compdb: String,
 
     #[serde(flatten, default)]
     unused: CaptureUnused,
@@ -236,6 +238,14 @@ impl Module {
     pub fn title_id_hex(&self) -> String {
         format!("{:016x}", self.title_id)
     }
+}
+
+fn default_target() -> PathBuf {
+    PathBuf::from("target")
+}
+
+fn default_comp_commands() -> String {
+    "compile_commands.json".to_string()
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
