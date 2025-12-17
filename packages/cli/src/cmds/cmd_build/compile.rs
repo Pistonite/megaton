@@ -11,9 +11,9 @@ use cu::pre::*;
 use fxhash::hash;
 
 use super::{Flags, RustCrate};
-use crate::{env::environment};
+use crate::{cmds::cmd_build::config::Build, env::environment};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct CompileDB {
     commands: BTreeMap<String, CompileRecord>,
     cc_version: String,
@@ -22,6 +22,10 @@ pub struct CompileDB {
 }
 
 impl CompileDB {
+    fn new() -> Self {
+        Self::default()
+    }
+
     // Creates a new compile record and adds it to the db
     fn update(&mut self, command: CompileCommand) -> cu::Result<()> {
         todo!()
@@ -110,11 +114,13 @@ impl SourceFile {
     pub fn compile(
         &self,
         flags: &Flags,
-        build_env: &BuildEnvironment,
+        build: &Build,
         compile_db: &mut CompileDB,
+        module_path: &Path
     ) -> cu::Result<()> {
-        let o_path = build_env.target.join(&build_env.profile).join(&build_env.module).join(format!("{}-{}.o", self.basename, self.hash));
-        let d_path = build_env.target.join(&build_env.profile).join(&build_env.module).join(format!("{}-{}.d", self.basename, self.hash));
+        let env = environment();
+        let o_path = module_path.join(format!("{}-{}.o", self.basename, self.hash));
+        let d_path = module_path.join(format!("{}-{}.d", self.basename, self.hash));
 
         let (comp_path, comp_flags) = match self.lang {
             Lang::C => (environment().cc_path(), &flags.cflags),
@@ -124,7 +130,7 @@ impl SourceFile {
 
         let comp_command = CompileCommand::new(comp_path, &self.path, &o_path, &comp_flags)?;
 
-        if self.need_recompile(compile_db, build_env, &o_path, &d_path, &comp_command)? {
+        if self.need_recompile(compile_db, build, &o_path, &d_path, &comp_command)? {
             // Compile and update record
             comp_command.execute()?;
 
@@ -143,11 +149,12 @@ impl SourceFile {
     fn need_recompile(
         &self,
         compile_db: &CompileDB,
-        build_env: &BuildEnvironment,
+        build_env: &Build,
         o_path: &Path,
         d_path: &Path,
         command: &CompileCommand,
     ) -> cu::Result<bool> {
+        let env = environment();
         // Check if record exists
         let comp_record = match compile_db.commands.get(&self.basename) {
             Some(record) => record,
@@ -184,11 +191,11 @@ impl SourceFile {
             return Ok(true);
         }
 
-        if (self.lang == Lang::Cpp && compile_db.cxx_version != build_env.cxx_version)
-            || compile_db.cc_version != build_env.cc_version
-        {
-            return Ok(true);
-        }
+        // if (self.lang == Lang::Cpp && compile_db.cxx_version != env.cxx_version)
+        //     || compile_db.cc_version != env.cc_version
+        // {
+        //     return Ok(true);
+        // }
 
         // No need to recompile!
         Ok(false)

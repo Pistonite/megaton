@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use cu::pre::*;
+use cu::{info, pre::*};
 use derive_more::AsRef;
 
 use config::Flags;
@@ -40,6 +40,8 @@ mod scan;
 // }
 use scan::discover_source;
 
+use crate::cmds::cmd_build::compile::CompileDB;
+
 // A rust crate that will be built as a component of the megaton lib or the mod
 #[allow(dead_code)]
 struct RustCrate {
@@ -58,9 +60,9 @@ impl RustCrate {
         }
     }
 
-    pub fn build(&mut self, build: config::Build) -> cu::Result<()> {
+    pub fn build(&mut self, build: &config::Build) -> cu::Result<()> {
         let cargo = cu::which("cargo").context("cargo executable not found")?;
-        let rust_flags = match build.flags.rust {
+        let rust_flags = match &build.flags.rust {
             Some(flags) => Some(flags.join(" ")),
             None => None,
         };
@@ -69,12 +71,14 @@ impl RustCrate {
             .add(cu::args![
                 "+megaton",
                 "build",
-                "--manifest_path",
+                "--manifest-path",
                 &self.manifest,
             ])
             .stdin_null()
             .stdoe(cu::pio::inherit());
-        if let Some(cargo_flags) = build.flags.cargo {
+
+        if let Some(cargo_flags) = &build.flags.cargo {
+            info!("{:#?}", cargo_flags);
             command = command.args(cargo_flags);
         }
         if let Some(rustc_flags) = rust_flags {
@@ -197,35 +201,39 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let compdb_path = profile_path.join(PathBuf::from("compdb.cache"));
     let module_path = profile_path.join(PathBuf::from(config.module.name));
 
-    let mut compdb = json::read(
-        cu::fs::read(compdb_path)
-            .context("Failed to read compdb.cache")?
-            .as_slice(),
-    )?;
 
+    info!("Reading CompileDB");
+    let mut compdb: CompileDB = if !compdb_path.exists() {
+        CompileDB::default()
+    } else {
+        json::read(
+            cu::fs::read(compdb_path)
+                .context("Failed to read compdb.cache")?
+                .as_slice()
+        )?
+    };
+
+    info!("Buildig rust crate!");
     let mut rust_crate = RustCrate::new(PathBuf::from(config.cargo.manifest.unwrap()));
-    rust_crate.build(build_config);
+    rust_crate.build(&build_config);
     let rust_changed = rust_crate.got_built;
 
+    info!("Generating cxx bridge src!");
     generate_cxx_bridge_src(rust_crate, &module_path)?;
 
     // TODO: Find all our other source code
-    // for source_dir in build_config.sources:
-    // let sources = discover_source(source_dir)
+    build_config.sources.iter().map(|src| {
+        // todo: inspect and handle errs
+        discover_source(PathBuf::from(src).as_path()).unwrap_or(vec![])
+    }).flatten().for_each(|src| {
+        src.compile(&build_flags, &build_config, &mut compdb, &module_path)
+            .inspect_err(|e| cu::error!("Failed to compile! {:?}", e)); // todo make error message better
+    });
 
+    info!("linking!");
     // TODO: Compile all c/cpp/s
     // for source in sources:
-    // compile(sources, source_o_name, build_flags)
 
-    for source_dir in build_config.sources {
-        // TODO: Combine these into a single step so sources are compiled (or skipped)
-        // as they are discovered.
-        let sources = discover_source(PathBuf::from(source_dir).as_ref())
-            .context("Failed to scan for sources in {source_dir}")?;
-        for source in sources {
-            source.compile(&build_flags, &mut compdb)?;
-        }
-    }
 
     // TODO: Link all our artifacts and make the nso
     // link(??)
