@@ -55,17 +55,27 @@ impl CompileCommand {
         out_file: &Path,
         dep_file: &Path,
         flags: &Vec<String>,
+        build_config: &Build,
     ) -> cu::Result<Self> {
         let mut argv = flags.clone();
-        argv.push(
-            src_file
-                .as_utf8()?
-                .to_string(),
-        );
+        argv.push(src_file.as_utf8()?.to_string());
+        let includes = build_config
+            .includes
+            .iter()
+            .map(|i| {
+                let path = PathBuf::from(i);
+                cu::info!("{:?}", path);
+                let path = path.canonicalize().inspect_err(|e| {cu::error!("cant find include {:?}", e)});
+                cu::info!("{:?}", path);
+                format!(" -I")
+            })
+            .collect::<String>();
+
         argv.push(String::from("-c"));
         argv.push(format!(
-            "-o{}
-            -MMD -MP -MF{}",
+            "-o{} \
+            -MMD -MP -MF{} \
+            {includes}",
             out_file.as_utf8()?,
             dep_file.as_utf8()?,
         ));
@@ -79,11 +89,12 @@ impl CompileCommand {
 
     fn execute(&self) -> cu::Result<()> {
         cu::info!("Compiling: {:#?}", &self.args);
-        cu::CommandBuilder::new(&self.compiler.as_os_str())
+        let child = cu::CommandBuilder::new(&self.compiler.as_os_str())
             .args(self.args.clone())
             .stdoe(cu::pio::inherit()) // todo: log to file
             .stdin_null()
             .spawn()?;
+        child.wait_nz()?;
         Ok(())
     }
 
@@ -123,10 +134,14 @@ impl SourceFile {
         flags: &Flags,
         build: &Build,
         compile_db: &mut CompileDB,
-        module_path: &Path
+        module_path: &Path,
     ) -> cu::Result<()> {
-        let o_path = module_path.join("o").join(format!("{}-{}.o", self.basename, self.hash));
-        let d_path = module_path.join("o").join(format!("{}-{}.d", self.basename, self.hash));
+        let o_path = module_path
+            .join("o")
+            .join(format!("{}-{}.o", self.basename, self.hash));
+        let d_path = module_path
+            .join("o")
+            .join(format!("{}-{}.d", self.basename, self.hash));
 
         let (comp_path, comp_flags) = match self.lang {
             Lang::C => (environment().cc_path(), &flags.cflags),
@@ -134,7 +149,8 @@ impl SourceFile {
             Lang::S => (environment().cc_path(), &flags.sflags),
         };
 
-        let comp_command = CompileCommand::new(comp_path, &self.path, &o_path, &d_path, &comp_flags)?;
+        let comp_command =
+            CompileCommand::new(comp_path, &self.path, &o_path, &d_path, &comp_flags, build)?;
 
         if self.need_recompile(compile_db, &o_path, &d_path, &comp_command)? {
             // Ensure source and artifacts have the same timestamp
