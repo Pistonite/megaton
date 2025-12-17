@@ -59,15 +59,15 @@ impl CompileCommand {
         let mut argv = flags.clone();
         argv.push(
             src_file
-                .as_utf8()
-                .context("failed to parse utf-8")?
+                .as_utf8()?
                 .to_string(),
         );
         argv.push(String::from("-c"));
         argv.push(format!(
-            "-o{} -MF{}",
-            out_file.as_utf8().context("failed to parse utf-8")?,
-            dep_file.as_utf8().context("failed to parse utf-8")?,
+            "-o{}
+            -MMD -MP -MF{}",
+            out_file.as_utf8()?,
+            dep_file.as_utf8()?,
         ));
 
         Ok(Self {
@@ -78,14 +78,11 @@ impl CompileCommand {
     }
 
     fn execute(&self) -> cu::Result<()> {
-        // TODO: Build and execute a cu::command
-        let cmd = cu::CommandBuilder::new(&self.compiler.as_os_str())
+        cu::CommandBuilder::new(&self.compiler.as_os_str())
             .args(self.args.clone())
-            .stdoe()
-            .srdin_null()
-            .exe
-        
-
+            .stdoe(cu::pio::inherit())
+            .stdin_null()
+            .spawn()?;
         Ok(())
     }
 
@@ -127,7 +124,6 @@ impl SourceFile {
         compile_db: &mut CompileDB,
         module_path: &Path
     ) -> cu::Result<()> {
-        let env = environment();
         let o_path = module_path.join(format!("{}-{}.o", self.basename, self.hash));
         let d_path = module_path.join(format!("{}-{}.d", self.basename, self.hash));
 
@@ -137,17 +133,17 @@ impl SourceFile {
             Lang::S => (environment().cc_path(), &flags.sflags),
         };
 
-        let comp_command = CompileCommand::new(comp_path, &self.path, &o_path, &comp_flags)?;
+        let comp_command = CompileCommand::new(comp_path, &self.path, &o_path, &d_path, &comp_flags)?;
 
-        if self.need_recompile(compile_db, build, &o_path, &d_path, &comp_command)? {
+        if self.need_recompile(compile_db, &o_path, &d_path, &comp_command)? {
+            // Ensure source and artifacts have the same timestamp
+            let src_time = cu::fs::get_mtime(&self.path)?.unwrap();
+
             // Compile and update record
             comp_command.execute()?;
 
-            // Ensure source and artifacts have the same timestamp
-            let now = cu::fs::Time::now();
-            cu::fs::set_mtime(o_path, now)?;
-            cu::fs::set_mtime(d_path, now)?;
-            cu::fs::set_mtime(&self.path, now)?;
+            cu::fs::set_mtime(o_path, src_time)?;
+            cu::fs::set_mtime(d_path, src_time)?;
 
             compile_db.update(comp_command)?;
         }
@@ -158,12 +154,10 @@ impl SourceFile {
     fn need_recompile(
         &self,
         compile_db: &CompileDB,
-        build_env: &Build,
         o_path: &Path,
         d_path: &Path,
         command: &CompileCommand,
     ) -> cu::Result<bool> {
-        let env = environment();
         // Check if record exists
         let comp_record = match compile_db.commands.get(&self.basename) {
             Some(record) => record,
