@@ -53,6 +53,7 @@ impl CompileCommand {
         compiler_path: &Path,
         src_file: &Path,
         out_file: &Path,
+        dep_file: &Path,
         flags: &Vec<String>,
     ) -> cu::Result<Self> {
         let mut argv = flags.clone();
@@ -64,8 +65,9 @@ impl CompileCommand {
         );
         argv.push(String::from("-c"));
         argv.push(format!(
-            "-o{}",
-            out_file.as_utf8().context("failed to parse utf-8")?
+            "-o{} -MF{}",
+            out_file.as_utf8().context("failed to parse utf-8")?,
+            dep_file.as_utf8().context("failed to parse utf-8")?,
         ));
 
         Ok(Self {
@@ -77,7 +79,14 @@ impl CompileCommand {
 
     fn execute(&self) -> cu::Result<()> {
         // TODO: Build and execute a cu::command
-        todo!()
+        let cmd = cu::CommandBuilder::new(&self.compiler.as_os_str())
+            .args(self.args.clone())
+            .stdoe()
+            .srdin_null()
+            .exe
+        
+
+        Ok(())
     }
 
     // We need two different ways of serializing this data since it will
