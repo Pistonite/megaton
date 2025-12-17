@@ -226,8 +226,9 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
         // todo: inspect and handle errs
         discover_source(PathBuf::from(src).as_path()).unwrap_or(vec![])
     }).flatten().for_each(|src| {
+        // todo make error message better
         src.compile(&build_flags, &build_config, &mut compdb, &module_path)
-            .inspect_err(|e| cu::error!("Failed to compile! {:?}", e)); // todo make error message better
+            .inspect_err(|e| cu::error!("Failed to compile! {:?}", e));
     });
 
     info!("linking!");

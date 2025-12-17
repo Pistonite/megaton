@@ -78,9 +78,10 @@ impl CompileCommand {
     }
 
     fn execute(&self) -> cu::Result<()> {
+        cu::info!("Compiling: {:#?}", &self.args);
         cu::CommandBuilder::new(&self.compiler.as_os_str())
             .args(self.args.clone())
-            .stdoe(cu::pio::inherit())
+            .stdoe(cu::pio::inherit()) // todo: log to file
             .stdin_null()
             .spawn()?;
         Ok(())
@@ -124,8 +125,8 @@ impl SourceFile {
         compile_db: &mut CompileDB,
         module_path: &Path
     ) -> cu::Result<()> {
-        let o_path = module_path.join(format!("{}-{}.o", self.basename, self.hash));
-        let d_path = module_path.join(format!("{}-{}.d", self.basename, self.hash));
+        let o_path = module_path.join("o").join(format!("{}-{}.o", self.basename, self.hash));
+        let d_path = module_path.join("o").join(format!("{}-{}.d", self.basename, self.hash));
 
         let (comp_path, comp_flags) = match self.lang {
             Lang::C => (environment().cc_path(), &flags.cflags),
