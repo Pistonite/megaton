@@ -6,9 +6,7 @@ use std::path::PathBuf;
 use cu::pre::*;
 use derive_more::AsRef;
 
-use config::Config;
 use config::Flags;
-// use compile::{compile, compile_rust};
 use generate::generate_cxx_bridge_src;
 
 mod compile;
@@ -145,55 +143,71 @@ pub fn get_project_root() -> PathBuf {
     PathBuf::from(".").canonicalize().unwrap()
 }
 
+// <target>/megaton
+//   - <profile>/: per-profile build files
+//     - lib/: where megaton emits it's own library file and build files
+//       - include/: megaton's include path
+//         - rust/cxx.h: header from cxxbridge
+//         - megaton/: megaton headers
+//       - src/: megaton's C/C++/S/RS source files
+//         - cxxbridge/:
+//       - dep/*: megaton's dependent Rust crates
+//       - Cargo.toml: generate Cargo.toml workspace shim (this needs a [workspace] section)
+//     - <module>/: per-module build files
+//       - include/: generated header files
+//         - rust/cxx.h:
+//       - src/cxxbridge:
+//       - o/: output object files
+//       - <module>.elf
+//       - <module>.nso
+//       - ...: other output files and caches
+
 fn run_build(args: CmdBuild) -> cu::Result<()> {
+    // Load config stuff
     let config = config::load_config(&args.config).context("failed to load config")?;
     cu::hint!("run with -v to see additional output");
     cu::debug!("{config:#?}");
+
     let profile = config.profile.resolve(&args.profile)?;
-    // you can mess with different -p flags and config combination
-    // to see how the config parsing and validation system work
     cu::debug!("profile: {profile}");
+
     let build_config = config.build.get_profile(profile);
+
     let entry = config.megaton.entry_point();
     cu::debug!("entry={entry}");
+
     let title_id_hex = config.module.title_id_hex();
     cu::debug!("title_id_hex={title_id_hex}");
 
     let mut build_flags = Flags::from_config(&build_config.flags);
     cu::debug!("build flags: {build_flags:#?}");
 
-    println!("obj files: {:#?}", link::get_obj_files(&config.module));
-
     // here are just suppressing the unused warning
-    build_flags.add_defines(["-Dfoo"]);
-    build_flags.add_includes(["-Ifoo"]);
-    build_flags.set_init("foo");
-    build_flags.set_version_script("verfile");
-    build_flags.add_libpaths(["foo"]);
-    build_flags.add_libraries(["foo"]);
-    build_flags.add_ldscripts(["foo"]);
+    // build_flags.add_defines(["-Dfoo"]);
+    // build_flags.add_includes(["-Ifoo"]);
+    // build_flags.set_init("foo");
+    // build_flags.set_version_script("verfile");
+    // build_flags.add_libpaths(["foo"]);
+    // build_flags.add_libraries(["foo"]);
+    // build_flags.add_ldscripts(["foo"]);
 
-    // Init build environment, load needed stuff from config
-    let mut compdb = json::parse(build_env.compdb_cache.to_str().unwrap())?;
+    // Get paths
+    let megaton_path = config.module.target.join(PathBuf::from("megaton"));
+    let profile_path = megaton_path.join(PathBuf::from(profile));
+    let compdb_path = profile_path.join(PathBuf::from("compdb.cache"));
+    let module_path = profile_path.join(PathBuf::from(config.module.name));
 
-    // TODO: Discover the rust crate (if rust enabled)
-    // let rust_crate = discover_crate(top_level_source_dir);
+    let mut compdb = json::read(
+        cu::fs::read(compdb_path)
+            .context("Failed to read compdb.cache")?
+            .as_slice(),
+    )?;
 
-    // TODO: Build rust crate
-    // compile_rust(rust_crate);
+    let mut rust_crate = RustCrate::new(PathBuf::from(config.cargo.manifest.unwrap()));
+    rust_crate.build(build_config);
+    let rust_changed = rust_crate.got_built;
 
-    // TODO: Generate cxxbridge headers and sources
-    // generate_cxx_bridge_src(rust_crate.src_dir, module_target_path)
-
-    let rust_crate = RustCrate::new(PathBuf::from(config.cargo.manifest.unwrap()));
-    let module_target_path: PathBuf = config
-        .module
-        .target
-        .as_ref()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("target/_test_module"));
-
-    generate_cxx_bridge_src(rust_crate, &module_target_path)?;
+    generate_cxx_bridge_src(rust_crate, &module_path)?;
 
     // TODO: Find all our other source code
     // for source_dir in build_config.sources:
