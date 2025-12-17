@@ -3,11 +3,11 @@
 # the value is is the default
 
 [module]
-# name of the module, which is used as the name of the finary
+# name of the module, which is used as the name of the final
 # binary. only alphanumeric characters and -/_ should be allowed
 #
 # required, no default, cannot be "lib"
-name = "NAME"
+name = ""
 
 # title id of the game, used to generate the NPDM file
 #
@@ -33,7 +33,9 @@ title-id = 0x0
 #       - o/: output object files
 #       - <module>.elf
 #       - <module>.nso
-#       - ...: other output files and caches
+#       - verfile
+#       - npdm.json
+#     - compdb.cache
 #
 # default is "target" in the current directory (regardless of Cargo workspace)
 target = "target"
@@ -41,19 +43,21 @@ target = "target"
 # the compile database for megaton to write build commands to, for clangd
 # megaton should write a modified command that works for clangd,
 # not the actual command passed to compiler (due to compatibility issue)
-# 
-# default is git root (the first directory that has a .git file/dir
-# in the path to /)
+#
+# default is project root with the name compile_commands.json
 compdb = "compile_commands.json"
 
 [profile]
-# if the base profile "none" is allowed to be built.
+# if the default profile "none" is allowed to be built.
 # default: true
-allow-base = true
+allow-default = true
+
 # if specified, then omitting -p PROFILE in the command line
 # will build this profile instead of the "none" profile
-# if empty then -p PROFILE must be specified on the command line
-default = ""
+#
+# can't be the empty string ""
+# default: none
+default = "none"
 
 [megaton]
 # version of the megaton build tool/library the project is supposed to use
@@ -80,7 +84,7 @@ library = true
 # in megaton library, this function is a shim for the megaton_main user defined
 # main function that runs additional initializations
 #
-# can only be specified in megaton = false
+# will be ignored if library = true
 #
 entry = "__megaton_module_entry"
 
@@ -89,7 +93,7 @@ entry = "__megaton_module_entry"
 #
 # megaton build tool will only generate and do rust related stuff if this is enabled
 #
-# default: true if cargo.manifest is specified, or Cargo.toml is found in the directory
+# default: if 
 # Megaton.toml is in
 enabled = true
 
@@ -103,10 +107,8 @@ manifest = "Cargo.toml"
 # can do #include <foo/lib.rs> for the immersion
 header-suffix = ".h"
 
-
 # *profile enabled* means the user can define overrides in a profile
 # for example build.profiles.foo for the build configuration in the foo profile
-
 [build] # *profile enabled*
 
 # list of source directories to recursively scan for C/C++/S source files
