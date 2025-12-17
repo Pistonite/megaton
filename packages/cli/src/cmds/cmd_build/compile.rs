@@ -62,14 +62,14 @@ impl CompileCommand {
         let includes = build_config
             .includes
             .iter()
-            .map(|i| {
+            .filter_map(|i| {
                 let path = PathBuf::from(i);
                 cu::info!("{:?}", path);
-                let path = path.canonicalize().inspect_err(|e| {cu::error!("cant find include {:?}", e)});
-                cu::info!("{:?}", path);
-                format!(" -I")
+                path.canonicalize().inspect_err(|e| {cu::error!("cant find include {:?}", e)}).ok()
             })
-            .collect::<String>();
+            .map(|i| format!("-I{}", i.as_os_str().to_str().unwrap()))
+            .collect::<Vec<String>>()
+            .join(" ");
 
         argv.push(String::from("-c"));
         argv.push(format!(

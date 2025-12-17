@@ -10,73 +10,11 @@ use std::{
 // use cu::{PathExtension, Spawn, fs::{self, DirEntry}, lv::P};
 use cu::pre::*;
 
-use crate::cmds::cmd_build::{
+use crate::{cmds::cmd_build::{
     compile::CompileDB,
     config::{Build, Config, Module},
-};
+}, env::environment};
 
-// exists: Path -> bool. Does there exist an ELF at Path
-// if elf exists at path, recreate/relink optionally
-// else: always remake elf
-// make_nso: convert elf at Path to nso
-// relink: take existing elf and relink using
-// need_relink:
-// similar logic to needs_recompiled
-// Relink is needed if:
-// If the ELF does not exist
-// If any objects were re-compiled
-// passed in as arg
-// If the list of objects changed (new source files are added without changing any existing files, or some source files are deleted)
-// passed in as arg
-// If any library changed, including the one cargo produced
-// passed in as arg
-
-// If the linker command change
-// read Config
-// If any linker scripts changed
-// what? and how?
-
-// check: read from Config and check for banned symbols - already implemented in old megaton
-
-// args to ld: .exe name, list of .o and .a files
-
-// "<version of ld> [.o files, .a files] [.ld files] [args]"
-
-pub async fn needs_relink(
-    compiler_did_something: bool,
-    elf_path: PathBuf,
-    compdb: &mut CompileDB,
-    build_config: &Build,
-    module: &Module,
-    profile: &str,
-) -> cu::Result<bool> {
-    if compiler_did_something {
-        return cu::Result::Ok(true);
-    }
-
-    let output_path = get_output_path(module, profile)
-        .to_str()
-        .expect("Failed to get absolute output path!")
-        .to_owned();
-    let obj_files = to_space_separated_str(get_obj_files(module));
-
-    let libraries = build_library_args(&build_config.ldscripts);
-    let old_command = get_last_linker_command(module, profile);
-    let ldscripts = get_ldscripts(build_config);
-    let new_ld_command = format!(
-        "ld -o {} {} {} {}",
-        output_path, ldscripts, obj_files, libraries
-    );
-    if let Some(old_command) = old_command
-        && &new_ld_command == &old_command
-    {
-        // ld command would be the same as before, nothing changed.
-        cu::Result::Ok(false)
-    } else {
-        compdb.ld_command = new_ld_command;
-        cu::Result::Ok(true)
-    }
-}
 
 pub fn get_ldscripts(build_config: &Build) -> String {
     build_config
@@ -161,7 +99,72 @@ fn is_file_obj(path: &cu::fs::DirEntry) -> bool {
     }
 }
 
-pub async fn relink(
+
+pub fn needs_relink(
+    compiler_did_something: bool,
+    elf_path: PathBuf,
+    compdb: &mut CompileDB,
+    build_config: &Build,
+    module: &Module,
+    profile: &str,
+) -> cu::Result<bool> {
+    if compiler_did_something {
+        return cu::Result::Ok(true);
+    }
+
+    let output_path = get_output_path(module, profile)
+        .to_str()
+        .expect("Failed to get absolute output path!")
+        .to_owned();
+    let obj_files = to_space_separated_str(get_obj_files(module));
+
+    let libraries = build_library_args(&build_config.ldscripts);
+    let old_command = get_last_linker_command(module, profile);
+    let ldscripts = get_ldscripts(build_config);
+    let new_ld_command = format!(
+        "ld -o {} {} {} {}",
+        output_path, ldscripts, obj_files, libraries
+    );
+    if let Some(old_command) = old_command
+        && &new_ld_command == &old_command
+    {
+        // ld command would be the same as before, nothing changed.
+        cu::Result::Ok(false)
+    } else {
+        compdb.ld_command = new_ld_command;
+        cu::Result::Ok(true)
+    }
+}
+
+
+// pub async fn relink(
+//     elf_path: PathBuf,
+//     compdb: &mut CompileDB,
+//     module: &Module,
+// ) -> cu::Result<bool> {
+//     let output_path = "";
+//     let obj_files: Vec<PathBuf> = get_obj_files(module); // scan target folder (BuildConfig)
+//     let libraries: Vec<&str> = vec!["-L"]; // BuildConfig
+//     let ld = cu::which("ld")?;
+//     let mut args = vec![];
+
+//     args.push("-o");
+//     args.push(output_path);
+//     args.extend(obj_files.iter().map(|p| p.to_str().unwrap()));
+//     args.push("-L");
+//     args.extend(libraries);
+//     let linker_command = ld
+//         .command()
+//         .args(args)
+//         .stdin_null()
+//         .stdoe(cu::pio::spinner("linking").info())
+//         .co_spawn()
+//         .await?
+//         .0;
+//     Ok(true)
+// }
+
+pub fn relink_sync(
     elf_path: PathBuf,
     compdb: &mut CompileDB,
     module: &Module,
@@ -182,10 +185,9 @@ pub async fn relink(
         .args(args)
         .stdin_null()
         .stdoe(cu::pio::spinner("linking").info())
-        .co_spawn()
-        .await?
+        .spawn()?
         .0;
-
+    linker_command.wait_nz()?;
     Ok(true)
 }
 
