@@ -58,10 +58,22 @@ impl CompileCommand {
         build_config: &Build,
     ) -> cu::Result<Self> {
         let mut argv = flags.clone();
-        argv.push(src_file.as_utf8()?.to_string());
-        let includes = build_config
-            .includes
-            .iter()
+        argv.push("-MMD".to_owned());
+        argv.push("-MP".to_owned());
+        argv.push("-MF".to_owned());
+        argv.push(dep_file.as_utf8()?.to_string());
+
+        
+        
+        let mut includes = build_config.includes.clone();
+        includes.extend(vec!["/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/15.1.0".to_owned(),
+                            "/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/15.1.0/aarch64-none-elf".to_owned(),
+                            "/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/15.1.0/backward".to_owned(),
+                            "/opt/devkitpro/devkitA64/lib/gcc/aarch64-none-elf/15.1.0/include".to_owned(),
+                            "/opt/devkitpro/devkitA64/lib/gcc/aarch64-none-elf/15.1.0/include-fixed".to_owned(),
+                            "/opt/devkitpro/devkitA64/aarch64-none-elf/include".to_owned()
+        ]);
+        let includes = includes.iter()
             .filter_map(|i| {
                 let path = PathBuf::from(i);
                 cu::info!("{:?}", path);
@@ -69,15 +81,13 @@ impl CompileCommand {
             })
             .map(|i| format!("-I{}", i.as_os_str().to_str().unwrap()))
             .collect::<Vec<String>>();
+        argv.extend(includes);
 
         argv.push(String::from("-c"));
 
         argv.push(format!("-o{}", out_file.as_utf8()?));
-        argv.push("-MMD".to_owned());
-        argv.push("-MP".to_owned());
-        argv.push("-MF".to_owned());
-        argv.push(dep_file.as_utf8()?.to_string());
-        argv.extend(includes);
+        
+        argv.push(src_file.as_utf8()?.to_string());
 
 
         cu::info!("Compiler command: {:?} {:?} {:#?}", &compiler_path, &src_file, &argv);
