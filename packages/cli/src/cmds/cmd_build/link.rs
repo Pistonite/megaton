@@ -188,14 +188,16 @@ pub fn relink_sync(
 }
 
 fn link_start(cxx: &Path, flags: &Flags, objects: Vec<String>, elf_path: PathBuf) -> cu::Result<cu::Child> {
-    let res = cxx.command()
-        .args(
-            flags
-                .ldflags
+    let output_arg = ["-o".to_string(), elf_path.display().to_string()];
+    let args = flags.ldflags
                 .iter()
                 .chain(objects.iter())
                 // .chain(self.lib_objects.iter())
-                .chain(["-o".to_string(), elf_path.display().to_string()].iter()),
+                .chain(output_arg.iter());
+    info!("{:?}", &args);
+    let res = cxx.command()
+        .args(
+            args,
         )
         .stdin_null()
         .stdoe(cu::pio::spinner("linking").info())
