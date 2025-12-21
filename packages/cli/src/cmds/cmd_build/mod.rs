@@ -199,7 +199,7 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let megaton_path = config.module.target.join(PathBuf::from("megaton"));
     let profile_path = megaton_path.join(PathBuf::from(profile));
     let compdb_path = profile_path.join(PathBuf::from("compdb.cache"));
-    let module_path = profile_path.join(PathBuf::from(config.module.name));
+    let module_path = profile_path.join(PathBuf::from(&config.module.name));
 
 
     info!("Reading CompileDB");
@@ -222,18 +222,26 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     generate_cxx_bridge_src(rust_crate, &module_path)?;
 
     // TODO: Find all our other source code
+    
+    let mut compiler_did_something = false;
     build_config.sources.iter().map(|src| {
         // todo: inspect and handle errs
         discover_source(PathBuf::from(src).as_path()).unwrap_or(vec![])
     }).flatten().for_each(|src| {
         // todo make error message better
-        src.compile(&build_flags, &build_config, &mut compdb, &module_path)
-            .inspect_err(|e| cu::error!("Failed to compile! {:?}", e));
+        let compilation_occurred = src.compile(&build_flags, &build_config, &mut compdb, &module_path)
+            .inspect_err(|e| cu::error!("Failed to compile! {:?}", e)).unwrap();
+        compiler_did_something = compiler_did_something || compilation_occurred;
     });
 
     info!("linking!");
     // TODO: Compile all c/cpp/s
+    
     // for source in sources:
+    if link::needs_relink(compiler_did_something, module_path.clone(), &mut compdb, &build_config, &config.module, profile).unwrap() {
+        let result = link::relink_sync(&module_path, &mut compdb, &config.module, &build_flags);
+        result.unwrap();
+    }
 
 
     // TODO: Link all our artifacts and make the nso

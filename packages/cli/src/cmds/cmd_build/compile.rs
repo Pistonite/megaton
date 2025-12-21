@@ -68,17 +68,19 @@ impl CompileCommand {
                 path.canonicalize().inspect_err(|e| {cu::error!("cant find include {:?}", e)}).ok()
             })
             .map(|i| format!("-I{}", i.as_os_str().to_str().unwrap()))
-            .collect::<Vec<String>>()
-            .join(" ");
+            .collect::<Vec<String>>();
 
         argv.push(String::from("-c"));
-        argv.push(format!(
-            "-o{} \
-            -MMD -MP -MF{} \
-            {includes}",
-            out_file.as_utf8()?,
-            dep_file.as_utf8()?,
-        ));
+
+        argv.push(format!("-o{}", out_file.as_utf8()?));
+        argv.push("-MMD".to_owned());
+        argv.push("-MP".to_owned());
+        argv.push("-MF".to_owned());
+        argv.push(dep_file.as_utf8()?.to_string());
+        argv.extend(includes);
+
+
+        cu::info!("Compiler command: {:?} {:?} {:#?}", &compiler_path, &src_file, &argv);
 
         Ok(Self {
             compiler: compiler_path.to_path_buf(),
@@ -88,7 +90,7 @@ impl CompileCommand {
     }
 
     fn execute(&self) -> cu::Result<()> {
-        cu::info!("Compiling: {:#?}", &self.args);
+        cu::info!("Compiling: {:?} {:?}", &self.compiler.as_os_str(), &self.args.join(" "));
         let child = cu::CommandBuilder::new(&self.compiler.as_os_str())
             .args(self.args.clone())
             .stdoe(cu::pio::inherit()) // todo: log to file
@@ -129,18 +131,24 @@ impl SourceFile {
         })
     }
 
+    // -fdiagnostics-color=never src/main.cpp -c -otarget/megaton/profile/NAME/o/main.cpp-12113651730592399284.o -MMD -MP -MFtarget/megaton/profile/NAME/o/main.cpp-12113651730592399284.d -I/home/lorem/Documents/School/Capstone/new-megaton-example/packages/new-example-mod/src -I/home/lorem/Documents/School/Capstone/new-megaton-example/packages/new-example-mod/include
+
     pub fn compile(
         &self,
         flags: &Flags,
         build: &Build,
         compile_db: &mut CompileDB,
         module_path: &Path,
-    ) -> cu::Result<()> {
-        let o_path = module_path
-            .join("o")
+    ) -> cu::Result<bool> {
+        let output_path = module_path
+            .join("o");
+        if !output_path.exists() {
+            cu::fs::make_dir(&output_path).unwrap();
+            cu::info!("Output path {:?} exists: {}", &output_path, &output_path.exists());
+        }
+        let o_path = output_path
             .join(format!("{}-{}.o", self.basename, self.hash));
-        let d_path = module_path
-            .join("o")
+        let d_path = output_path
             .join(format!("{}-{}.d", self.basename, self.hash));
 
         let (comp_path, comp_flags) = match self.lang {
@@ -161,11 +169,11 @@ impl SourceFile {
 
             cu::fs::set_mtime(o_path, src_time)?;
             cu::fs::set_mtime(d_path, src_time)?;
-
-            compile_db.update(comp_command)?;
+            Ok(true)
+            // compile_db.update(comp_command)?;            
+        } else {
+            Ok(false)
         }
-
-        Ok(())
     }
 
     fn need_recompile(

@@ -8,11 +8,11 @@ use std::{
 };
 
 // use cu::{PathExtension, Spawn, fs::{self, DirEntry}, lv::P};
-use cu::pre::*;
+use cu::{info, pre::*};
 
 use crate::{cmds::cmd_build::{
     compile::CompileDB,
-    config::{Build, Config, Module},
+    config::{Build, Config, Flags, Module},
 }, env::environment};
 
 
@@ -108,32 +108,35 @@ pub fn needs_relink(
     module: &Module,
     profile: &str,
 ) -> cu::Result<bool> {
-    if compiler_did_something {
-        return cu::Result::Ok(true);
-    }
 
-    let output_path = get_output_path(module, profile)
-        .to_str()
-        .expect("Failed to get absolute output path!")
-        .to_owned();
-    let obj_files = to_space_separated_str(get_obj_files(module));
+    Ok(true)
 
-    let libraries = build_library_args(&build_config.ldscripts);
-    let old_command = get_last_linker_command(module, profile);
-    let ldscripts = get_ldscripts(build_config);
-    let new_ld_command = format!(
-        "ld -o {} {} {} {}",
-        output_path, ldscripts, obj_files, libraries
-    );
-    if let Some(old_command) = old_command
-        && &new_ld_command == &old_command
-    {
-        // ld command would be the same as before, nothing changed.
-        cu::Result::Ok(false)
-    } else {
-        compdb.ld_command = new_ld_command;
-        cu::Result::Ok(true)
-    }
+    // if compiler_did_something {
+    //     return cu::Result::Ok(true);
+    // }
+
+    // let output_path = get_output_path(module, profile)
+    //     .to_str()
+    //     .expect("Failed to get absolute output path!")
+    //     .to_owned();
+    // let obj_files = to_space_separated_str(get_obj_files(module));
+
+    // let libraries = build_library_args(&build_config.ldscripts);
+    // let old_command = get_last_linker_command(module, profile);
+    // let ldscripts = get_ldscripts(build_config);
+    // let new_ld_command = format!(
+    //     "ld -o {} {} {} {}",
+    //     output_path, ldscripts, obj_files, libraries
+    // );
+    // if let Some(old_command) = old_command
+    //     && &new_ld_command == &old_command
+    // {
+    //     // ld command would be the same as before, nothing changed.
+    //     cu::Result::Ok(false)
+    // } else {
+    //     compdb.ld_command = new_ld_command;
+    //     cu::Result::Ok(true)
+    // }
 }
 
 
@@ -165,30 +168,40 @@ pub fn needs_relink(
 // }
 
 pub fn relink_sync(
-    elf_path: PathBuf,
+    module_path: &PathBuf,
     compdb: &mut CompileDB,
     module: &Module,
+    flags: &Flags,
 ) -> cu::Result<bool> {
-    let output_path = "";
-    let obj_files: Vec<PathBuf> = get_obj_files(module); // scan target folder (BuildConfig)
-    let libraries: Vec<&str> = vec!["-L"]; // BuildConfig
-    let ld = cu::which("ld")?;
-    let mut args = vec![];
+    let elf_name = format!("{}.elf",module.name);
+    let elf_path = module_path.join(elf_name);
+    
+    let obj_files: Vec<String> = get_obj_files(module)
+        .iter().map(|o| o.display().to_string()).collect(); // scan target folder (BuildConfig)
+    let libraries: Vec<String> = vec![]; // BuildConfig
+    let env = environment();
 
-    args.push("-o");
-    args.push(output_path);
-    args.extend(obj_files.iter().map(|p| p.to_str().unwrap()));
-    args.push("-L");
-    args.extend(libraries);
-    let linker_command = ld
-        .command()
-        .args(args)
+    let command = link_start(env.cxx_path(), flags, obj_files, elf_path)?;
+    command.wait_nz()?;
+    info!("Linker finished!");
+    Ok(true)
+}
+
+fn link_start(cxx: &Path, flags: &Flags, objects: Vec<String>, elf_path: PathBuf) -> cu::Result<cu::Child> {
+    let res = cxx.command()
+        .args(
+            flags
+                .ldflags
+                .iter()
+                .chain(objects.iter())
+                // .chain(self.lib_objects.iter())
+                .chain(["-o".to_string(), elf_path.display().to_string()].iter()),
+        )
         .stdin_null()
         .stdoe(cu::pio::spinner("linking").info())
         .spawn()?
         .0;
-    linker_command.wait_nz()?;
-    Ok(true)
+    Ok(res)
 }
 
 #[cfg(test)]
