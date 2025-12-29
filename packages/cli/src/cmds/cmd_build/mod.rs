@@ -40,7 +40,7 @@ mod scan;
 // }
 use scan::discover_source;
 
-use crate::cmds::cmd_build::compile::CompileDB;
+use crate::cmds::cmd_build::compile::{CompileDB, MyCompileDB};
 
 // A rust crate that will be built as a component of the megaton lib or the mod
 #[allow(dead_code)]
@@ -202,6 +202,7 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let module_path = profile_path.join(PathBuf::from(&config.module.name));
 
 
+    let mut my_compdb = MyCompileDB::default();
     info!("Reading CompileDB");
     let mut compdb: CompileDB = if !compdb_path.exists() {
         CompileDB::default()
@@ -229,7 +230,7 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
         discover_source(PathBuf::from(src).as_path()).unwrap_or(vec![])
     }).flatten().for_each(|src| {
         // todo make error message better
-        let compilation_occurred = src.compile(&build_flags, &build_config, &mut compdb, &module_path)
+        let compilation_occurred = src.compile(&build_flags, &build_config, &mut compdb, &mut my_compdb, &module_path)
             .inspect_err(|e| cu::error!("Failed to compile! {:?}", e)).unwrap();
         compiler_did_something = compiler_did_something || compilation_occurred;
     });
@@ -238,10 +239,14 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     // TODO: Compile all c/cpp/s
     
     // for source in sources:
+    
     if link::needs_relink(compiler_did_something, module_path.clone(), &mut compdb, &build_config, &config.module, profile).unwrap() {
-        let result = link::relink_sync(&module_path, &mut compdb, &config.module, &build_flags);
-        result.unwrap();
+        if let Err(v) = link::relink_sync(&module_path, &mut compdb, &mut my_compdb, &config.module, &build_flags) {
+            info!("Error during linking: {:?}", v);
+        } 
+        my_compdb.save();
     }
+
 
 
     // TODO: Link all our artifacts and make the nso

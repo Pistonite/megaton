@@ -36,19 +36,60 @@ impl CompileDB {
     }
 }
 
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct MyCompileDB {
+    commands: Vec<CompileCommand>,
+    cc_version: String,
+    cxx_version: String,
+    pub ld_command: String,
+}
+
+impl MyCompileDB {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    // Creates a new compile record and adds it to the db
+    pub fn update(&mut self, command: CompileCommand) -> cu::Result<()> {
+        self.commands.push(command);
+        Ok(())
+    }
+
+    fn set_linker_command(&mut self, cmd: String) {
+        self.ld_command = cmd;
+    }
+
+    pub fn save(&self) -> cu::Result<()> {
+        let path = PathBuf::new().join("compilecommands.txt");
+        let content = self.commands.iter()
+            .map(|c| format!("{} {}", 
+                c.compiler.as_os_str().to_str().unwrap(), 
+                c.args.join(" ")))
+            
+            .collect::<Vec<String>>()
+            .join("\n\n");
+        cu::fs::write(path, content)
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct CompileRecord {
     command: CompileCommand,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq)]
-struct CompileCommand {
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct CompileCommand {
     compiler: PathBuf,
     source: PathBuf,
     args: Vec<String>,
 }
 
 impl CompileCommand {
+    pub fn new_ld_command(ld_path: &Path, args: &Vec<String>) -> Self {
+        Self { compiler: ld_path.to_path_buf(), source: PathBuf::new(), args: args.to_vec() }
+    }
+
     fn new(
         compiler_path: &Path,
         src_file: &Path,
@@ -89,8 +130,7 @@ impl CompileCommand {
         
         argv.push(src_file.as_utf8()?.to_string());
 
-
-        cu::info!("Compiler command: {:?} {:?} {:#?}", &compiler_path, &src_file, &argv);
+        cu::info!("Compiler command: \n{} {} {}", &compiler_path.display(), &src_file.display(), &argv.join(" "));
 
         Ok(Self {
             compiler: compiler_path.to_path_buf(),
@@ -100,7 +140,7 @@ impl CompileCommand {
     }
 
     fn execute(&self) -> cu::Result<()> {
-        cu::info!("Compiling: {:?} {:?}", &self.compiler.as_os_str(), &self.args.join(" "));
+        cu::info!("Executing CompileCommand: \n{} {}", &self.compiler.display(), &self.args.join(" "));
         let child = cu::CommandBuilder::new(&self.compiler.as_os_str())
             .args(self.args.clone())
             .stdoe(cu::pio::inherit()) // todo: log to file
@@ -117,6 +157,7 @@ impl CompileCommand {
         // TODO: Implement
         todo!()
     }
+    
 }
 
 // A source file and its corresponding artifacts
@@ -148,13 +189,14 @@ impl SourceFile {
         flags: &Flags,
         build: &Build,
         compile_db: &mut CompileDB,
+        other_compile_db: &mut MyCompileDB,
         module_path: &Path,
     ) -> cu::Result<bool> {
         let output_path = module_path
             .join("o");
         if !output_path.exists() {
             cu::fs::make_dir(&output_path).unwrap();
-            cu::info!("Output path {:?} exists: {}", &output_path, &output_path.exists());
+            cu::info!("Output path {:?} exists={}", &output_path, &output_path.exists());
         }
         let o_path = output_path
             .join(format!("{}-{}.o", self.basename, self.hash));
@@ -169,6 +211,8 @@ impl SourceFile {
 
         let comp_command =
             CompileCommand::new(comp_path, &self.path, &o_path, &d_path, &comp_flags, build)?;
+
+        other_compile_db.update(comp_command.clone());
 
         if self.need_recompile(compile_db, &o_path, &d_path, &comp_command)? {
             // Ensure source and artifacts have the same timestamp

@@ -7,11 +7,10 @@ use std::{
     str::FromStr,
 };
 
-// use cu::{PathExtension, Spawn, fs::{self, DirEntry}, lv::P};
 use cu::{info, pre::*};
 
 use crate::{cmds::cmd_build::{
-    compile::CompileDB,
+    compile::{CompileCommand, CompileDB, MyCompileDB},
     config::{Build, Config, Flags, Module},
 }, env::environment};
 
@@ -170,6 +169,7 @@ pub fn needs_relink(
 pub fn relink_sync(
     module_path: &PathBuf,
     compdb: &mut CompileDB,
+    my_compdb: &mut MyCompileDB,
     module: &Module,
     flags: &Flags,
 ) -> cu::Result<bool> {
@@ -181,19 +181,21 @@ pub fn relink_sync(
     let libraries: Vec<String> = vec![]; // BuildConfig
     let env = environment();
 
-    let command = link_start(env.cxx_path(), flags, obj_files, elf_path)?;
+    let command = link_start(my_compdb, env.cxx_path(), flags, obj_files, elf_path)?;
     command.wait_nz()?;
     info!("Linker finished!");
     Ok(true)
 }
 
-fn link_start(cxx: &Path, flags: &Flags, objects: Vec<String>, elf_path: PathBuf) -> cu::Result<cu::Child> {
+fn link_start(my_compdb: &mut MyCompileDB, cxx: &Path, flags: &Flags, objects: Vec<String>, elf_path: PathBuf) -> cu::Result<cu::Child> {
     let output_arg = ["-o".to_string(), elf_path.display().to_string()];
-    let args = flags.ldflags
-                .iter()
-                .chain(objects.iter())
-                // .chain(self.lib_objects.iter())
-                .chain(output_arg.iter());
+    let mut args = flags.ldflags.clone();
+    args.extend(objects);
+    args.extend(output_arg);
+    
+    let cmd = CompileCommand::new_ld_command(cxx, &args);
+    my_compdb.update(cmd);
+
     info!("{:?}", &args);
     let res = cxx.command()
         .args(
