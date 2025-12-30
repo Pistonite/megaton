@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025 Megaton contributors
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use cu::{info, pre::*};
 use derive_more::AsRef;
@@ -108,6 +108,18 @@ impl RustCrate {
         }
         Ok(source_files)
     }
+
+    pub fn get_output_path(&self, target_path: &Path) -> cu::Result<PathBuf> {
+        // Assuming cargo is in release mode
+        let rel_path = target_path.join("release");
+        let name = &cu::fs::read_string(&self.manifest)
+            .unwrap()
+            .parse::<toml::Table>()
+            .unwrap()["package.name"];
+        let filename = format!("lib{}.a", name);
+        let path = rel_path.join(filename).canonicalize()?;
+        Ok(path)
+    }
 }
 
 /// Manage the custom `megaton` Rust toolchain
@@ -195,7 +207,6 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let compdb_path = profile_path.join(PathBuf::from("compdb.cache"));
     let module_path = profile_path.join(PathBuf::from(&config.module.name));
 
-
     let mut my_compdb = MyCompileDB::default();
     info!("Reading CompileDB");
     let mut compdb: CompileDB = if !compdb_path.exists() {
@@ -216,32 +227,64 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     generate_cxx_bridge_src(rust_crate, &module_path)?;
 
     // TODO: Find all our other source code
-    
+
     let mut compiler_did_something = false;
-    build_config.sources.iter().map(|src| {
-        // todo: inspect and handle errs
-        discover_source(PathBuf::from(src).as_path()).unwrap_or(vec![])
-    }).flatten().for_each(|src| {
-        // todo make error message better
-        let compilation_occurred = src.compile(&build_flags, &build_config, &mut compdb, &mut my_compdb, &module_path)
-            .inspect_err(|e| cu::error!("Failed to compile! {:?}", e)).unwrap();
-        compiler_did_something = compiler_did_something || compilation_occurred;
-    });
+    build_config
+        .sources
+        .iter()
+        .map(|src| {
+            // todo: inspect and handle errs
+            discover_source(PathBuf::from(src).as_path()).unwrap_or(vec![])
+        })
+        .flatten()
+        .for_each(|src| {
+            // todo make error message better
+            let compilation_occurred = src
+                .compile(
+                    &build_flags,
+                    &build_config,
+                    &mut compdb,
+                    &mut my_compdb,
+                    &module_path,
+                )
+                .inspect_err(|e| cu::error!("Failed to compile! {:?}", e))
+                .unwrap();
+            compiler_did_something = compiler_did_something || compilation_occurred;
+        });
 
     info!("linking!");
     // TODO: Compile all c/cpp/s
-    
+
     // for source in sources:
+<<<<<<< HEAD
     
     if link::needs_relink(compiler_did_something, module_path.clone(), &mut compdb, &build_config, &config.module, profile).unwrap() {
         let libs = vec![]; // todo: get built lib from cargo
         if let Err(v) = link::relink_sync(&module_path, &mut compdb, &mut my_compdb, &libs, &config.module, &build_flags) {
+=======
+
+    if link::needs_relink(
+        compiler_did_something,
+        module_path.clone(),
+        &mut compdb,
+        &build_config,
+        &config.module,
+        profile,
+    )
+    .unwrap()
+    {
+        if let Err(v) = link::relink_sync(
+            &module_path,
+            &mut compdb,
+            &mut my_compdb,
+            &config.module,
+            &build_flags,
+        ) {
+>>>>>>> 24f60fb (get absolute path of output rust staticlib)
             info!("Error during linking: {:?}", v);
-        } 
+        }
         my_compdb.save();
     }
-
-
 
     // TODO: Link all our artifacts and make the nso
     // link(??)
