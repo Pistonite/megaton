@@ -23,9 +23,9 @@ pub fn get_ldscripts(build_config: &Build) -> String {
         .collect()
 }
 
-pub fn build_library_args(libraries: &Vec<String>) -> String {
-    // e.g. given ["lib1.ld", "lib2.ld"], returns: "-L lib1.ld -L lib2.ld"
-    libraries.iter().map(|l| "-l ".to_owned() + l).collect()
+pub fn build_library_args(libraries: &Vec<String>) -> Vec<String> {
+    // e.g. given ["lib1.ld", "lib2.ld"], returns: "-llib1.ld -llib2.ld"
+    libraries.iter().map(|l| l.to_owned()).collect()
 }
 
 pub fn get_last_linker_command(module: &Module, profile: &str) -> Option<String> {
@@ -54,12 +54,6 @@ pub fn get_cached_obj_files(module: &Module, profile: &str) -> Vec<PathBuf> {
         .join("objects.cache");
     let file = cu::fs::read_string(obj_cache).expect("Failed to read object cache");
     file.lines().map(|l| PathBuf::from(l)).collect()
-}
-
-pub fn get_obj_files(module: &Module) -> Vec<PathBuf> {
-    // scan target for obj files
-    let target = &module.target;
-    get_obj_files_in(target)
 }
 
 fn get_obj_files_in(target: &PathBuf) -> Vec<PathBuf> {
@@ -170,26 +164,28 @@ pub fn relink_sync(
     module_path: &PathBuf,
     compdb: &mut CompileDB,
     my_compdb: &mut MyCompileDB,
+    libraries: &Vec<String>,
     module: &Module,
     flags: &Flags,
 ) -> cu::Result<bool> {
     let elf_name = format!("{}.elf",module.name);
     let elf_path = module_path.join(elf_name);
     
-    let obj_files: Vec<String> = get_obj_files(module)
+    let obj_files: Vec<String> = get_obj_files_in(module_path)
         .iter().map(|o| o.display().to_string()).collect(); // scan target folder (BuildConfig)
-    let libraries: Vec<String> = vec![]; // BuildConfig
     let env = environment();
-
-    let command = link_start(my_compdb, env.cxx_path(), flags, obj_files, elf_path)?;
+    let libraries = build_library_args(libraries);
+    let command = link_start(my_compdb, env.cxx_path(), flags, obj_files, libraries, elf_path)?;
     command.wait_nz()?;
     info!("Linker finished!");
     Ok(true)
 }
 
-fn link_start(my_compdb: &mut MyCompileDB, cxx: &Path, flags: &Flags, objects: Vec<String>, elf_path: PathBuf) -> cu::Result<cu::Child> {
+fn link_start(my_compdb: &mut MyCompileDB, cxx: &Path, flags: &Flags, objects: Vec<String>, libraries: Vec<String>, elf_path: PathBuf) -> cu::Result<cu::Child> {
     let output_arg = ["-o".to_string(), elf_path.display().to_string()];
     let mut args = flags.ldflags.clone();
+    
+    args.extend(libraries);
     args.extend(objects);
     args.extend(output_arg);
     

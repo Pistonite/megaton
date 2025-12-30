@@ -104,8 +104,6 @@ impl CompileCommand {
         argv.push("-MF".to_owned());
         argv.push(dep_file.as_utf8()?.to_string());
 
-        
-        
         let mut includes = build_config.includes.clone();
         includes.extend(vec!["/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/15.1.0".to_owned(),
                             "/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/15.1.0/aarch64-none-elf".to_owned(),
@@ -181,8 +179,6 @@ impl SourceFile {
             hash,
         })
     }
-
-    // -fdiagnostics-color=never src/main.cpp -c -otarget/megaton/profile/NAME/o/main.cpp-12113651730592399284.o -MMD -MP -MFtarget/megaton/profile/NAME/o/main.cpp-12113651730592399284.d -I/home/lorem/Documents/School/Capstone/new-megaton-example/packages/new-example-mod/src -I/home/lorem/Documents/School/Capstone/new-megaton-example/packages/new-example-mod/include
 
     pub fn compile(
         &self,

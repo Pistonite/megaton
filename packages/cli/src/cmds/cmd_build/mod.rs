@@ -60,12 +60,10 @@ impl RustCrate {
         }
     }
 
-    pub fn build(&mut self, build: &config::Build) -> cu::Result<()> {
+    pub fn build(&mut self, build: &config::Build, build_flags: &Flags) -> cu::Result<()> {
+        info!("Building rust crate!");
         let cargo = cu::which("cargo").context("cargo executable not found")?;
-        let rust_flags = match &build.flags.rust {
-            Some(flags) => Some(flags.join(" ")),
-            None => None,
-        };
+        
         let mut command = cargo
             .command()
             .add(cu::args![
@@ -77,13 +75,9 @@ impl RustCrate {
             .stdin_null()
             .stdoe(cu::pio::inherit());
 
-        if let Some(cargo_flags) = &build.flags.cargo {
-            info!("{:#?}", cargo_flags);
-            command = command.args(cargo_flags);
-        }
-        if let Some(rustc_flags) = rust_flags {
-            command = command.env("RUSTFLAGS", rustc_flags);
-        }
+        command = command.args(&build_flags.cargoflags);
+        command = command.env("RUSTFLAGS", build_flags.rustflags.clone());
+        
         let exit_code = command.spawn()?.wait()?;
         if !exit_code.success() {
             return Err(cu::Error::msg(format!(
@@ -211,12 +205,11 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
             cu::fs::read(compdb_path)
                 .context("Failed to read compdb.cache")?
                 .as_slice()
-        )?
+        ).unwrap_or_default()
     };
 
-    info!("Buildig rust crate!");
     let mut rust_crate = RustCrate::new(PathBuf::from(config.cargo.manifest.unwrap()));
-    rust_crate.build(&build_config);
+    rust_crate.build(&build_config, &build_flags).unwrap();
     let rust_changed = rust_crate.got_built;
 
     info!("Generating cxx bridge src!");
@@ -241,7 +234,8 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     // for source in sources:
     
     if link::needs_relink(compiler_did_something, module_path.clone(), &mut compdb, &build_config, &config.module, profile).unwrap() {
-        if let Err(v) = link::relink_sync(&module_path, &mut compdb, &mut my_compdb, &config.module, &build_flags) {
+        let libs = vec![]; // todo: get built lib from cargo
+        if let Err(v) = link::relink_sync(&module_path, &mut compdb, &mut my_compdb, &libs, &config.module, &build_flags) {
             info!("Error during linking: {:?}", v);
         } 
         my_compdb.save();
