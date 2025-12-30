@@ -256,31 +256,10 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     // TODO: Compile all c/cpp/s
 
     // for source in sources:
-<<<<<<< HEAD
     
     if link::needs_relink(compiler_did_something, module_path.clone(), &mut compdb, &build_config, &config.module, profile).unwrap() {
         let libs = vec![]; // todo: get built lib from cargo
         if let Err(v) = link::relink_sync(&module_path, &mut compdb, &mut my_compdb, &libs, &config.module, &build_flags) {
-=======
-
-    if link::needs_relink(
-        compiler_did_something,
-        module_path.clone(),
-        &mut compdb,
-        &build_config,
-        &config.module,
-        profile,
-    )
-    .unwrap()
-    {
-        if let Err(v) = link::relink_sync(
-            &module_path,
-            &mut compdb,
-            &mut my_compdb,
-            &config.module,
-            &build_flags,
-        ) {
->>>>>>> 24f60fb (get absolute path of output rust staticlib)
             info!("Error during linking: {:?}", v);
         }
         my_compdb.save();
