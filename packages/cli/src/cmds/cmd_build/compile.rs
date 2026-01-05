@@ -8,7 +8,6 @@ use std::{
 };
 
 use cu::pre::*;
-use fxhash::hash;
 
 use super::{Flags, RustCrate};
 use crate::{cmds::cmd_build::config::Build, env::environment};
@@ -162,8 +161,8 @@ impl CompileCommand {
 pub struct SourceFile {
     lang: Lang,
     path: PathBuf,
+    pathhash: usize,
     basename: String,
-    hash: usize,
 }
 
 impl SourceFile {
@@ -171,12 +170,12 @@ impl SourceFile {
         let basename = cu::PathExtension::file_name_str(&path)
             .context("path is not utf-8")?
             .to_owned();
-        let hash = hash(&cu::fs::read(&path).context("Failed to read source file")?);
+        let pathhash = fxhash::hash(&path);
         Ok(Self {
             lang,
             path,
+            pathhash,
             basename,
-            hash,
         })
     }
 
@@ -195,9 +194,9 @@ impl SourceFile {
             cu::info!("Output path {:?} exists={}", &output_path, &output_path.exists());
         }
         let o_path = output_path
-            .join(format!("{}-{}.o", self.basename, self.hash));
+            .join(format!("{}-{}.o", self.basename, self.pathhash));
         let d_path = output_path
-            .join(format!("{}-{}.d", self.basename, self.hash));
+            .join(format!("{}-{}.d", self.basename, self.pathhash));
 
         let (comp_path, comp_flags) = match self.lang {
             Lang::C => (environment().cc_path(), &flags.cflags),
@@ -288,8 +287,3 @@ pub enum Lang {
     S,
 }
 
-// Builds the give rust crate and places the binary in the target as specified in the rust manifest
-pub fn compile_rust(rust_crate: RustCrate) -> cu::Result<()> {
-    // TODO: Implement
-    Ok(todo!())
-}
