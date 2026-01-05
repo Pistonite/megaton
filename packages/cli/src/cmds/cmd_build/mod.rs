@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-use cu::{info, pre::*};
+use cu::pre::*;
 use derive_more::AsRef;
 
 use config::Flags;
@@ -60,9 +60,9 @@ impl RustCrate {
     }
 
     pub fn build(&mut self, build: &config::Build, build_flags: &Flags) -> cu::Result<()> {
-        info!("Building rust crate!");
+        cu::info!("Building rust crate!");
         let cargo = cu::which("cargo").context("cargo executable not found")?;
-        
+
         let mut command = cargo
             .command()
             .add(cu::args![
@@ -76,7 +76,7 @@ impl RustCrate {
 
         command = command.args(&build_flags.cargoflags);
         command = command.env("RUSTFLAGS", build_flags.rustflags.clone());
-        
+
         let exit_code = command.spawn()?.wait()?;
         if !exit_code.success() {
             return Err(cu::Error::msg(format!(
@@ -199,42 +199,56 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let module_path = profile_path.join(PathBuf::from(&config.module.name));
 
     let mut my_compdb = MyCompileDB::default();
-    info!("Reading CompileDB");
+    cu::info!("Reading CompileDB");
     let mut compdb: CompileDB = if !compdb_path.exists() {
         CompileDB::default()
     } else {
         json::read(
             cu::fs::read(compdb_path)
                 .context("Failed to read compdb.cache")?
-                .as_slice()
-        ).unwrap_or_default()
+                .as_slice(),
+        )
+        .unwrap_or_default()
     };
 
     let mut rust_crate = RustCrate::new(PathBuf::from(config.cargo.manifest.unwrap()));
     rust_crate.build(&build_config, &build_flags).unwrap();
     let rust_changed = rust_crate.got_built;
 
-    info!("Generating cxx bridge src!");
-    generate_cxx_bridge_src(&rust_crate, &module_path)?;
+    cu::info!("Generating cxx bridge src!");
+    generate_cxx_bridge_src(rust_crate, &module_path)?;
 
     let mut compiler_did_something = false;
-    build_config.sources.iter().map(|src| {
-        // todo: inspect and handle errs
-        discover_source(PathBuf::from(src).as_path()).unwrap_or(vec![])
-    }).flatten().for_each(|src| {
-        let compilation_occurred = src.compile(&build_flags, &build_config, &mut compdb, &mut my_compdb, &module_path)
-            .inspect_err(|e| cu::error!("Failed to compile! {:?}", e)).unwrap();
-        compiler_did_something = compiler_did_something || compilation_occurred;
-    });
+    build_config
+        .sources
+        .iter()
+        .map(|src| {
+            // todo: inspect and handle errs
+            discover_source(PathBuf::from(src).as_path()).unwrap_or(vec![])
+        })
+        .flatten()
+        .for_each(|src| {
+            let compilation_occurred = src
+                .compile(
+                    &build_flags,
+                    &build_config,
+                    &mut compdb,
+                    &mut my_compdb,
+                    &module_path,
+                )
+                .inspect_err(|e| cu::error!("Failed to compile! {:?}", e))
+                .unwrap();
+            compiler_did_something = compiler_did_something || compilation_occurred;
+        });
 
-    info!("linking!");
+    cu::info!("linking!");
     
     let libs = vec![
         rust_crate.get_output_path(&config.module.target).expect("Failed to get rust crate output path!")
     ]; 
 
     if let Err(v) = compile::relink(&module_path, &mut compdb, &mut my_compdb, &libs, &config.module, &build_flags) {
-        info!("Error during linking: {:?}", v);
+        cu::info!("Error during linking: {:?}", v);
     } 
     my_compdb.save();
 
