@@ -149,10 +149,6 @@ impl CmdBuild {
     }
 }
 
-pub fn get_project_root() -> PathBuf {
-    PathBuf::from(".").canonicalize().unwrap()
-}
-
 // <target>/megaton
 //   - <profile>/: per-profile build files
 //     - lib/: where megaton emits it's own library file and build files
@@ -192,16 +188,6 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let mut build_flags = Flags::from_config(&build_config.flags);
     cu::debug!("build flags: {build_flags:#?}");
 
-    // here are just suppressing the unused warning
-    // build_flags.add_defines(["-Dfoo"]);
-    // build_flags.add_includes(["-Ifoo"]);
-    // build_flags.set_init("foo");
-    // build_flags.set_version_script("verfile");
-    // build_flags.add_libpaths(["foo"]);
-    // build_flags.add_libraries(["foo"]);
-    // build_flags.add_ldscripts(["foo"]);
-
-    // Get paths
     let megaton_path = config.module.target.join(PathBuf::from("megaton"));
     let profile_path = megaton_path.join(PathBuf::from(profile));
     let compdb_path = profile_path.join(PathBuf::from("compdb.cache"));
@@ -226,49 +212,23 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     info!("Generating cxx bridge src!");
     generate_cxx_bridge_src(rust_crate, &module_path)?;
 
-    // TODO: Find all our other source code
-
     let mut compiler_did_something = false;
-    build_config
-        .sources
-        .iter()
-        .map(|src| {
-            // todo: inspect and handle errs
-            discover_source(PathBuf::from(src).as_path()).unwrap_or(vec![])
-        })
-        .flatten()
-        .for_each(|src| {
-            // todo make error message better
-            let compilation_occurred = src
-                .compile(
-                    &build_flags,
-                    &build_config,
-                    &mut compdb,
-                    &mut my_compdb,
-                    &module_path,
-                )
-                .inspect_err(|e| cu::error!("Failed to compile! {:?}", e))
-                .unwrap();
-            compiler_did_something = compiler_did_something || compilation_occurred;
-        });
+    build_config.sources.iter().map(|src| {
+        // todo: inspect and handle errs
+        discover_source(PathBuf::from(src).as_path()).unwrap_or(vec![])
+    }).flatten().for_each(|src| {
+        let compilation_occurred = src.compile(&build_flags, &build_config, &mut compdb, &mut my_compdb, &module_path)
+            .inspect_err(|e| cu::error!("Failed to compile! {:?}", e)).unwrap();
+        compiler_did_something = compiler_did_something || compilation_occurred;
+    });
 
     info!("linking!");
-    // TODO: Compile all c/cpp/s
-
-    // for source in sources:
+    let libs = vec![]; // todo: get built lib from cargo
     
-    if link::needs_relink(compiler_did_something, module_path.clone(), &mut compdb, &build_config, &config.module, profile).unwrap() {
-        let libs = vec![]; // todo: get built lib from cargo
-        if let Err(v) = link::relink_sync(&module_path, &mut compdb, &mut my_compdb, &libs, &config.module, &build_flags) {
-            info!("Error during linking: {:?}", v);
-        }
-        my_compdb.save();
-    }
-
-    // TODO: Link all our artifacts and make the nso
-    // link(??)
-
-    let crate_changed = true;
+    if let Err(v) = compile::relink(&module_path, &mut compdb, &mut my_compdb, &libs, &config.module, &build_flags) {
+        info!("Error during linking: {:?}", v);
+    } 
+    my_compdb.save();
 
     Ok(())
 }

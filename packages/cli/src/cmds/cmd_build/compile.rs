@@ -10,14 +10,14 @@ use std::{
 use cu::pre::*;
 
 use super::{Flags, RustCrate};
-use crate::{cmds::cmd_build::config::Build, env::environment};
+use crate::{cmds::cmd_build::config::{Build, Module}, env::environment};
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct CompileDB {
+    // key: name of source
     commands: BTreeMap<String, CompileRecord>,
     cc_version: String,
     cxx_version: String,
-    pub ld_command: String,
 }
 
 impl CompileDB {
@@ -28,10 +28,6 @@ impl CompileDB {
     // Creates a new compile record and adds it to the db
     fn update(&mut self, command: CompileCommand) -> cu::Result<()> {
         todo!()
-    }
-
-    fn set_linker_command(&mut self, cmd: String) {
-        self.ld_command = cmd;
     }
 }
 
@@ -287,3 +283,111 @@ pub enum Lang {
     S,
 }
 
+// Builds the give rust crate and places the binary in the target as specified in the rust manifest
+pub fn compile_rust(rust_crate: RustCrate) -> cu::Result<()> {
+    // TODO: Implement
+    Ok(todo!())
+}
+
+
+fn get_obj_files_in(target: &PathBuf) -> Vec<PathBuf> {
+    let paths = cu::fs::read_dir(target).unwrap();
+    let mut result: Vec<PathBuf> = vec![];
+
+    for path in paths {
+        if let Ok(path) = path
+            && let Ok(ft) = path.file_type()
+        {
+            if ft.is_dir() {
+                result.extend(get_obj_files_in(&path.path()));
+            } else if ft.is_file() && is_file_obj(&path) {
+                result.push(path.path());
+            }
+        }
+    }
+    result
+}
+
+fn is_file_obj(path: &cu::fs::DirEntry) -> bool {
+    let name = path.file_name();
+    let name = name.to_str();
+    if let Some(name) = name {
+        name.ends_with(".o")
+    } else {
+        false
+    }
+}
+
+pub fn relink(
+    module_path: &PathBuf,
+    compdb: &mut CompileDB,
+    my_compdb: &mut MyCompileDB,
+    libraries: &Vec<String>,
+    module: &Module,
+    flags: &Flags,
+) -> cu::Result<bool> {
+    // Returns: whether linking was performed
+
+    let elf_name = format!("{}.elf",module.name);
+    let elf_path = module_path.join(elf_name);
+    
+    let obj_files: Vec<String> = get_obj_files_in(module_path)
+        .iter().map(|o| o.display().to_string()).collect(); // scan target folder (BuildConfig)
+    let env = environment();
+
+    let output_arg = ["-o".to_string(), elf_path.display().to_string()];
+    let mut args = flags.ldflags.clone();
+    args.extend(libraries.iter().map(|lib| lib.to_owned()));
+    args.extend(obj_files);
+    args.extend(output_arg);
+    let cxx = env.cxx_path();
+    let link_cmd = CompileCommand::new_ld_command(cxx, &args);
+    // todo: implement proper equality check (same args in the same order?)
+    if let Some(old_link_cmd) = &compdb.commands.last_entry() && old_link_cmd.get().command.eq(&link_cmd) { 
+        return Ok(false); // no relinking needed
+    }
+    my_compdb.update(link_cmd).unwrap();
+
+    cu::info!("{:?}", &args);
+    let command = cxx.command()
+        .args(
+            args,
+        )
+        .stdin_null()
+        .stdoe(cu::pio::spinner("linking").info())
+        .spawn()?
+        .0;
+    
+    command.wait_nz()?;
+    cu::info!("Linker finished!");
+    Ok(true)
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_obj_files() {
+        let mut path = PathBuf::from("test/test_get_obj_files");
+        let result = get_obj_files_in(&path);
+        assert!(
+            result.contains(&PathBuf::from("test/test_get_obj_files/file1.o")),
+            "{:#?}",
+            result
+        );
+        assert!(
+            result.contains(&PathBuf::from("test/test_get_obj_files/nested/file2.o")),
+            "{:#?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_get_obj_files_empty() {
+        let mut path = PathBuf::from("test/test_get_obj_files/empty");
+        let result = get_obj_files_in(&path);
+        assert_eq!(result.len(), 0, "{:#?}", result);
+    }
+}
