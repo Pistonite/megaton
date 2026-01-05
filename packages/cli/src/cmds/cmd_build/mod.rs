@@ -12,7 +12,6 @@ use generate::generate_cxx_bridge_src;
 mod compile;
 mod config;
 mod generate;
-mod link;
 mod scan;
 
 // use scan::{discover_crates, discover_source};
@@ -110,14 +109,20 @@ impl RustCrate {
     }
 
     pub fn get_output_path(&self, target_path: &Path) -> cu::Result<PathBuf> {
-        // Assuming cargo is in release mode
-        let rel_path = target_path.join("release");
+        // Assuming cargo is in release mode 
+        let rel_path = target_path
+            .join("aarch64-unknown-hermit")
+            .join("release");
         let name = &cu::fs::read_string(&self.manifest)
             .unwrap()
             .parse::<toml::Table>()
-            .unwrap()["package.name"];
-        let filename = format!("lib{}.a", name);
+            .unwrap();
+
+        let name = &name["package"]["name"].as_str().unwrap();
+        let name = name.replace("-", "_");
+        let filename = format!("lib{name}.a");
         let path = rel_path.join(filename).canonicalize()?;
+        
         Ok(path)
     }
 }
@@ -210,7 +215,7 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let rust_changed = rust_crate.got_built;
 
     info!("Generating cxx bridge src!");
-    generate_cxx_bridge_src(rust_crate, &module_path)?;
+    generate_cxx_bridge_src(&rust_crate, &module_path)?;
 
     let mut compiler_did_something = false;
     build_config.sources.iter().map(|src| {
@@ -223,8 +228,11 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     });
 
     info!("linking!");
-    let libs = vec![]; // todo: get built lib from cargo
     
+    let libs = vec![
+        rust_crate.get_output_path(&config.module.target).expect("Failed to get rust crate output path!")
+    ]; 
+
     if let Err(v) = compile::relink(&module_path, &mut compdb, &mut my_compdb, &libs, &config.module, &build_flags) {
         info!("Error during linking: {:?}", v);
     } 

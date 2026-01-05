@@ -7,7 +7,7 @@ use cu::pre::*;
 
 use super::RustCrate;
 
-pub fn generate_cxx_bridge_src(rust_crate: RustCrate, module_target_path: &Path) -> cu::Result<()> {
+pub fn generate_cxx_bridge_src(rust_crate: &RustCrate, module_target_path: &Path) -> cu::Result<()> {
 
     let include_rust = module_target_path.join("include").join("rust");
     let cxx_src_dir = module_target_path.join("src").join("cxxbridge");
@@ -115,7 +115,7 @@ fn write_if_changed(path: &Path, bytes: &[u8]) -> cu::Result<bool> {
     Ok(changed)
 }
 
-fn find_bridge_files(rust_crate: RustCrate) -> cu::Result<Vec<PathBuf>> {
+fn find_bridge_files(rust_crate: &RustCrate) -> cu::Result<Vec<PathBuf>> {
     let source_files = rust_crate.get_source_files()?;
 
     let mut cxxbridge_rs_files = Vec::new();

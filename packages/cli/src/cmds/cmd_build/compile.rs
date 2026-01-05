@@ -322,7 +322,7 @@ pub fn relink(
     module_path: &PathBuf,
     compdb: &mut CompileDB,
     my_compdb: &mut MyCompileDB,
-    libraries: &Vec<String>,
+    libraries: &Vec<PathBuf>,
     module: &Module,
     flags: &Flags,
 ) -> cu::Result<bool> {
@@ -337,7 +337,7 @@ pub fn relink(
 
     let output_arg = ["-o".to_string(), elf_path.display().to_string()];
     let mut args = flags.ldflags.clone();
-    args.extend(libraries.iter().map(|lib| lib.to_owned()));
+    args.extend(libraries.iter().map(|lib| lib.canonicalize().unwrap().display().to_string()));
     args.extend(obj_files);
     args.extend(output_arg);
     let cxx = env.cxx_path();
