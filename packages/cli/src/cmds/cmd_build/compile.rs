@@ -3,8 +3,7 @@
 
 // This modules handles compiling c/c++/asm/rust code
 use std::{
-    collections::BTreeMap,
-    path::{Path, PathBuf},
+    collections::BTreeMap, io::Write, iter::Zip, path::{Path, PathBuf}
 };
 
 use cu::pre::*;
@@ -14,8 +13,7 @@ use crate::{cmds::cmd_build::config::{Build, Module}, env::environment};
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct CompileDB {
-    // key: name of source
-    commands: BTreeMap<String, CompileRecord>,
+    commands: Vec<CompileRecord>, // ordered by completion time
     cc_version: String,
     cxx_version: String,
 }
@@ -26,65 +24,58 @@ impl CompileDB {
     }
 
     // Creates a new compile record and adds it to the db
-    fn update(&mut self, command: CompileCommand) -> cu::Result<()> {
-        todo!()
-    }
-}
-
-
-#[derive(Serialize, Deserialize, Default)]
-pub struct MyCompileDB {
-    commands: Vec<CompileCommand>,
-    cc_version: String,
-    cxx_version: String,
-    pub ld_command: String,
-}
-
-impl MyCompileDB {
-    fn new() -> Self {
-        Self::default()
-    }
-
-    // Creates a new compile record and adds it to the db
-    pub fn update(&mut self, command: CompileCommand) -> cu::Result<()> {
+    fn update(&mut self, command: CompileRecord) {
         self.commands.push(command);
+    }
+
+    pub fn save(&self, path: &PathBuf) -> cu::Result<()> {
+        let file = std::fs::File::create(path)?;
+        json::write(file, self)
+    }
+
+    pub fn save_command_log(&self, path: &PathBuf) -> cu::Result<()> {
+        let mut file = std::fs::File::create(path)?;
+        let content = self.commands.iter().map(|record| {
+            match record {
+                CompileRecord::Compile(compile_command) => compile_command.command(),
+                CompileRecord::Link(link_command) => link_command.command(),
+            }
+        }).collect::<Vec<_>>().join("\n");
+        file.write(content.as_bytes())?;
         Ok(())
-    }
-
-    fn set_linker_command(&mut self, cmd: String) {
-        self.ld_command = cmd;
-    }
-
-    pub fn save(&self) -> cu::Result<()> {
-        let path = PathBuf::new().join("compilecommands.txt");
-        let content = self.commands.iter()
-            .map(|c| format!("{} {}", 
-                c.compiler.as_os_str().to_str().unwrap(), 
-                c.args.join(" ")))
-            
-            .collect::<Vec<String>>()
-            .join("\n\n");
-        cu::fs::write(path, content)
     }
 }
 
 #[derive(Serialize, Deserialize)]
-struct CompileRecord {
-    command: CompileCommand,
+enum CompileRecord {
+    Compile(CompileCommand),
+    Link(LinkCommand)
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Clone)]
+pub struct LinkCommand {
+    linker: PathBuf,
+    args: Vec<String>,
+}
+impl LinkCommand {
+    pub fn new(ld_path: &Path, args: &Vec<String>) -> Self {
+        Self { linker: ld_path.to_path_buf(), args: args.to_vec() }
+    }
+
+    fn command(&self) -> String {
+        format!("{} {}", self.linker.display(), self.args.join(" "))
+    }
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub struct CompileCommand {
+    pathhash: usize,
     compiler: PathBuf,
     source: PathBuf,
     args: Vec<String>,
 }
 
 impl CompileCommand {
-    pub fn new_ld_command(ld_path: &Path, args: &Vec<String>) -> Self {
-        Self { compiler: ld_path.to_path_buf(), source: PathBuf::new(), args: args.to_vec() }
-    }
-
     fn new(
         compiler_path: &Path,
         src_file: &Path,
@@ -125,9 +116,11 @@ impl CompileCommand {
 
         cu::info!("Compiler command: \n{} {} {}", &compiler_path.display(), &src_file.display(), &argv.join(" "));
 
+        let src_path = src_file.to_path_buf();
         Ok(Self {
+            pathhash: fxhash::hash(&src_path),
             compiler: compiler_path.to_path_buf(),
-            source: src_file.to_path_buf(),
+            source: src_path,
             args: argv,
         })
     }
@@ -141,6 +134,10 @@ impl CompileCommand {
             .spawn()?;
         child.wait_nz()?;
         Ok(())
+    }
+
+    fn command(&self) -> String {
+        format!("{} {}", self.compiler.display(), self.args.join(" "))
     }
 
     // We need two different ways of serializing this data since it will
@@ -180,7 +177,6 @@ impl SourceFile {
         flags: &Flags,
         build: &Build,
         compile_db: &mut CompileDB,
-        other_compile_db: &mut MyCompileDB,
         module_path: &Path,
     ) -> cu::Result<bool> {
         let output_path = module_path
@@ -203,7 +199,7 @@ impl SourceFile {
         let comp_command =
             CompileCommand::new(comp_path, &self.path, &o_path, &d_path, &comp_flags, build)?;
 
-        other_compile_db.update(comp_command.clone());
+        compile_db.update(CompileRecord::Compile(comp_command.clone()));
 
         if self.need_recompile(compile_db, &o_path, &d_path, &comp_command)? {
             // Ensure source and artifacts have the same timestamp
@@ -229,10 +225,18 @@ impl SourceFile {
         command: &CompileCommand,
     ) -> cu::Result<bool> {
         // Check if record exists
-        let comp_record = match compile_db.commands.get(&self.basename) {
-            Some(record) => record,
-            None => return Ok(true),
+        let comp_record = compile_db.commands.iter().find(|command| {
+            match command {
+                CompileRecord::Compile(compile_command) => compile_command.pathhash == self.pathhash,
+                CompileRecord::Link(link_command) => false,
+            }
+        });
+
+        let comp_record = match comp_record {
+            Some(CompileRecord::Compile(cmd)) => cmd,
+            _ => return Ok(true)
         };
+
 
         // Check if artifacts exist
         if !o_path.exists() || !d_path.exists() {
@@ -260,7 +264,7 @@ impl SourceFile {
             }
         }
 
-        if command != &comp_record.command {
+        if command != comp_record {
             return Ok(true);
         }
 
@@ -282,13 +286,6 @@ pub enum Lang {
     Cpp,
     S,
 }
-
-// Builds the give rust crate and places the binary in the target as specified in the rust manifest
-pub fn compile_rust(rust_crate: RustCrate) -> cu::Result<()> {
-    // TODO: Implement
-    Ok(todo!())
-}
-
 
 fn get_obj_files_in(target: &PathBuf) -> Vec<PathBuf> {
     let paths = cu::fs::read_dir(target).unwrap();
@@ -320,11 +317,11 @@ fn is_file_obj(path: &cu::fs::DirEntry) -> bool {
 
 pub fn relink(
     module_path: &PathBuf,
-    compdb: &mut CompileDB,
-    my_compdb: &mut MyCompileDB,
+    compile_db: &mut CompileDB,
     libraries: &Vec<PathBuf>,
     module: &Module,
     flags: &Flags,
+    compilation_occurred: bool
 ) -> cu::Result<bool> {
     // Returns: whether linking was performed
 
@@ -341,14 +338,19 @@ pub fn relink(
     args.extend(obj_files);
     args.extend(output_arg);
     let cxx = env.cxx_path();
-    let link_cmd = CompileCommand::new_ld_command(cxx, &args);
-    // todo: implement proper equality check (same args in the same order?)
-    if let Some(old_link_cmd) = &compdb.commands.last_entry() && old_link_cmd.get().command.eq(&link_cmd) { 
-        return Ok(false); // no relinking needed
+    
+    let link_cmd = LinkCommand::new(cxx, &args);
+    let old_link_cmd: Option<&LinkCommand> = compile_db.commands.iter().find_map(|cmd| -> Option<&LinkCommand> { 
+        match cmd {
+            CompileRecord::Compile(compile_command) => None,
+            CompileRecord::Link(link_command) => Some(link_command),
+        }
+    });
+    if !compilation_occurred && let Some(old_link_cmd) = old_link_cmd && *old_link_cmd == link_cmd {
+        return Ok(false); // skip compilation
     }
-    my_compdb.update(link_cmd).unwrap();
 
-    cu::info!("{:?}", &args);
+    compile_db.update(CompileRecord::Link(link_cmd.clone()));
     let command = cxx.command()
         .args(
             args,

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025 Megaton contributors
 
-use std::path::{Path, PathBuf};
+use std::{fs::File, path::{Path, PathBuf}};
 
 use cu::pre::*;
 use derive_more::AsRef;
@@ -39,7 +39,7 @@ mod scan;
 // }
 use scan::discover_source;
 
-use crate::cmds::cmd_build::compile::{CompileDB, MyCompileDB};
+use crate::cmds::cmd_build::compile::CompileDB;
 
 // A rust crate that will be built as a component of the megaton lib or the mod
 #[allow(dead_code)]
@@ -206,15 +206,18 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let megaton_path = config.module.target.join(PathBuf::from("megaton"));
     let profile_path = megaton_path.join(PathBuf::from(profile));
     let compdb_path = profile_path.join(PathBuf::from("compdb.cache"));
+    let command_log_path = profile_path.join(PathBuf::from("command_log.txt"));
     let module_path = profile_path.join(PathBuf::from(&config.module.name));
+    cu::fs::make_dir(&module_path)?;
 
-    let mut my_compdb = MyCompileDB::default();
     cu::info!("Reading CompileDB");
     let mut compdb: CompileDB = if !compdb_path.exists() {
+        cu::info!("{}", compdb_path.display());
+        File::create(&compdb_path)?;
         CompileDB::default()
     } else {
         json::read(
-            cu::fs::read(compdb_path)
+            cu::fs::read(&compdb_path)
                 .context("Failed to read compdb.cache")?
                 .as_slice(),
         )
@@ -229,27 +232,14 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     generate_cxx_bridge_src(&rust_crate, &module_path)?;
 
     let mut compiler_did_something = false;
-    build_config
-        .sources
-        .iter()
-        .map(|src| {
-            // todo: inspect and handle errs
-            discover_source(PathBuf::from(src).as_path()).unwrap_or(vec![])
-        })
-        .flatten()
-        .for_each(|src| {
-            let compilation_occurred = src
-                .compile(
-                    &build_flags,
-                    &build_config,
-                    &mut compdb,
-                    &mut my_compdb,
-                    &module_path,
-                )
-                .inspect_err(|e| cu::error!("Failed to compile! {:?}", e))
-                .unwrap();
-            compiler_did_something = compiler_did_something || compilation_occurred;
-        });
+    build_config.sources.iter().map(|src| {
+        // todo: inspect and handle errs
+        discover_source(PathBuf::from(src).as_path()).unwrap_or(vec![])
+    }).flatten().for_each(|src| {
+        let compilation_occurred = src.compile(&build_flags, &build_config, &mut compdb,  &module_path)
+            .inspect_err(|e| cu::error!("Failed to compile! {:?}", e)).unwrap();
+        compiler_did_something = compiler_did_something || compilation_occurred;
+    });
 
     cu::info!("linking!");
     
@@ -257,10 +247,15 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
         rust_crate.get_output_path(&config.module.target).expect("Failed to get rust crate output path!")
     ]; 
 
-    if let Err(v) = compile::relink(&module_path, &mut compdb, &mut my_compdb, &libs, &config.module, &build_flags) {
-        cu::info!("Error during linking: {:?}", v);
-    } 
-    my_compdb.save();
+    let link_result = compile::relink(&module_path, &mut compdb,  &libs, &config.module, &build_flags, compiler_did_something);
+    if let Err(e) = link_result {
+        cu::info!("Error during linking: {:?}", e);
+    } else if let Ok(did_relink) = link_result && !did_relink {
+        cu::info!("Skipping relinking.");
+    }
+
+    let _ = compdb.save(&compdb_path).inspect_err(|e| cu::error!("Failed to save compdb.cache! {}", e));
+    let _ = compdb.save_command_log(&command_log_path).inspect_err(|e| cu::error!("Failed to save command log! {}", e));
 
     Ok(())
 }
