@@ -242,12 +242,8 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     });
 
     cu::info!("linking!");
-    
-    let libs = vec![
-        rust_crate.get_output_path(&config.module.target).expect("Failed to get rust crate output path!")
-    ]; 
 
-    let link_result = compile::relink(&module_path, &mut compdb,  &libs, &config.module, &build_flags, compiler_did_something);
+    let link_result = compile::relink(&module_path, &mut compdb,  &config.module, &build_flags, &build_config, compiler_did_something);
     if let Err(e) = link_result {
         cu::info!("Error during linking: {:?}", e);
     } else if let Ok(did_relink) = link_result && !did_relink {

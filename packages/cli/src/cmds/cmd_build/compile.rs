@@ -41,6 +41,7 @@ impl CompileDB {
                 CompileRecord::Link(link_command) => link_command.command(),
             }
         }).collect::<Vec<_>>().join("\n");
+        let content = content + "\n";
         file.write(content.as_bytes())?;
         Ok(())
     }
@@ -318,9 +319,9 @@ fn is_file_obj(path: &cu::fs::DirEntry) -> bool {
 pub fn relink(
     module_path: &PathBuf,
     compile_db: &mut CompileDB,
-    libraries: &Vec<PathBuf>,
     module: &Module,
     flags: &Flags,
+    build: &Build,
     compilation_occurred: bool
 ) -> cu::Result<bool> {
     // Returns: whether linking was performed
@@ -334,7 +335,30 @@ pub fn relink(
 
     let output_arg = ["-o".to_string(), elf_path.display().to_string()];
     let mut args = flags.ldflags.clone();
-    args.extend(libraries.iter().map(|lib| lib.canonicalize().unwrap().display().to_string()));
+
+    let linker_args: Vec<Vec<String>> = vec![&build.libraries, &build.libpaths, &build.ldscripts].iter().map(|paths| {
+        paths.iter().filter_map(|path| {
+            match PathBuf::from(path).canonicalize() {
+                Ok(abs_path) => Some(abs_path.display().to_string()),
+                Err(e) => {
+                    cu::error!("Error when building link flags. Failed to canonicalize path to {}. Error: {}", path, e);
+                    None
+                },
+            }
+        }).collect()
+    }).collect();
+
+    let libraries = linker_args[0].clone();
+    let libpaths: Vec<String> = linker_args[1].iter().map(|lp| {
+        format!("-L{}", lp)
+    }).collect();
+    let ldscripts: Vec<String> = linker_args[2].iter().map(|lp| {
+        format!("-T{}", lp)
+    }).collect();
+
+    args.extend(ldscripts);
+    args.extend(libpaths);
+    args.extend(libraries);
     args.extend(obj_files);
     args.extend(output_arg);
     let cxx = env.cxx_path();
@@ -342,7 +366,7 @@ pub fn relink(
     let link_cmd = LinkCommand::new(cxx, &args);
     let old_link_cmd: Option<&LinkCommand> = compile_db.commands.iter().find_map(|cmd| -> Option<&LinkCommand> { 
         match cmd {
-            CompileRecord::Compile(compile_command) => None,
+            CompileRecord::Compile(_) => None,
             CompileRecord::Link(link_command) => Some(link_command),
         }
     });
