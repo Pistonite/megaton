@@ -39,7 +39,7 @@ mod scan;
 // }
 use scan::discover_source;
 
-use crate::cmds::cmd_build::compile::CompileDB;
+use crate::cmds::cmd_build::compile::{CompileDB, build_nso};
 
 // A rust crate that will be built as a component of the megaton lib or the mod
 #[allow(dead_code)]
@@ -242,12 +242,18 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     });
 
     cu::info!("linking!");
-
     let link_result = compile::relink(&module_path, &mut compdb,  &config.module, &build_flags, &build_config, compiler_did_something);
+    let link_succeeded = link_result.is_ok();
     if let Err(e) = link_result {
         cu::info!("Error during linking: {:?}", e);
     } else if let Ok(did_relink) = link_result && !did_relink {
         cu::info!("Skipping relinking.");
+    }
+
+    if link_succeeded {
+        let elf_path = module_path.join(format!("{}.elf",&config.module.name));
+        let nso_path = module_path.join(format!("{}.nso",&config.module.name));
+        let _ = build_nso(&elf_path, &nso_path).inspect_err(|e| cu::error!("Failed to build NSO: {}", e));
     }
 
     let _ = compdb.save(&compdb_path).inspect_err(|e| cu::error!("Failed to save compdb.cache! {}", e));

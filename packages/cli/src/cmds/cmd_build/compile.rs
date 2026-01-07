@@ -3,12 +3,12 @@
 
 // This modules handles compiling c/c++/asm/rust code
 use std::{
-    collections::BTreeMap, io::Write, iter::Zip, path::{Path, PathBuf}
+    io::Write, path::{Path, PathBuf}
 };
 
 use cu::pre::*;
 
-use super::{Flags, RustCrate};
+use super::Flags;
 use crate::{cmds::cmd_build::config::{Build, Module}, env::environment};
 
 #[derive(Serialize, Deserialize, Default)]
@@ -389,6 +389,28 @@ pub fn relink(
     Ok(true)
 }
 
+pub fn build_nso(elf_path: &PathBuf, nso_path: &PathBuf) -> cu::Result<()> {
+    let elf2nso = environment().elf2nso_path();
+
+    let command = elf2nso.command()
+        .args(
+            [elf_path, nso_path],
+        )
+        .stdin_null()
+        .stdoe(cu::pio::spinner("Building NSO").info())
+        .spawn()
+        .context("Failed to build NSO!")?
+        .0;
+
+    let result = command.wait()?;
+    match result.success() {
+        true => Ok(()),
+        false => Err(cu::Error::msg(format!("Failed to build NSO with exit code {}", result.code().unwrap_or_else(|| {
+            cu::error!("Failed to get exit code!");
+            -1
+        })))),
+    }
+}
 
 #[cfg(test)]
 mod tests {

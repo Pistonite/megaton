@@ -56,6 +56,9 @@ impl Environment {
     pub fn asm_path(&self) -> &Path {
         &self.asm
     }
+    pub fn elf2nso_path(&self) -> &Path {
+        &self.elf2nso
+    }
 }
 
 static ENVIRONMENT: OnceLock<Environment> = OnceLock::new();
