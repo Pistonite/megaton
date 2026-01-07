@@ -173,6 +173,16 @@ impl CmdBuild {
 //       - <module>.nso
 //       - ...: other output files and caches
 
+fn unpack_lib() -> cu::Result<()> {
+    // TODO
+    Ok(())
+}
+
+fn build_lib() -> cu::Result<()> {
+    //TODO:
+    Ok(())
+}
+
 fn run_build(args: CmdBuild) -> cu::Result<()> {
     // Load config stuff
     let config = config::load_config(&args.config).context("failed to load config")?;
@@ -216,7 +226,7 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let rust_changed = rust_crate.got_built;
 
     cu::info!("Generating cxx bridge src!");
-    generate_cxx_bridge_src(rust_crate, &module_path)?;
+    generate_cxx_bridge_src(&rust_crate, &module_path)?;
 
     let mut compiler_did_something = false;
     build_config
