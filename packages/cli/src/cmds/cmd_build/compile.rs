@@ -6,10 +6,10 @@ use std::{
     io::Write, path::{Path, PathBuf}
 };
 
-use cu::pre::*;
+use cu::{lib, pre::*};
 
 use super::Flags;
-use crate::{cmds::cmd_build::config::{Build, Module}, env::environment};
+use crate::{cmds::cmd_build::{BTArtifacts, config::{Build, Module}}, env::environment};
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct CompileDB {
@@ -178,10 +178,9 @@ impl SourceFile {
         flags: &Flags,
         build: &Build,
         compile_db: &mut CompileDB,
-        module_path: &Path,
+        bt_artifacts: &BTArtifacts,
     ) -> cu::Result<bool> {
-        let output_path = module_path
-            .join("o");
+        let output_path = &bt_artifacts.module_obj;
         if !output_path.exists() {
             cu::fs::make_dir(&output_path).unwrap();
             cu::info!("Output path {:?} exists={}", &output_path, &output_path.exists());
@@ -317,7 +316,7 @@ fn is_file_obj(path: &cu::fs::DirEntry) -> bool {
 }
 
 pub fn relink(
-    module_path: &PathBuf,
+    bt_artifacts: &BTArtifacts,
     compile_db: &mut CompileDB,
     module: &Module,
     flags: &Flags,
@@ -325,18 +324,23 @@ pub fn relink(
     compilation_occurred: bool
 ) -> cu::Result<bool> {
     // Returns: whether linking was performed
-
-    let elf_name = format!("{}.elf",module.name);
-    let elf_path = module_path.join(elf_name);
-    
-    let obj_files: Vec<String> = get_obj_files_in(module_path)
-        .iter().map(|o| o.display().to_string()).collect(); // scan target folder (BuildConfig)
     let env = environment();
-
-    let output_arg = ["-o".to_string(), elf_path.display().to_string()];
+    
+    let mod_objs: Vec<String> = get_obj_files_in(&bt_artifacts.module_root)
+        .iter().map(|o| o.display().to_string()).collect(); // scan target folder (BuildConfig)
+    // TODO: Unpack lib
+    // let lib_objs: Vec<String> = get_obj_files_in(&bt_artifacts.lib_obj)
+    //     .iter().map(|o| o.display().to_string()).collect();
+    let lib_objs = vec![];
+    let output_arg = ["-o".to_string(), bt_artifacts.elf_path.display().to_string()];
+    
     let mut args = flags.ldflags.clone();
+    let mut ldscripts = build.ldscripts.clone();
+    
+    let main_ldscript_path = bt_artifacts.lib_linkldscript.canonicalize().unwrap().display().to_string();
+    ldscripts.push(main_ldscript_path);
 
-    let linker_args: Vec<Vec<String>> = vec![&build.libraries, &build.libpaths, &build.ldscripts].iter().map(|paths| {
+    let linker_args: Vec<Vec<String>> = vec![&build.libraries, &build.libpaths, &ldscripts].iter().map(|paths| {
         paths.iter().filter_map(|path| {
             match PathBuf::from(path).canonicalize() {
                 Ok(abs_path) => Some(abs_path.display().to_string()),
@@ -353,13 +357,14 @@ pub fn relink(
         format!("-L{}", lp)
     }).collect();
     let ldscripts: Vec<String> = linker_args[2].iter().map(|lp| {
-        format!("-T{}", lp)
+        format!("-Wl,-T,{}", lp)
     }).collect();
 
     args.extend(ldscripts);
     args.extend(libpaths);
     args.extend(libraries);
-    args.extend(obj_files);
+    args.extend(mod_objs);
+    args.extend(lib_objs);
     args.extend(output_arg);
     let cxx = env.cxx_path();
     

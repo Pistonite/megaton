@@ -14,6 +14,11 @@ mod config;
 mod generate;
 mod scan;
 
+use scan::discover_source;
+
+use crate::cmds::cmd_build::compile::{CompileDB, build_nso};
+
+
 // use scan::{discover_crates, discover_source};
 
 // A source file that can be compiled into a .o file
@@ -37,10 +42,86 @@ mod scan;
 //         }
 //     }
 // }
-use scan::discover_source;
 
-use crate::cmds::cmd_build::compile::{CompileDB, build_nso};
+// <target>/megaton
+//   - <profile>/: per-profile build files
+//     - lib/: where megaton emits it's own library file and build files
+//       - include/: megaton's include path
+//         - rust/cxx.h: header from cxxbridge
+//         - megaton/: megaton headers
+//       - src/: megaton's C/C++/S/RS source files
+//          -abi  
+//          -lib 
+//          -nx 
+//          -sys
+//          -cxxbridge
+//       - o/
+//       - dep/*: megaton's dependent Rust crates
+//       - Cargo.toml: generate Cargo.toml workspace shim (this needs a [workspace] section)
+//      
+//     - <module>/: per-module build files
+//       - include/: generated header files
+//         - rust/cxx.h:
+//       - src/cxxbridge:
+//       - o/: output object files
+//       - <module>.elf
+//       - <module>.nso
+//       - ...: other output files and caches
 
+
+struct BTArtifacts {
+    root: PathBuf,
+    profile: String,
+    module: String,
+    
+    module_root: PathBuf,
+    module_obj: PathBuf, // module/o
+    module_src: PathBuf,
+    module_include: PathBuf,
+    module_cxxbridge_src: PathBuf,
+    module_cxxbridge_include: PathBuf,
+    elf_path: PathBuf,
+    nso_path: PathBuf,
+    
+    lib_root: PathBuf,
+    lib_obj: PathBuf,
+    lib_src: PathBuf,
+    lib_include: PathBuf,
+    lib_linkldscript: PathBuf,
+
+    compdb_path: PathBuf,
+    command_log_path: PathBuf
+    // lib_staticlib: PathBuf, // lib/libmegaton.a
+}
+
+impl BTArtifacts {
+    pub fn new(root_path: PathBuf, module_name: &str, profile_name: &str) -> Self {
+        let profile_root = root_path.join(profile_name);
+        let module_root = profile_root.join(module_name);
+        let lib_root = profile_root.join("lib");
+        let lib_src = lib_root.join("src");
+        
+        Self { root: root_path.clone(), module: module_name.to_owned(), profile: profile_name.to_owned(),
+            module_root: module_root.clone(),
+            module_obj: module_root.join("o"),
+            module_src: module_root.join("src"),
+            module_include: module_root.join("include"),
+            module_cxxbridge_include: module_root.join("include").join("cxxbridge"),
+            module_cxxbridge_src: module_root.join("src").join("cxxbridge"),
+            elf_path: module_root.join(format!("{}.elf", module_name)),
+            nso_path: module_root.join(format!("{}.nso", module_name)),
+
+            lib_root: lib_root.clone(),
+            lib_obj: lib_root.join("o"),
+            lib_src: lib_src.clone(),
+            lib_include: lib_root.join("include"),
+            lib_linkldscript: lib_src.join("sys").join("link.ld"),
+
+            compdb_path: profile_root.join("compdb.cache"),
+            command_log_path: profile_root.join("command_log.txt")
+        }
+    }
+}
 // A rust crate that will be built as a component of the megaton lib or the mod
 #[allow(dead_code)]
 struct RustCrate {
@@ -154,25 +235,6 @@ impl CmdBuild {
     }
 }
 
-// <target>/megaton
-//   - <profile>/: per-profile build files
-//     - lib/: where megaton emits it's own library file and build files
-//       - include/: megaton's include path
-//         - rust/cxx.h: header from cxxbridge
-//         - megaton/: megaton headers
-//       - src/: megaton's C/C++/S/RS source files
-//         - cxxbridge/:
-//       - dep/*: megaton's dependent Rust crates
-//       - Cargo.toml: generate Cargo.toml workspace shim (this needs a [workspace] section)
-//     - <module>/: per-module build files
-//       - include/: generated header files
-//         - rust/cxx.h:
-//       - src/cxxbridge:
-//       - o/: output object files
-//       - <module>.elf
-//       - <module>.nso
-//       - ...: other output files and caches
-
 fn unpack_lib() -> cu::Result<()> {
     // TODO
     Ok(())
@@ -203,21 +265,18 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let mut build_flags = Flags::from_config(&build_config.flags);
     cu::debug!("build flags: {build_flags:#?}");
 
-    let megaton_path = config.module.target.join(PathBuf::from("megaton"));
-    let profile_path = megaton_path.join(PathBuf::from(profile));
-    let compdb_path = profile_path.join(PathBuf::from("compdb.cache"));
-    let command_log_path = profile_path.join(PathBuf::from("command_log.txt"));
-    let module_path = profile_path.join(PathBuf::from(&config.module.name));
-    cu::fs::make_dir(&module_path)?;
+    let megaton_root = config.module.target.join("megaton");
+    cu::fs::make_dir(&megaton_root)?;
+    let bt_artifacts = BTArtifacts::new(megaton_root.canonicalize().unwrap(), &config.module.name, profile);
+    cu::fs::make_dir(&bt_artifacts.module_root)?;
 
     cu::info!("Reading CompileDB");
-    let mut compdb: CompileDB = if !compdb_path.exists() {
-        cu::info!("{}", compdb_path.display());
-        File::create(&compdb_path)?;
+    let mut compdb: CompileDB = if !bt_artifacts.compdb_path.exists() {
+        File::create(&bt_artifacts.compdb_path)?;
         CompileDB::default()
     } else {
         json::read(
-            cu::fs::read(&compdb_path)
+            cu::fs::read(&bt_artifacts.compdb_path)
                 .context("Failed to read compdb.cache")?
                 .as_slice(),
         )
@@ -229,20 +288,25 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let rust_changed = rust_crate.got_built;
 
     cu::info!("Generating cxx bridge src!");
-    generate_cxx_bridge_src(&rust_crate, &module_path)?;
+    generate_cxx_bridge_src(&rust_crate, &bt_artifacts)?;
 
     let mut compiler_did_something = false;
-    build_config.sources.iter().map(|src| {
+    let mut sources = build_config.sources.clone();
+    sources.push(bt_artifacts.module_cxxbridge_src.display().to_string());
+
+    cu::info!("Sources: {:#?}", sources);
+
+    sources.iter().map(|src| {
         // todo: inspect and handle errs
         discover_source(PathBuf::from(src).as_path()).unwrap_or(vec![])
     }).flatten().for_each(|src| {
-        let compilation_occurred = src.compile(&build_flags, &build_config, &mut compdb,  &module_path)
+        let compilation_occurred = src.compile(&build_flags, &build_config, &mut compdb,  &bt_artifacts)
             .inspect_err(|e| cu::error!("Failed to compile! {:?}", e)).unwrap();
         compiler_did_something = compiler_did_something || compilation_occurred;
     });
 
     cu::info!("linking!");
-    let link_result = compile::relink(&module_path, &mut compdb,  &config.module, &build_flags, &build_config, compiler_did_something);
+    let link_result = compile::relink(&bt_artifacts, &mut compdb,  &config.module, &build_flags, &build_config, compiler_did_something);
     let link_succeeded = link_result.is_ok();
     if let Err(e) = link_result {
         cu::info!("Error during linking: {:?}", e);
@@ -251,13 +315,13 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     }
 
     if link_succeeded {
-        let elf_path = module_path.join(format!("{}.elf",&config.module.name));
-        let nso_path = module_path.join(format!("{}.nso",&config.module.name));
+        let elf_path = bt_artifacts.module_root.join(format!("{}.elf",&config.module.name));
+        let nso_path = bt_artifacts.module_root.join(format!("{}.nso",&config.module.name));
         let _ = build_nso(&elf_path, &nso_path).inspect_err(|e| cu::error!("Failed to build NSO: {}", e));
     }
 
-    let _ = compdb.save(&compdb_path).inspect_err(|e| cu::error!("Failed to save compdb.cache! {}", e));
-    let _ = compdb.save_command_log(&command_log_path).inspect_err(|e| cu::error!("Failed to save command log! {}", e));
+    let _ = compdb.save(&bt_artifacts.compdb_path).inspect_err(|e| cu::error!("Failed to save compdb.cache! {}", e));
+    let _ = compdb.save_command_log(&bt_artifacts.command_log_path).inspect_err(|e| cu::error!("Failed to save command log! {}", e));
 
     Ok(())
 }
