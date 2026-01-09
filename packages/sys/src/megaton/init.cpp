@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2025 Megaton contributors
+// Copyright (c) 2025-2026 Megaton contributors
 // * * * * *
 // Parts of this file was taken from the exlaunch project and modified.
 // See original license information below

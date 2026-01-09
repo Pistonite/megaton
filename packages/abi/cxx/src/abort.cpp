@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2025 Megaton contributors
+// Copyright (c) 2025-2026 Megaton contributors
 
 // #include <toolkit/tcp.hpp>
 //
