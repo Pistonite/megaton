@@ -5,10 +5,7 @@ edition = "2024"
 
 [lib]
 crate-type = ["staticlib"]
+panic = "abort"
 
 [dependencies]
 cxx = "1.0.186"
-
-[dependencies.abi]
-package = "megaton-abi"
-path = "../../abi/rs"
