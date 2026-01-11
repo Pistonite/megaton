@@ -24,6 +24,10 @@ depfile = "0.1.1"
 workspace = true
 features = ["process"]
 
+[build-dependencies]
+flate2 = "1.1.2"
+tar = "0.4.44"
+
 
 [[bin]]
 name = "megaton"
