@@ -216,7 +216,7 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let rust_changed = rust_crate.got_built;
 
     cu::info!("Generating cxx bridge src!");
-    generate_cxx_bridge_src(rust_crate, &module_path)?;
+    generate_cxx_bridge_src(&rust_crate, &module_path)?;
 
     let mut compiler_did_something = false;
     build_config
