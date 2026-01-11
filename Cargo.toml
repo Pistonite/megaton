@@ -2,9 +2,13 @@
 resolver = "2"
 members = [
     "packages/cli", 
+<<<<<<< Updated upstream
     "packages/abi/rs",
     "packages/lib/rs",
     "packages/nx/rs", "packages/lib",
+=======
+    "packages/lib",
+>>>>>>> Stashed changes
 ]
 
 [workspace.dependencies]
