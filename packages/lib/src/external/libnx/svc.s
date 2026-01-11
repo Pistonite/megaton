@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: ISC
-// Copyright (c) 2022 libnx Authors
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2022-2026 Megaton contributors
 
 .macro SVC_BEGIN name
 	.section .text.\name, "ax", %progbits

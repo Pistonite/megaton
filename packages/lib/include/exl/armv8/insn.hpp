@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 Megaton contributors
+
 #pragma once
 #include <megaton/prelude.h>
 

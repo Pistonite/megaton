@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 Megaton contributors
+
 #pragma once
 
 #include <exl/armv8/inst/opx1x0/load_store_register_unsigned_immediate.hpp>

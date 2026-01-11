@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 Megaton contributors
+
 #pragma once
 
 #include <exl/armv8/inst/op100x/add_sub_imm.hpp>
