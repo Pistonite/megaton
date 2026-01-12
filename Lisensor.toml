@@ -4,7 +4,8 @@
 "packages/lib/**/*.cpp" = "GPL-3.0-or-later"
 "packages/lib/**/*.hpp" = "GPL-3.0-or-later"
 "packages/lib/**/*.h" = "GPL-3.0-or-later"
-"packages/lib/**/*.s" = "GPL-3.0-or-later"
+"packages/lib/src/megaton/*.s" = "GPL-3.0-or-later"
+"packages/lib/src/nximpl/*.s" = "GPL-3.0-or-later"
 
 # Rust files
 "packages/lib/**/*.rs" = "GPL-3.0-or-later"
