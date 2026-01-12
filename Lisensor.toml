@@ -1,29 +1,14 @@
 ["Megaton contributors"]
 # C files
-"packages/sys/include/megaton/**/*" = "GPL-3.0-or-later"
-"packages/sys/src/nximpl/**/*.s" = "GPL-3.0-or-later"
-"packages/sys/src/nximpl/**/*.cpp" = "GPL-3.0-or-later"
-"packages/sys/src/nximpl/**/*.c" = "GPL-3.0-or-later"
-"packages/sys/src/megaton/**/*.s" = "GPL-3.0-or-later"
-"packages/sys/src/megaton/**/*.cpp" = "GPL-3.0-or-later"
-"packages/sys/src/megaton/**/*.c" = "GPL-3.0-or-later"
-"packages/nx/cxx/**/*.c" = "GPL-3.0-or-later"
-"packages/lib/cxx/**/*.c" = "GPL-3.0-or-later"
-"packages/abi/cxx/**/*.c" = "GPL-3.0-or-later"
-"packages/nx/cxx/**/*.cpp" = "GPL-3.0-or-later"
-"packages/lib/cxx/**/*.cpp" = "GPL-3.0-or-later"
-"packages/abi/cxx/**/*.cpp" = "GPL-3.0-or-later"
-"packages/nx/cxx/**/*.hpp" = "GPL-3.0-or-later"
-"packages/lib/cxx/**/*.hpp" = "GPL-3.0-or-later"
-"packages/abi/cxx/**/*.hpp" = "GPL-3.0-or-later"
-"packages/nx/cxx/**/*.h" = "GPL-3.0-or-later"
-"packages/lib/cxx/**/*.h" = "GPL-3.0-or-later"
-"packages/abi/cxx/**/*.h" = "GPL-3.0-or-later"
+"packages/lib/**/*.c" = "GPL-3.0-or-later"
+"packages/lib/**/*.cpp" = "GPL-3.0-or-later"
+"packages/lib/**/*.hpp" = "GPL-3.0-or-later"
+"packages/lib/**/*.h" = "GPL-3.0-or-later"
+"packages/lib/src/megaton/*.s" = "GPL-3.0-or-later"
+"packages/lib/src/nximpl/*.s" = "GPL-3.0-or-later"
 
 # Rust files
-"packages/nx/rs/**/*.rs" = "GPL-3.0-or-later"
-"packages/lib/rs/**/*.rs" = "GPL-3.0-or-later"
-"packages/abi/rs/**/*.rs" = "GPL-3.0-or-later"
+"packages/lib/**/*.rs" = "GPL-3.0-or-later"
 "packages/cli/**/*.rs" = "MIT"
 
 # Unmodified files
