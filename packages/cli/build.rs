@@ -37,21 +37,19 @@ fn make_lib_targz() -> cu::Result<()> {
         builder
     };
 
-    let library_packages = vec!["lib", "abi", "nx", "sys"];
-    for package_name in library_packages {
-        let package_path = {
+        let lib_path = {
             let mut path = crate_path.parent_abs()?;
-            path.push(package_name);
+            path.push("lib");
             path
         };
-        let mut walk = cu::fs::walk(&package_path)?;
+        let mut walk = cu::fs::walk(&lib_path)?;
         while let Some(entry) = walk.next() {
             let entry = entry?;
             let entry_path = entry.path();
             if !entry_path.is_file() {
                 continue;
             }
-            let rel_path = entry_path.try_to_rel_from(&package_path.parent_abs()?);
+            let rel_path = entry_path.try_to_rel_from(&lib_path);
             cu::ensure!(
                 rel_path.is_relative(),
                 "not relative: {}",
@@ -65,7 +63,6 @@ fn make_lib_targz() -> cu::Result<()> {
             println!("cargo::rerun-if-changed={}", entry_path.as_utf8()?);
             tar_builder.append_file(&rel_path, &mut file)?;
         }
-    }
     tar_builder.into_inner()?.finish()?.flush()?;
     Ok(())
 }
