@@ -325,7 +325,7 @@ pub fn relink(
 ) -> cu::Result<bool> {
     // Returns: whether linking was performed
     let env = environment();
-    
+
     let mod_objs: Vec<String> = get_obj_files_in(&bt_artifacts.module_root)
         .iter().map(|o| o.display().to_string()).collect(); // scan target folder (BuildConfig)
     // TODO: Unpack lib
@@ -336,7 +336,7 @@ pub fn relink(
     
     let mut args = flags.ldflags.clone();
     let mut ldscripts = build.ldscripts.clone();
-    
+
     let main_ldscript_path = bt_artifacts.lib_linkldscript.canonicalize().unwrap().display().to_string();
     ldscripts.push(main_ldscript_path);
 
@@ -359,6 +359,12 @@ pub fn relink(
     let ldscripts: Vec<String> = linker_args[2].iter().map(|lp| {
         format!("-Wl,-T,{}", lp)
     }).collect();
+
+
+    let verfile_path = &bt_artifacts.verfile_path;
+    let entrypoint = "__module_start";
+    create_verfile(verfile_path, entrypoint)?;
+    args.push(format!("-Wl,--version-script={}", verfile_path.display().to_string()));
 
     args.extend(ldscripts);
     args.extend(libpaths);
@@ -415,6 +421,21 @@ pub fn build_nso(elf_path: &PathBuf, nso_path: &PathBuf) -> cu::Result<()> {
             -1
         })))),
     }
+}
+
+fn create_verfile(verfile: &PathBuf, entry: &str) -> cu::Result<()> {
+    cu::debug!("creating verfile");
+    let verfile_before = "{\n\tglobal:\n";
+    let verfile_after = ";\n\tlocal: *;\n};";
+    let verfile_data = format!(
+        "{}{}{}",
+        verfile_before,
+        entry,
+        verfile_after
+    );
+    cu::fs::write(verfile, &verfile_data)?;
+    cu::debug!("Created verfile");
+    Ok(())
 }
 
 #[cfg(test)]

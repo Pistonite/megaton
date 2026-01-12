@@ -80,6 +80,7 @@ struct BTArtifacts {
     lib_src: PathBuf,
     lib_include: PathBuf,
     lib_linkldscript: PathBuf,
+    verfile_path: PathBuf,
 
     compdb_path: PathBuf,
     command_log_path: PathBuf, // lib_staticlib: PathBuf, // lib/libmegaton.a
@@ -109,7 +110,8 @@ impl BTArtifacts {
             lib_obj: lib_root.join("o"),
             lib_src: lib_src.clone(),
             lib_include: lib_root.join("include"),
-            lib_linkldscript: lib_src.join("sys").join("link.ld"),
+            lib_linkldscript: lib_root.join("rt").join("link.ld"),
+            verfile_path: lib_root.join("verfile"),
 
             compdb_path: profile_root.join("compdb.cache"),
             command_log_path: profile_root.join("command_log.txt"),
