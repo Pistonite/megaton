@@ -83,7 +83,7 @@ impl CompileCommand {
         out_file: &Path,
         dep_file: &Path,
         flags: &Vec<String>,
-        build_config: &Build,
+        includes: Vec<String>,
     ) -> cu::Result<Self> {
         let mut argv = flags.clone();
         argv.push("-MMD".to_owned());
@@ -91,7 +91,7 @@ impl CompileCommand {
         argv.push("-MF".to_owned());
         argv.push(dep_file.as_utf8()?.to_string());
 
-        let mut includes = build_config.includes.clone();
+        let mut includes = includes;
         includes.extend(vec!["/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/15.1.0".to_owned(),
                             "/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/15.1.0/aarch64-none-elf".to_owned(),
                             "/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/15.1.0/backward".to_owned(),
@@ -176,11 +176,10 @@ impl SourceFile {
     pub fn compile(
         &self,
         flags: &Flags,
-        build: &Build,
+        includes: Vec<String>,
         compile_db: &mut CompileDB,
-        bt_artifacts: &BTArtifacts,
+        output_path: &PathBuf,
     ) -> cu::Result<bool> {
-        let output_path = &bt_artifacts.module_obj;
         if !output_path.exists() {
             cu::fs::make_dir(&output_path).unwrap();
             cu::info!("Output path {:?} exists={}", &output_path, &output_path.exists());
@@ -197,7 +196,7 @@ impl SourceFile {
         };
 
         let comp_command =
-            CompileCommand::new(comp_path, &self.path, &o_path, &d_path, &comp_flags, build)?;
+            CompileCommand::new(comp_path, &self.path, &o_path, &d_path, &comp_flags, includes)?;
 
         compile_db.update(CompileRecord::Compile(comp_command.clone()));
 
@@ -209,7 +208,9 @@ impl SourceFile {
             comp_command.execute()?;
 
             cu::fs::set_mtime(o_path, src_time)?;
-            cu::fs::set_mtime(d_path, src_time)?;
+            if d_path.exists() {
+                cu::fs::set_mtime(d_path, src_time)?;
+            }
             Ok(true)
             // compile_db.update(comp_command)?;            
         } else {
