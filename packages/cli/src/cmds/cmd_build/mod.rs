@@ -78,6 +78,7 @@ struct BTArtifacts {
     lib_root: PathBuf,
     lib_obj: PathBuf,
     lib_src: PathBuf,
+    lib_rt: PathBuf,
     lib_include: PathBuf,
     lib_linkldscript: PathBuf,
     verfile_path: PathBuf,
@@ -109,6 +110,7 @@ impl BTArtifacts {
             lib_root: lib_root.clone(),
             lib_obj: lib_root.join("o"),
             lib_src: lib_src.clone(),
+            lib_rt: lib_root.clone().join("rt"),
             lib_include: lib_root.join("include"),
             lib_linkldscript: lib_root.join("rt").join("link.ld"),
             verfile_path: lib_root.join("verfile"),
@@ -236,9 +238,49 @@ fn unpack_lib(lib_root_path: &Path) -> cu::Result<()> {
     Ok(())
 }
 
-fn build_lib() -> cu::Result<()> {
-    //TODO:
-    Ok(())
+impl Flags {
+    fn add_c_cpp_flags(&self, new_flags: Vec<String>) -> Self {
+        let mut flags = self.clone();
+        flags.cflags.extend(new_flags.clone());
+        flags.cxxflags.extend(new_flags);
+        return flags;
+    }
+}
+
+fn build_lib(config: &config::Config, build_flags: &Flags, btart: &BTArtifacts, compdb: &mut CompileDB) -> cu::Result<bool> {
+    // build lib
+    let mut compiler_did_something = false;
+    let lib_build_flags = build_flags.add_c_cpp_flags(vec!["-DMEGATON_LIB".to_string()]);
+    discover_source(btart.lib_src.as_path()).unwrap_or(vec![])
+        .iter()
+        .for_each(|src| {
+            let compilation_occurred = src
+                .compile(&lib_build_flags, vec![btart.lib_include.display().to_string(), String::from("/opt/devkitpro/libnx/include/")], compdb, &btart.lib_obj)
+                .inspect_err(|e| cu::error!("Failed to compile! {:?}", e))
+                .unwrap();
+            compiler_did_something = compiler_did_something || compilation_occurred;
+        });
+    // build rt
+    let module_name = format!("-D MEGART_NX_MODULE_NAME={:?}", config.module.name);
+    let module_name_len = format!("-D MEGART_NX_MODULE_NAME_LEN={:?}", module_name.len());
+    let title_id = format!("-D MEGART_TITLE_ID={:?}", config.module.title_id);
+    let title_id_hex = format!("-D MEGART_TITLE_ID_HEX={:016x}", config.module.title_id);
+    let mut rt_build_flags = vec![module_name, module_name_len, title_id, title_id_hex];
+    if config.cargo.enabled {
+        rt_build_flags.push("-DMEGART_RUST".to_string());
+        rt_build_flags.push("-DMEGART_RUST_MAIN".to_string());
+    }
+    let rt_build_flags = build_flags.add_c_cpp_flags(rt_build_flags);
+    discover_source(btart.lib_rt.as_path()).unwrap_or(vec![])
+        .iter()
+        .for_each(|src| {
+            let compilation_occurred = src
+                .compile(&rt_build_flags, vec![btart.lib_include.display().to_string()], compdb, &btart.lib_obj)
+                .inspect_err(|e| cu::error!("Failed to compile! {:?}", e))
+                .unwrap();
+            compiler_did_something = compiler_did_something || compilation_occurred;
+        });
+    Ok(compiler_did_something)
 }
 
 fn run_build(args: CmdBuild) -> cu::Result<()> {
@@ -272,7 +314,6 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     // Build Library
     cu::fs::make_dir(&bt_artifacts.lib_root)?;
     unpack_lib(&bt_artifacts.lib_root).context("Failed to unpack library")?;
-    build_lib().context("Failed to build library")?;
 
     cu::fs::make_dir(&bt_artifacts.module_root)?;
 
@@ -289,6 +330,10 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
         .unwrap_or_default()
     };
 
+    let mut compiler_did_something = if config.megaton.library {
+        build_lib(&config, &build_flags, &bt_artifacts, &mut compdb).context("Failed to build library")?
+    } else {false};
+    
     let mut rust_crate = RustCrate::new(PathBuf::from(config.cargo.manifest.unwrap()));
     rust_crate.build(&build_config, &build_flags).unwrap();
     let rust_changed = rust_crate.got_built;
@@ -296,7 +341,6 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     cu::info!("Generating cxx bridge src!");
     generate_cxx_bridge_src(&rust_crate, &bt_artifacts)?;
 
-    let mut compiler_did_something = false;
     let mut sources = build_config.sources.clone();
     sources.push(bt_artifacts.module_cxxbridge_src.display().to_string());
 
@@ -311,7 +355,7 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
         .flatten()
         .for_each(|src| {
             let compilation_occurred = src
-                .compile(&build_flags, &build_config, &mut compdb, &bt_artifacts)
+                .compile(&build_flags, build_config.includes.clone(), &mut compdb, &bt_artifacts.module_obj)
                 .inspect_err(|e| cu::error!("Failed to compile! {:?}", e))
                 .unwrap();
             compiler_did_something = compiler_did_something || compilation_occurred;
