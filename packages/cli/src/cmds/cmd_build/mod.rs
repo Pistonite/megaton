@@ -134,7 +134,7 @@ impl RustCrate {
                 .clone()
                 .canonicalize()
                 .expect(format!("Could not find Cargo.toml at {:?}", manifest_path).as_str()),
-            got_built: true,
+            got_built: false,
         }
     }
 
@@ -334,15 +334,22 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
         build_lib(&config, &build_flags, &bt_artifacts, &mut compdb).context("Failed to build library")?
     } else {false};
     
-    let mut rust_crate = RustCrate::new(PathBuf::from(config.cargo.manifest.unwrap()));
-    rust_crate.build(&build_config, &build_flags).unwrap();
-    let rust_changed = rust_crate.got_built;
-
-    cu::info!("Generating cxx bridge src!");
-    generate_cxx_bridge_src(&rust_crate, &bt_artifacts)?;
-
     let mut sources = build_config.sources.clone();
-    sources.push(bt_artifacts.module_cxxbridge_src.display().to_string());
+    let mut includes = build_config.includes.clone();
+    includes.push(bt_artifacts.lib_include.display().to_string());
+    includes.push("/opt/devkitpro/libnx/include".to_owned());
+
+    if config.cargo.enabled {
+        let mut rust_crate = RustCrate::new(PathBuf::from(config.cargo.manifest.unwrap()));
+        rust_crate.build(&build_config, &build_flags).unwrap();
+        compiler_did_something = compiler_did_something || rust_crate.got_built;
+
+        cu::info!("Generating cxx bridge src!");
+        generate_cxx_bridge_src(&rust_crate, &bt_artifacts)?;
+
+        sources.push(bt_artifacts.module_cxxbridge_src.display().to_string());
+        includes.push(bt_artifacts.module_cxxbridge_include.display().to_string());
+    }
 
     cu::info!("Sources: {:#?}", sources);
 
@@ -355,7 +362,7 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
         .flatten()
         .for_each(|src| {
             let compilation_occurred = src
-                .compile(&build_flags, build_config.includes.clone(), &mut compdb, &bt_artifacts.module_obj)
+                .compile(&build_flags, includes.clone(), &mut compdb, &bt_artifacts.module_obj)
                 .inspect_err(|e| cu::error!("Failed to compile! {:?}", e))
                 .unwrap();
             compiler_did_something = compiler_did_something || compilation_occurred;
