@@ -514,6 +514,7 @@ dependencies = [
  "flate2",
  "fxhash",
  "pistonite-cu",
+ "regex",
  "serde",
  "tar",
  "walkdir",

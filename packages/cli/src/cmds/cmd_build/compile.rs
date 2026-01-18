@@ -9,7 +9,7 @@ use std::{
 use cu::{lib, pre::*};
 
 use super::Flags;
-use crate::{cmds::cmd_build::{BTArtifacts, config::{Build, Module}}, env::environment};
+use crate::{cmds::cmd_build::{BTArtifacts, config::{Build, Config, Module}}, env::environment};
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct CompileDB {
@@ -102,8 +102,7 @@ impl CompileCommand {
         let includes = includes.iter()
             .filter_map(|i| {
                 let path = PathBuf::from(i);
-                cu::info!("{:?}", path);
-                path.canonicalize().inspect_err(|e| {cu::error!("cant find include {:?}", e)}).ok()
+                path.canonicalize().inspect_err(|e| {cu::error!("cant find include {} {}", path.display(), e)}).ok()
             })
             .map(|i| format!("-I{}", i.as_os_str().to_str().unwrap()))
             .collect::<Vec<String>>();
@@ -115,7 +114,7 @@ impl CompileCommand {
         
         argv.push(src_file.as_utf8()?.to_string());
 
-        cu::info!("Compiler command: \n{} {} {}", &compiler_path.display(), &src_file.display(), &argv.join(" "));
+        cu::trace!("Compiler command: \n{} {} {}", &compiler_path.display(), &src_file.display(), &argv.join(" "));
 
         let src_path = src_file.to_path_buf();
         Ok(Self {
@@ -127,7 +126,7 @@ impl CompileCommand {
     }
 
     fn execute(&self) -> cu::Result<()> {
-        cu::info!("Executing CompileCommand: \n{} {}", &self.compiler.display(), &self.args.join(" "));
+        cu::trace!("Executing CompileCommand: \n{} {}", &self.compiler.display(), &self.args.join(" "));
         let child = cu::CommandBuilder::new(&self.compiler.as_os_str())
             .args(self.args.clone())
             .stdoe(cu::pio::inherit()) // todo: log to file
@@ -299,7 +298,7 @@ fn get_obj_files_in(target: &PathBuf) -> Vec<PathBuf> {
             if ft.is_dir() {
                 result.extend(get_obj_files_in(&path.path()));
             } else if ft.is_file() && is_file_obj(&path) {
-                result.push(path.path());
+                result.push(path.path().canonicalize().unwrap());
             }
         }
     }
@@ -319,27 +318,29 @@ fn is_file_obj(path: &cu::fs::DirEntry) -> bool {
 pub fn relink(
     bt_artifacts: &BTArtifacts,
     compile_db: &mut CompileDB,
-    module: &Module,
+    config: &Config,
     flags: &Flags,
     build: &Build,
-    compilation_occurred: bool
+    rust_staticlib: Option<PathBuf>,
+    compilation_occurred: bool,
 ) -> cu::Result<bool> {
     // Returns: whether linking was performed
     let env = environment();
+    let module = &config.module;
 
     let mod_objs: Vec<String> = get_obj_files_in(&bt_artifacts.module_root)
         .iter().map(|o| o.display().to_string()).collect(); // scan target folder (BuildConfig)
     // TODO: Unpack lib
-    // let lib_objs: Vec<String> = get_obj_files_in(&bt_artifacts.lib_obj)
-    //     .iter().map(|o| o.display().to_string()).collect();
-    let lib_objs = vec![];
+    let lib_objs: Vec<String> = get_obj_files_in(&bt_artifacts.lib_obj)
+        .iter().map(|o| o.display().to_string()).collect();
+    
     let output_arg = ["-o".to_string(), bt_artifacts.elf_path.display().to_string()];
     
     let mut args = flags.ldflags.clone();
     let mut ldscripts = build.ldscripts.clone();
 
     let main_ldscript_path = bt_artifacts.lib_linkldscript.canonicalize().unwrap().display().to_string();
-    ldscripts.push(main_ldscript_path);
+    ldscripts.insert(0,main_ldscript_path);
 
     let linker_args: Vec<Vec<String>> = vec![&build.libraries, &build.libpaths, &ldscripts].iter().map(|paths| {
         paths.iter().filter_map(|path| {
@@ -362,8 +363,9 @@ pub fn relink(
     }).collect();
 
 
+    let entrypoint = &config.megaton.entry.clone().unwrap_or("__megaton_module_entry".to_owned());
+    args.push(format!("-Wl,-init={}", entrypoint));
     let verfile_path = &bt_artifacts.verfile_path;
-    let entrypoint = "__module_start";
     create_verfile(verfile_path, entrypoint)?;
     args.push(format!("-Wl,--version-script={}", verfile_path.display().to_string()));
 
@@ -371,6 +373,9 @@ pub fn relink(
     args.extend(libpaths);
     args.extend(libraries);
     args.extend(mod_objs);
+    if let Some(rust_staticlib_path) = rust_staticlib {
+        args.push(rust_staticlib_path.display().to_string());
+    }
     args.extend(lib_objs);
     args.extend(output_arg);
     let cxx = env.cxx_path();
@@ -397,6 +402,7 @@ pub fn relink(
         .0;
     
     command.wait_nz()?;
+    cu::debug!("Link command: {}", link_cmd.command());
     cu::info!("Linker finished!");
     Ok(true)
 }

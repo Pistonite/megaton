@@ -17,6 +17,7 @@ mod compile;
 mod config;
 mod generate;
 mod scan;
+mod check;
 
 use scan::discover_source;
 
@@ -62,7 +63,8 @@ static LIBRARY_TARGZ: &[u8] = include_bytes!("../../../libmegaton.tar.gz");
 //       - ...: other output files and caches
 
 struct BTArtifacts {
-    root: PathBuf,
+    project_root: PathBuf,
+    target: PathBuf, // ./target/megaton
     profile: String,
     module: String,
 
@@ -88,14 +90,16 @@ struct BTArtifacts {
 }
 
 impl BTArtifacts {
-    pub fn new(root_path: PathBuf, module_name: &str, profile_name: &str) -> Self {
-        let profile_root = root_path.join(profile_name);
+    pub fn new(target_path: PathBuf, module_name: &str, profile_name: &str) -> Self {
+        let megaton_root = target_path.join("megaton");
+        let profile_root = megaton_root.join(profile_name);
         let module_root = profile_root.join(module_name);
         let lib_root = profile_root.join("lib");
         let lib_src = lib_root.join("src");
 
         Self {
-            root: root_path.clone(),
+            project_root: PathBuf::from(".").canonicalize().unwrap(),
+            target: target_path.clone(),
             module: module_name.to_owned(),
             profile: profile_name.to_owned(),
             module_root: module_root.clone(),
@@ -266,10 +270,10 @@ fn build_lib(config: &config::Config, build_flags: &Flags, btart: &BTArtifacts, 
     let title_id = format!("-D MEGART_TITLE_ID={:?}", config.module.title_id);
     let title_id_hex = format!("-D MEGART_TITLE_ID_HEX={:016x}", config.module.title_id);
     let mut rt_build_flags = vec![module_name, module_name_len, title_id, title_id_hex];
-    if config.cargo.enabled {
-        rt_build_flags.push("-DMEGART_RUST".to_string());
-        rt_build_flags.push("-DMEGART_RUST_MAIN".to_string());
-    }
+    // if config.cargo.enabled {
+    //     rt_build_flags.push("-DMEGART_RUST".to_string());
+    //     rt_build_flags.push("-DMEGART_RUST_MAIN".to_string());
+    // }
     let rt_build_flags = build_flags.add_c_cpp_flags(rt_build_flags);
     discover_source(btart.lib_rt.as_path()).unwrap_or(vec![])
         .iter()
@@ -303,10 +307,11 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let mut build_flags = Flags::from_config(&build_config.flags);
     cu::debug!("build flags: {build_flags:#?}");
 
-    let megaton_root = config.module.target.join("megaton");
+    let target = &config.module.target;
+    let megaton_root = target.join("megaton");
     cu::fs::make_dir(&megaton_root)?;
     let bt_artifacts = BTArtifacts::new(
-        megaton_root.canonicalize().unwrap(),
+        target.canonicalize().unwrap(),
         &config.module.name,
         profile,
     );
@@ -339,8 +344,9 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     includes.push(bt_artifacts.lib_include.display().to_string());
     includes.push("/opt/devkitpro/libnx/include".to_owned());
 
+    let mut rust_staticlib_path: Option<PathBuf> = None;
     if config.cargo.enabled {
-        let mut rust_crate = RustCrate::new(PathBuf::from(config.cargo.manifest.unwrap()));
+        let mut rust_crate = RustCrate::new(PathBuf::from(&config.cargo.manifest.clone().unwrap()));
         rust_crate.build(&build_config, &build_flags).unwrap();
         compiler_did_something = compiler_did_something || rust_crate.got_built;
 
@@ -349,6 +355,11 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
 
         sources.push(bt_artifacts.module_cxxbridge_src.display().to_string());
         includes.push(bt_artifacts.module_cxxbridge_include.display().to_string());
+        rust_staticlib_path = rust_crate.get_output_path(&bt_artifacts.target)
+            .inspect_err(|e| {
+                panic!("Failed to get output rust output path!: {}", e);
+            })
+            .ok();
     }
 
     cu::info!("Sources: {:#?}", sources);
@@ -372,9 +383,10 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let link_result = compile::relink(
         &bt_artifacts,
         &mut compdb,
-        &config.module,
+        &config,
         &build_flags,
         &build_config,
+        rust_staticlib_path,
         compiler_did_something,
     );
     let link_succeeded = link_result.is_ok();
@@ -395,6 +407,19 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
             .join(format!("{}.nso", &config.module.name));
         let _ = build_nso(&elf_path, &nso_path)
             .inspect_err(|e| cu::error!("Failed to build NSO: {}", e));
+
+
+        if let Some(check) = &config.check {
+            let check = check.get_profile(profile);
+            let res = check::load_known_symbols(&bt_artifacts, &check);
+            let symbols = check::load_known_symbols(&bt_artifacts, &check).unwrap_or_default();
+            let res = check::check_symbols(&elf_path, symbols, &check).unwrap();
+            if !res.is_empty() {
+                cu::error!("Missing symbols found: {:#?}", res);
+            } else {
+                cu::info!("Check: No missing symbols found");
+            }
+        }
     }
 
     let _ = compdb

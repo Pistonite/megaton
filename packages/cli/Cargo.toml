@@ -19,6 +19,7 @@ which = "8.0.0"
 walkdir = "2.5.0"
 fxhash = "0.2.1"
 depfile = "0.1.1"
+regex = "1.12.2"
 
 [build-dependencies.cu]
 workspace = true
