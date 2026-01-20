@@ -76,6 +76,29 @@ pub struct CompileCommand {
     args: Vec<String>,
 }
 
+fn devkitpro_includes(compiler_path: &Path) -> cu::Result<Vec<String>> {
+    let devkitpaths = vec!["/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/?ver?".to_owned(),
+                            "/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/?ver?/aarch64-none-elf".to_owned(),
+                            "/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/?ver?/backward".to_owned(),
+                            "/opt/devkitpro/devkitA64/lib/gcc/aarch64-none-elf/?ver?/include".to_owned(),
+                            "/opt/devkitpro/devkitA64/lib/gcc/aarch64-none-elf/?ver?/include-fixed".to_owned(),
+                            "/opt/devkitpro/devkitA64/aarch64-none-elf/include".to_owned()
+    ];
+    let (gcc, mut output) = cu::CommandBuilder::new(compiler_path.as_os_str())
+        .arg("--version")
+        .stdout(cu::pio::lines()) // todo: log to file
+        .stderr_null()
+        .stdin_null()
+        .spawn()?;
+    let verline = output.next().unwrap()?;
+    let verstring = verline.split(" ").nth(2).unwrap();
+    let new_includes: Vec<String> = devkitpaths.iter().map(|path| {
+        path.replace("?ver?", verstring)
+    }).collect();
+    Ok(new_includes)
+    // gcc.wait_nz()?;
+}
+
 impl CompileCommand {
     fn new(
         compiler_path: &Path,
@@ -92,13 +115,7 @@ impl CompileCommand {
         argv.push(dep_file.as_utf8()?.to_string());
 
         let mut includes = includes;
-        includes.extend(vec!["/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/15.1.0".to_owned(),
-                            "/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/15.1.0/aarch64-none-elf".to_owned(),
-                            "/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/15.1.0/backward".to_owned(),
-                            "/opt/devkitpro/devkitA64/lib/gcc/aarch64-none-elf/15.1.0/include".to_owned(),
-                            "/opt/devkitpro/devkitA64/lib/gcc/aarch64-none-elf/15.1.0/include-fixed".to_owned(),
-                            "/opt/devkitpro/devkitA64/aarch64-none-elf/include".to_owned()
-        ]);
+        includes.extend(devkitpro_includes(compiler_path)?);
         let includes = includes.iter()
             .filter_map(|i| {
                 let path = PathBuf::from(i);
