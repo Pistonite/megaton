@@ -8,6 +8,7 @@ use derive_more::AsRef;
 
 use config::Flags;
 use generate::generate_cxx_bridge_src;
+use serde_json::Value;
 
 mod compile;
 mod config;
@@ -211,12 +212,25 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
         .unwrap_or_default()
     };
 
-    let mut rust_crate = RustCrate::new(PathBuf::from(config.cargo.manifest.unwrap()));
-    rust_crate.build(&build_config, &build_flags).unwrap();
-    let rust_changed = rust_crate.got_built;
+let mut rust_changed = false;
+
+if let Some(manifest) = &config.cargo.manifest {
+    let mut rust_crate = RustCrate::new(PathBuf::from(manifest));
+
+    // TEMP: skip rust build if megaton toolchain is missing
+    match rust_crate.build(&build_config, &build_flags) {
+        Ok(_) => {
+            rust_changed = rust_crate.got_built;
+        }
+        Err(e) => {
+            cu::warn!("Skipping rust build: {e}");
+        }
+    }
+}
+
 
     cu::info!("Generating cxx bridge src!");
-    generate_cxx_bridge_src(&rust_crate, &module_path)?;
+    //generate_cxx_bridge_src(&rust_crate, &module_path)?;
 
     let mut compiler_did_something = false;
     build_config
@@ -243,14 +257,31 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     cu::info!("linking!");
     
-    let libs = vec![
-        rust_crate.get_output_path(&config.module.target).expect("Failed to get rust crate output path!")
-    ]; 
+    // let libs = vec![
+    //     rust_crate.get_output_path(&config.module.target).expect("Failed to get rust crate output path!")
+    // ]; 
 
-    if let Err(v) = compile::relink(&module_path, &mut compdb, &mut my_compdb, &libs, &config.module, &build_flags) {
-        cu::info!("Error during linking: {:?}", v);
-    } 
+    // if let Err(v) = compile::relink(&module_path, &mut compdb, &mut my_compdb, &libs, &config.module, &build_flags) {
+    //     cu::info!("Error during linking: {:?}", v);
+    // } 
     my_compdb.save();
+
+    let template_str = include_str!("npdm_template.json");
+    let npdm: Value = serde_json::from_str(template_str)
+        .expect("invalid npdm_template.json");
+    let module_dir = &module_path;
+
+    cu::fs::make_dir(module_dir)
+        .expect("failed to create module output directory");
+
+    let npdm_path = module_dir.join("npdm.json");
+    
+    cu::fs::write(
+        &npdm_path,
+serde_json::to_string_pretty(&npdm).unwrap(),
+    ).expect("failed to write npdm.json");
+
+    println!("Generated {}", npdm_path.display());
 
     Ok(())
 }

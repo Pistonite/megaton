@@ -1,0 +1,16 @@
+[megaton]
+entry = "main"
+library = false
+
+[module]
+title-id = 1
+name = "testmod"
+target = "target"
+
+[cargo]
+manifest = "Cargo.toml"
+
+[build]
+default = {}
+
+[profile.none]

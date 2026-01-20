@@ -1,0 +1,33 @@
+{
+  "META": {
+    "MainThreadPriority": 44,
+    "MainThreadStackSize": "0x00040000",
+    "SystemResourceSize": 0,
+    "Version": 0,
+    "Flags": 0
+  },
+
+  "ACID": {
+    "Flags": 0
+  },
+
+  "ACI0": {},
+
+  "FsAccessControl": {
+    "FsAccessFlag": [
+      "MountSdCard"
+    ]
+  },
+
+  "ServiceAccessControl": [
+    "sm:",
+    "fs:",
+    "ldr:"
+  ],
+
+  "KernelCapability": {
+    "EnableSystemCalls": [
+      1, 2, 3, 4, 5, 6, 7, 8
+    ]
+  }
+}
