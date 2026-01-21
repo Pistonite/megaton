@@ -88,7 +88,7 @@ mod onto the switch.
 #### `<module>/verfile`
 Sets the entry point for the mod, needed by the linker.
 
-### `<module>/compdb.cache`
+#### `<module>/compdb.cache`
 The cached compilation database used by the build tool. This records every
 command in the build process to keep track of what objects have been built
 and what command was used to build them. This keeps track of the incremental
