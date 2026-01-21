@@ -16,13 +16,7 @@ separate debug and release directory.
 For all following directories, assume they are relative to
 `<target>/megaton/<profile>`.
 
-### `compdb.cache`
-The cached compilation database used by the build tool. This records every
-command in the build process to keep track of what objects have been built
-and what command was used to build them. This keeps track of the incremental
-build for both the library and the module.
 
----
 ### `lib/`
 This directory contains all sources and artifacts for the Megaton library.
 
@@ -66,7 +60,7 @@ Contains all generated headers needed to build the mod.
 - `<module>/include/**/*.rs.h`: Headers generated from rust. The file extension
 for generated headers can be changed in the config.
 
-- `<module>/include/cxx/cxx.h`: This file is genreated by cxxbridge and needed
+- `<module>/include/rust/cxx.h`: This file is genreated by cxxbridge and needed
 for rust interop with C++.
 
 #### `<module>/src/`
@@ -79,18 +73,23 @@ Contains all the C(++) object files and dependency files compiled from the mod
 and the library source. Used to incrementally build the mod. Library objects
 are also placed here since they depend on module-specific build configs.
 
-#### `<module>.elf`
+#### `<module>/<module>.elf`
 The elf created by linking the mod, library, and rust staticlib. This is not
 the final binary that will be loaded by the switch.
 
-#### `<module>.nso`
+#### `<module>/<module>.nso`
 This is the binary that the switch will load when loading the mod. It is
 created by converting the mod elf to an nso file.
 
-#### `npdm.json`
+#### `<module>/npdm.json`
 The data file needed needed for setting file permissions to properly load the
 mod onto the switch.
 
-#### `verfile`
+#### `<module>/verfile`
 Sets the entry point for the mod, needed by the linker.
 
+### `<module>/compdb.cache`
+The cached compilation database used by the build tool. This records every
+command in the build process to keep track of what objects have been built
+and what command was used to build them. This keeps track of the incremental
+build for both the library and the module.
