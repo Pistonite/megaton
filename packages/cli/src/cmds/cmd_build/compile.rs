@@ -3,13 +3,20 @@
 
 // This modules handles compiling c/c++/asm/rust code
 use std::{
-    io::Write, path::{Path, PathBuf}
+    io::Write,
+    path::{Path, PathBuf},
 };
 
-use cu::{lib, pre::*};
+use cu::pre::*;
 
 use super::Flags;
-use crate::{cmds::cmd_build::{BTArtifacts, config::{Build, Config, Module}}, env::environment};
+use crate::{
+    cmds::cmd_build::{
+        BTArtifacts,
+        config::{Build, Config},
+    },
+    env::environment,
+};
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct CompileDB {
@@ -19,10 +26,6 @@ pub struct CompileDB {
 }
 
 impl CompileDB {
-    fn new() -> Self {
-        Self::default()
-    }
-
     // Creates a new compile record and adds it to the db
     fn update(&mut self, command: CompileRecord) {
         self.commands.push(command);
@@ -35,12 +38,15 @@ impl CompileDB {
 
     pub fn save_command_log(&self, path: &PathBuf) -> cu::Result<()> {
         let mut file = std::fs::File::create(path)?;
-        let content = self.commands.iter().map(|record| {
-            match record {
+        let content = self
+            .commands
+            .iter()
+            .map(|record| match record {
                 CompileRecord::Compile(compile_command) => compile_command.command(),
                 CompileRecord::Link(link_command) => link_command.command(),
-            }
-        }).collect::<Vec<_>>().join("\n");
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
         let content = content + "\n";
         file.write(content.as_bytes())?;
         Ok(())
@@ -50,7 +56,7 @@ impl CompileDB {
 #[derive(Serialize, Deserialize)]
 enum CompileRecord {
     Compile(CompileCommand),
-    Link(LinkCommand)
+    Link(LinkCommand),
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
@@ -60,7 +66,10 @@ pub struct LinkCommand {
 }
 impl LinkCommand {
     pub fn new(ld_path: &Path, args: &Vec<String>) -> Self {
-        Self { linker: ld_path.to_path_buf(), args: args.to_vec() }
+        Self {
+            linker: ld_path.to_path_buf(),
+            args: args.to_vec(),
+        }
     }
 
     fn command(&self) -> String {
@@ -74,29 +83,6 @@ pub struct CompileCommand {
     compiler: PathBuf,
     source: PathBuf,
     args: Vec<String>,
-}
-
-fn devkitpro_includes(compiler_path: &Path) -> cu::Result<Vec<String>> {
-    let devkitpaths = vec!["/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/?ver?".to_owned(),
-                            "/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/?ver?/aarch64-none-elf".to_owned(),
-                            "/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/?ver?/backward".to_owned(),
-                            "/opt/devkitpro/devkitA64/lib/gcc/aarch64-none-elf/?ver?/include".to_owned(),
-                            "/opt/devkitpro/devkitA64/lib/gcc/aarch64-none-elf/?ver?/include-fixed".to_owned(),
-                            "/opt/devkitpro/devkitA64/aarch64-none-elf/include".to_owned()
-    ];
-    let (gcc, mut output) = cu::CommandBuilder::new(compiler_path.as_os_str())
-        .arg("--version")
-        .stdout(cu::pio::lines()) // todo: log to file
-        .stderr_null()
-        .stdin_null()
-        .spawn()?;
-    let verline = output.next().unwrap()?;
-    let verstring = verline.split(" ").nth(2).unwrap();
-    let new_includes: Vec<String> = devkitpaths.iter().map(|path| {
-        path.replace("?ver?", verstring)
-    }).collect();
-    Ok(new_includes)
-    // gcc.wait_nz()?;
 }
 
 impl CompileCommand {
@@ -116,10 +102,13 @@ impl CompileCommand {
 
         let mut includes = includes;
         includes.extend(devkitpro_includes(compiler_path)?);
-        let includes = includes.iter()
+        let includes = includes
+            .iter()
             .filter_map(|i| {
                 let path = PathBuf::from(i);
-                path.canonicalize().inspect_err(|e| {cu::error!("cant find include {} {}", path.display(), e)}).ok()
+                path.canonicalize()
+                    .inspect_err(|e| cu::error!("cant find include {} {}", path.display(), e))
+                    .ok()
             })
             .map(|i| format!("-I{}", i.as_os_str().to_str().unwrap()))
             .collect::<Vec<String>>();
@@ -128,10 +117,15 @@ impl CompileCommand {
         argv.push(String::from("-c"));
 
         argv.push(format!("-o{}", out_file.as_utf8()?));
-        
+
         argv.push(src_file.as_utf8()?.to_string());
 
-        cu::trace!("Compiler command: \n{} {} {}", &compiler_path.display(), &src_file.display(), &argv.join(" "));
+        cu::trace!(
+            "Compiler command: \n{} {} {}",
+            &compiler_path.display(),
+            &src_file.display(),
+            &argv.join(" ")
+        );
 
         let src_path = src_file.to_path_buf();
         Ok(Self {
@@ -143,7 +137,11 @@ impl CompileCommand {
     }
 
     fn execute(&self) -> cu::Result<()> {
-        cu::trace!("Executing CompileCommand: \n{} {}", &self.compiler.display(), &self.args.join(" "));
+        cu::trace!(
+            "Executing CompileCommand: \n{} {}",
+            &self.compiler.display(),
+            &self.args.join(" ")
+        );
         let child = cu::CommandBuilder::new(&self.compiler.as_os_str())
             .args(self.args.clone())
             .stdoe(cu::pio::inherit()) // todo: log to file
@@ -156,16 +154,60 @@ impl CompileCommand {
     fn command(&self) -> String {
         format!("{} {}", self.compiler.display(), self.args.join(" "))
     }
-
-    // We need two different ways of serializing this data since it will
-    // need to be writen to the compiledb cache and the compile_commands.json
-    // and the format will be different for each
-    fn to_clangd_json(&self) -> String {
-        // TODO: Implement
-        todo!()
-    }
-    
 }
+
+fn devkitpro_includes(compiler_path: &Path) -> cu::Result<Vec<String>> {
+    let devkitpaths = [
+        "/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/?ver?".to_owned(),
+        "/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/?ver?/aarch64-none-elf".to_owned(),
+        "/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/?ver?/backward".to_owned(),
+        "/opt/devkitpro/devkitA64/lib/gcc/aarch64-none-elf/?ver?/include".to_owned(),
+        "/opt/devkitpro/devkitA64/lib/gcc/aarch64-none-elf/?ver?/include-fixed".to_owned(),
+        "/opt/devkitpro/devkitA64/aarch64-none-elf/include".to_owned(),
+    ];
+    let (gcc, mut output) = cu::CommandBuilder::new(compiler_path.as_os_str())
+        .arg("--version")
+        .stdout(cu::pio::lines()) // todo: log to file
+        .stderr_null()
+        .stdin_null()
+        .spawn()?;
+    let verline = output.next().unwrap()?;
+    let verstring = verline.split(" ").nth(2).unwrap();
+    let new_includes: Vec<String> = devkitpaths
+        .iter()
+        .map(|path| path.replace("?ver?", verstring))
+        .collect();
+    Ok(new_includes)
+    // gcc.wait_nz()?;
+}
+
+#[derive(Serialize)]
+struct CompileCommandsClangd {
+    commands: Vec<CommandObjectClangd>,
+}
+
+#[derive(Serialize)]
+struct CommandObjectClangd {
+    arguments: Vec<String>,
+    directory: String,
+    file: String,
+}
+
+impl CommandObjectClangd {
+    fn new(arguments: Vec<String>, directory: String, file: String) -> Self {
+        Self {
+            arguments,
+            directory,
+            file,
+        }
+    }
+}
+
+// impl From<CompileCommand> for CommandObjectClangd {
+//     fn from(value: CompileCommand) -> Self {
+//         Self {}
+//     }
+// }
 
 // A source file and its corresponding artifacts
 pub struct SourceFile {
@@ -198,12 +240,14 @@ impl SourceFile {
     ) -> cu::Result<bool> {
         if !output_path.exists() {
             cu::fs::make_dir(&output_path).unwrap();
-            cu::info!("Output path {:?} exists={}", &output_path, &output_path.exists());
+            cu::info!(
+                "Output path {:?} exists={}",
+                &output_path,
+                &output_path.exists()
+            );
         }
-        let o_path = output_path
-            .join(format!("{}-{}.o", self.basename, self.pathhash));
-        let d_path = output_path
-            .join(format!("{}-{}.d", self.basename, self.pathhash));
+        let o_path = output_path.join(format!("{}-{}.o", self.basename, self.pathhash));
+        let d_path = output_path.join(format!("{}-{}.d", self.basename, self.pathhash));
 
         let (comp_path, comp_flags) = match self.lang {
             Lang::C => (environment().cc_path(), &flags.cflags),
@@ -211,8 +255,14 @@ impl SourceFile {
             Lang::S => (environment().cc_path(), &flags.sflags),
         };
 
-        let comp_command =
-            CompileCommand::new(comp_path, &self.path, &o_path, &d_path, &comp_flags, includes)?;
+        let comp_command = CompileCommand::new(
+            comp_path,
+            &self.path,
+            &o_path,
+            &d_path,
+            &comp_flags,
+            includes,
+        )?;
 
         compile_db.update(CompileRecord::Compile(comp_command.clone()));
 
@@ -228,7 +278,7 @@ impl SourceFile {
                 cu::fs::set_mtime(d_path, src_time)?;
             }
             Ok(true)
-            // compile_db.update(comp_command)?;            
+            // compile_db.update(comp_command)?;
         } else {
             Ok(false)
         }
@@ -242,18 +292,15 @@ impl SourceFile {
         command: &CompileCommand,
     ) -> cu::Result<bool> {
         // Check if record exists
-        let comp_record = compile_db.commands.iter().find(|command| {
-            match command {
-                CompileRecord::Compile(compile_command) => compile_command.pathhash == self.pathhash,
-                CompileRecord::Link(link_command) => false,
-            }
+        let comp_record = compile_db.commands.iter().find(|command| match command {
+            CompileRecord::Compile(compile_command) => compile_command.pathhash == self.pathhash,
+            CompileRecord::Link(_) => false,
         });
 
         let comp_record = match comp_record {
             Some(CompileRecord::Compile(cmd)) => cmd,
-            _ => return Ok(true)
+            _ => return Ok(true),
         };
-
 
         // Check if artifacts exist
         if !o_path.exists() || !d_path.exists() {
@@ -343,21 +390,32 @@ pub fn relink(
 ) -> cu::Result<bool> {
     // Returns: whether linking was performed
     let env = environment();
-    let module = &config.module;
 
     let mod_objs: Vec<String> = get_obj_files_in(&bt_artifacts.module_root)
-        .iter().map(|o| o.display().to_string()).collect(); // scan target folder (BuildConfig)
+        .iter()
+        .map(|o| o.display().to_string())
+        .collect(); // scan target folder (BuildConfig)
     // TODO: Unpack lib
     let lib_objs: Vec<String> = get_obj_files_in(&bt_artifacts.lib_obj)
-        .iter().map(|o| o.display().to_string()).collect();
-    
-    let output_arg = ["-o".to_string(), bt_artifacts.elf_path.display().to_string()];
-    
+        .iter()
+        .map(|o| o.display().to_string())
+        .collect();
+
+    let output_arg = [
+        "-o".to_string(),
+        bt_artifacts.elf_path.display().to_string(),
+    ];
+
     let mut args = flags.ldflags.clone();
     let mut ldscripts = build.ldscripts.clone();
 
-    let main_ldscript_path = bt_artifacts.lib_linkldscript.canonicalize().unwrap().display().to_string();
-    ldscripts.insert(0,main_ldscript_path);
+    let main_ldscript_path = bt_artifacts
+        .lib_linkldscript
+        .canonicalize()
+        .unwrap()
+        .display()
+        .to_string();
+    ldscripts.insert(0, main_ldscript_path);
 
     let linker_args: Vec<Vec<String>> = vec![&build.libraries, &build.libpaths, &ldscripts].iter().map(|paths| {
         paths.iter().filter_map(|path| {
@@ -372,19 +430,27 @@ pub fn relink(
     }).collect();
 
     let libraries = linker_args[0].clone();
-    let libpaths: Vec<String> = linker_args[1].iter().map(|lp| {
-        format!("-L{}", lp)
-    }).collect();
-    let ldscripts: Vec<String> = linker_args[2].iter().map(|lp| {
-        format!("-Wl,-T,{}", lp)
-    }).collect();
+    let libpaths: Vec<String> = linker_args[1]
+        .iter()
+        .map(|lp| format!("-L{}", lp))
+        .collect();
+    let ldscripts: Vec<String> = linker_args[2]
+        .iter()
+        .map(|lp| format!("-Wl,-T,{}", lp))
+        .collect();
 
-
-    let entrypoint = &config.megaton.entry.clone().unwrap_or("__megaton_module_entry".to_owned());
+    let entrypoint = &config
+        .megaton
+        .entry
+        .clone()
+        .unwrap_or("__megaton_module_entry".to_owned());
     args.push(format!("-Wl,-init={}", entrypoint));
     let verfile_path = &bt_artifacts.verfile_path;
     create_verfile(verfile_path, entrypoint)?;
-    args.push(format!("-Wl,--version-script={}", verfile_path.display().to_string()));
+    args.push(format!(
+        "-Wl,--version-script={}",
+        verfile_path.display().to_string()
+    ));
 
     args.extend(ldscripts);
     args.extend(libpaths);
@@ -396,28 +462,34 @@ pub fn relink(
     args.extend(lib_objs);
     args.extend(output_arg);
     let cxx = env.cxx_path();
-    
+
     let link_cmd = LinkCommand::new(cxx, &args);
-    let old_link_cmd: Option<&LinkCommand> = compile_db.commands.iter().find_map(|cmd| -> Option<&LinkCommand> { 
-        match cmd {
-            CompileRecord::Compile(_) => None,
-            CompileRecord::Link(link_command) => Some(link_command),
-        }
-    });
-    if !compilation_occurred && let Some(old_link_cmd) = old_link_cmd && *old_link_cmd == link_cmd {
+    let old_link_cmd: Option<&LinkCommand> =
+        compile_db
+            .commands
+            .iter()
+            .find_map(|cmd| -> Option<&LinkCommand> {
+                match cmd {
+                    CompileRecord::Compile(_) => None,
+                    CompileRecord::Link(link_command) => Some(link_command),
+                }
+            });
+    if !compilation_occurred
+        && let Some(old_link_cmd) = old_link_cmd
+        && *old_link_cmd == link_cmd
+    {
         return Ok(false); // skip compilation
     }
 
     compile_db.update(CompileRecord::Link(link_cmd.clone()));
-    let command = cxx.command()
-        .args(
-            args,
-        )
+    let command = cxx
+        .command()
+        .args(args)
         .stdin_null()
         .stdoe(cu::pio::spinner("linking").info())
         .spawn()?
         .0;
-    
+
     command.wait_nz()?;
     cu::debug!("Link command: {}", link_cmd.command());
     cu::info!("Linker finished!");
@@ -427,10 +499,9 @@ pub fn relink(
 pub fn build_nso(elf_path: &PathBuf, nso_path: &PathBuf) -> cu::Result<()> {
     let elf2nso = environment().elf2nso_path();
 
-    let command = elf2nso.command()
-        .args(
-            [elf_path, nso_path],
-        )
+    let command = elf2nso
+        .command()
+        .args([elf_path, nso_path])
         .stdin_null()
         .stdoe(cu::pio::spinner("Building NSO").info())
         .spawn()
@@ -440,10 +511,13 @@ pub fn build_nso(elf_path: &PathBuf, nso_path: &PathBuf) -> cu::Result<()> {
     let result = command.wait()?;
     match result.success() {
         true => Ok(()),
-        false => Err(cu::Error::msg(format!("Failed to build NSO with exit code {}", result.code().unwrap_or_else(|| {
-            cu::error!("Failed to get exit code!");
-            -1
-        })))),
+        false => Err(cu::Error::msg(format!(
+            "Failed to build NSO with exit code {}",
+            result.code().unwrap_or_else(|| {
+                cu::error!("Failed to get exit code!");
+                -1
+            })
+        ))),
     }
 }
 
@@ -451,12 +525,7 @@ fn create_verfile(verfile: &PathBuf, entry: &str) -> cu::Result<()> {
     cu::debug!("creating verfile");
     let verfile_before = "{\n\tglobal:\n";
     let verfile_after = ";\n\tlocal: *;\n};";
-    let verfile_data = format!(
-        "{}{}{}",
-        verfile_before,
-        entry,
-        verfile_after
-    );
+    let verfile_data = format!("{}{}{}", verfile_before, entry, verfile_after);
     cu::fs::write(verfile, &verfile_data)?;
     cu::debug!("Created verfile");
     Ok(())
@@ -468,7 +537,7 @@ mod tests {
 
     #[test]
     fn test_get_obj_files() {
-        let mut path = PathBuf::from("test/test_get_obj_files");
+        let path = PathBuf::from("test/test_get_obj_files");
         let result = get_obj_files_in(&path);
         assert!(
             result.contains(&PathBuf::from("test/test_get_obj_files/file1.o")),
@@ -484,7 +553,7 @@ mod tests {
 
     #[test]
     fn test_get_obj_files_empty() {
-        let mut path = PathBuf::from("test/test_get_obj_files/empty");
+        let path = PathBuf::from("test/test_get_obj_files/empty");
         let result = get_obj_files_in(&path);
         assert_eq!(result.len(), 0, "{:#?}", result);
     }
