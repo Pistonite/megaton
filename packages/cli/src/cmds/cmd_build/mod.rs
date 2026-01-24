@@ -13,11 +13,11 @@ use config::Flags;
 use flate2::bufread::GzDecoder;
 use generate::generate_cxx_bridge_src;
 
+mod check;
 mod compile;
 mod config;
 mod generate;
 mod scan;
-mod check;
 
 use scan::discover_source;
 
@@ -247,19 +247,33 @@ impl Flags {
         let mut flags = self.clone();
         flags.cflags.extend(new_flags.clone());
         flags.cxxflags.extend(new_flags);
-        return flags;
+        flags
     }
 }
 
-fn build_lib(config: &config::Config, build_flags: &Flags, btart: &BTArtifacts, compdb: &mut CompileDB) -> cu::Result<bool> {
+fn build_lib(
+    config: &config::Config,
+    build_flags: &Flags,
+    btart: &BTArtifacts,
+    compdb: &mut CompileDB,
+) -> cu::Result<bool> {
     // build lib
     let mut compiler_did_something = false;
     let lib_build_flags = build_flags.add_c_cpp_flags(vec!["-DMEGATON_LIB".to_string()]);
-    discover_source(btart.lib_src.as_path()).unwrap_or(vec![])
+    discover_source(btart.lib_src.as_path())
+        .unwrap_or_default()
         .iter()
         .for_each(|src| {
             let compilation_occurred = src
-                .compile(&lib_build_flags, vec![btart.lib_include.display().to_string(), String::from("/opt/devkitpro/libnx/include/")], compdb, &btart.lib_obj)
+                .compile(
+                    &lib_build_flags,
+                    vec![
+                        btart.lib_include.display().to_string(),
+                        String::from("/opt/devkitpro/libnx/include/"),
+                    ],
+                    compdb,
+                    &btart.lib_obj,
+                )
                 .inspect_err(|e| cu::error!("Failed to compile! {:?}", e))
                 .unwrap();
             compiler_did_something = compiler_did_something || compilation_occurred;
@@ -269,17 +283,23 @@ fn build_lib(config: &config::Config, build_flags: &Flags, btart: &BTArtifacts, 
     let module_name_len = format!("-D MEGART_NX_MODULE_NAME_LEN={:?}", module_name.len());
     let title_id = format!("-D MEGART_TITLE_ID={:?}", config.module.title_id);
     let title_id_hex = format!("-D MEGART_TITLE_ID_HEX={:016x}", config.module.title_id);
-    let mut rt_build_flags = vec![module_name, module_name_len, title_id, title_id_hex];
+    let rt_build_flags = vec![module_name, module_name_len, title_id, title_id_hex];
     // if config.cargo.enabled {
     //     rt_build_flags.push("-DMEGART_RUST".to_string());
     //     rt_build_flags.push("-DMEGART_RUST_MAIN".to_string());
     // }
     let rt_build_flags = build_flags.add_c_cpp_flags(rt_build_flags);
-    discover_source(btart.lib_rt.as_path()).unwrap_or(vec![])
+    discover_source(btart.lib_rt.as_path())
+        .unwrap_or_default()
         .iter()
         .for_each(|src| {
             let compilation_occurred = src
-                .compile(&rt_build_flags, vec![btart.lib_include.display().to_string()], compdb, &btart.lib_obj)
+                .compile(
+                    &rt_build_flags,
+                    vec![btart.lib_include.display().to_string()],
+                    compdb,
+                    &btart.lib_obj,
+                )
                 .inspect_err(|e| cu::error!("Failed to compile! {:?}", e))
                 .unwrap();
             compiler_did_something = compiler_did_something || compilation_occurred;
@@ -304,17 +324,14 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let title_id_hex = config.module.title_id_hex();
     cu::debug!("title_id_hex={title_id_hex}");
 
-    let mut build_flags = Flags::from_config(&build_config.flags);
+    let build_flags = Flags::from_config(&build_config.flags);
     cu::debug!("build flags: {build_flags:#?}");
 
     let target = &config.module.target;
     let megaton_root = target.join("megaton");
     cu::fs::make_dir(&megaton_root)?;
-    let bt_artifacts = BTArtifacts::new(
-        target.canonicalize().unwrap(),
-        &config.module.name,
-        profile,
-    );
+    let bt_artifacts =
+        BTArtifacts::new(target.canonicalize().unwrap(), &config.module.name, profile);
 
     // Build Library
     cu::fs::make_dir(&bt_artifacts.lib_root)?;
@@ -336,9 +353,12 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     };
 
     let mut compiler_did_something = if config.megaton.library {
-        build_lib(&config, &build_flags, &bt_artifacts, &mut compdb).context("Failed to build library")?
-    } else {false};
-    
+        build_lib(&config, &build_flags, &bt_artifacts, &mut compdb)
+            .context("Failed to build library")?
+    } else {
+        false
+    };
+
     let mut sources = build_config.sources.clone();
     let mut includes = build_config.includes.clone();
     includes.push(bt_artifacts.lib_include.display().to_string());
@@ -355,7 +375,8 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
 
         sources.push(bt_artifacts.module_cxxbridge_src.display().to_string());
         includes.push(bt_artifacts.module_cxxbridge_include.display().to_string());
-        rust_staticlib_path = rust_crate.get_output_path(&bt_artifacts.target)
+        rust_staticlib_path = rust_crate
+            .get_output_path(&bt_artifacts.target)
             .inspect_err(|e| {
                 panic!("Failed to get output rust output path!: {}", e);
             })
@@ -368,12 +389,17 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
         .iter()
         .map(|src| {
             // todo: inspect and handle errs
-            discover_source(PathBuf::from(src).as_path()).unwrap_or(vec![])
+            discover_source(PathBuf::from(src).as_path()).unwrap_or_default()
         })
         .flatten()
         .for_each(|src| {
             let compilation_occurred = src
-                .compile(&build_flags, includes.clone(), &mut compdb, &bt_artifacts.module_obj)
+                .compile(
+                    &build_flags,
+                    includes.clone(),
+                    &mut compdb,
+                    &bt_artifacts.module_obj,
+                )
                 .inspect_err(|e| cu::error!("Failed to compile! {:?}", e))
                 .unwrap();
             compiler_did_something = compiler_did_something || compilation_occurred;
@@ -407,7 +433,6 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
             .join(format!("{}.nso", &config.module.name));
         let _ = build_nso(&elf_path, &nso_path)
             .inspect_err(|e| cu::error!("Failed to build NSO: {}", e));
-
 
         if let Some(check) = &config.check {
             let check = check.get_profile(profile);

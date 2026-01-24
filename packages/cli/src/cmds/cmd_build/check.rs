@@ -1,8 +1,11 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Megaton contributors
+
 use std::{collections::BTreeSet, path::PathBuf};
 
 use cu::{PathExtension, Spawn};
 
-use crate::{cmds::cmd_build::{BTArtifacts, config::Check}, env::environment};
+use crate::{cmds::cmd_build::{BTArtifacts, config::Check}};
 
 
 type Symbols = BTreeSet<String>;
