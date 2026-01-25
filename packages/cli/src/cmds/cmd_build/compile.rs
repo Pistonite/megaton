@@ -523,7 +523,7 @@ pub fn build_nso(elf_path: &PathBuf, nso_path: &PathBuf) -> cu::Result<()> {
 
 fn create_verfile(verfile: &PathBuf, entry: &str) -> cu::Result<()> {
     cu::debug!("creating verfile");
-    let verfile_before = "{\n\tglobal:\n";
+    let verfile_before = "{\n\tglobal:\n\n";
     let verfile_after = ";\n\tlocal: *;\n};";
     let verfile_data = format!("{}{}{}", verfile_before, entry, verfile_after);
     cu::fs::write(verfile, &verfile_data)?;

@@ -5,16 +5,15 @@
 // #include <toolkit/tcp.hpp>
 
 static u8 bss_alloc[BSS_ALLOC_SIZE] = {0};
-static nn::mem::StandardAllocator sa = nn::mem::StandardAllocator();
+
+nn::mem::StandardAllocator& allocator() {
+    static nn::mem::StandardAllocator instance(bss_alloc, sizeof(bss_alloc));
+    return instance;
+}
 
 extern "C" u8 *sys_malloc(u64 size, u64 align) {
-    // botw::tcp::sendf("calling malloc for %d bytes with alignment %d\n", size,
-    // align);
-    if (!sa.mIsInitialized) {
-        sa.Initialize(bss_alloc, BSS_ALLOC_SIZE);
-    }
-    void *ptr = sa.Allocate(size, align);
-    if (ptr != NULL) {
+    void *ptr = allocator().Allocate(size, align);
+    if (ptr != nullptr) {
         return (u8 *)ptr;
     }
     return nullptr;
@@ -24,10 +23,7 @@ extern "C" void sys_free(u8 *ptr, u64 size, u64 align) {
     // botw::tcp::sendf("calling free on ptr %d with size %d and alignment
     // %d\n",
     // ptr, size, align);
-    if (!sa.mIsInitialized) {
-        return;
-    }
-    sa.Free(ptr);
+    allocator().Free(ptr);
     // botw::tcp::sendf("successfully freed memory\n");
 }
 
