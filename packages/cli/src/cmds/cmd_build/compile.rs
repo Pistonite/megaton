@@ -83,6 +83,7 @@ pub struct CompileCommand {
     compiler: PathBuf,
     source: PathBuf,
     args: Vec<String>,
+    sys_headers: Vec<String>,
 }
 
 impl CompileCommand {
@@ -94,14 +95,12 @@ impl CompileCommand {
         flags: &Vec<String>,
         includes: Vec<String>,
     ) -> cu::Result<Self> {
-        let mut argv = flags.clone();
-        argv.push("-MMD".to_owned());
-        argv.push("-MP".to_owned());
-        argv.push("-MF".to_owned());
-        argv.push(dep_file.as_utf8()?.to_string());
+        let mut args = flags.clone();
+        args.push("-MMD".to_owned());
+        args.push("-MP".to_owned());
+        args.push("-MF".to_owned());
+        args.push(dep_file.display().to_string());
 
-        let mut includes = includes;
-        includes.extend(devkitpro_includes(compiler_path)?);
         let includes = includes
             .iter()
             .filter_map(|i| {
@@ -112,19 +111,20 @@ impl CompileCommand {
             })
             .map(|i| format!("-I{}", i.as_os_str().to_str().unwrap()))
             .collect::<Vec<String>>();
-        argv.extend(includes);
 
-        argv.push(String::from("-c"));
+        args.extend(includes);
 
-        argv.push(format!("-o{}", out_file.as_utf8()?));
+        args.push(String::from("-c"));
 
-        argv.push(src_file.as_utf8()?.to_string());
+        args.push(format!("-o{}", out_file.display().to_string()));
+
+        args.push(src_file.display().to_string());
 
         cu::trace!(
             "Compiler command: \n{} {} {}",
             &compiler_path.display(),
             &src_file.display(),
-            &argv.join(" ")
+            &args.join(" ")
         );
 
         let src_path = src_file.to_path_buf();
@@ -132,7 +132,8 @@ impl CompileCommand {
             pathhash: fxhash::hash(&src_path),
             compiler: compiler_path.to_path_buf(),
             source: src_path,
-            args: argv,
+            args,
+            sys_headers: devkitpro_includes()
         })
     }
 
@@ -156,29 +157,24 @@ impl CompileCommand {
     }
 }
 
-fn devkitpro_includes(compiler_path: &Path) -> cu::Result<Vec<String>> {
-    let devkitpaths = [
-        "/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/?ver?".to_owned(),
-        "/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/?ver?/aarch64-none-elf".to_owned(),
-        "/opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/?ver?/backward".to_owned(),
-        "/opt/devkitpro/devkitA64/lib/gcc/aarch64-none-elf/?ver?/include".to_owned(),
-        "/opt/devkitpro/devkitA64/lib/gcc/aarch64-none-elf/?ver?/include-fixed".to_owned(),
-        "/opt/devkitpro/devkitA64/aarch64-none-elf/include".to_owned(),
-    ];
-    let (gcc, mut output) = cu::CommandBuilder::new(compiler_path.as_os_str())
-        .arg("--version")
-        .stdout(cu::pio::lines()) // todo: log to file
-        .stderr_null()
-        .stdin_null()
-        .spawn()?;
-    let verline = output.next().unwrap()?;
-    let verstring = verline.split(" ").nth(2).unwrap();
-    let new_includes: Vec<String> = devkitpaths
-        .iter()
-        .map(|path| path.replace("?ver?", verstring))
-        .collect();
-    Ok(new_includes)
-    // gcc.wait_nz()?;
+fn devkitpro_includes() -> Vec<String> {
+    [
+        "devkitA64/aarch64-none-elf/include/c++/?ver?",
+        "devkitA64/aarch64-none-elf/include/c++/?ver?/aarch64-none-elf",
+        "devkitA64/aarch64-none-elf/include/c++/?ver?/backward",
+        "devkitA64/lib/gcc/aarch64-none-elf/?ver?/include",
+        "devkitA64/lib/gcc/aarch64-none-elf/?ver?/include-fixed",
+        "devkitA64/aarch64-none-elf/include",
+    ]
+    .iter()
+    .map(|path| {
+        environment()
+            .dkp_path()
+            .join(path.replace("?ver?", environment().dkp_version()))
+            .display()
+            .to_string()
+    })
+    .collect::<Vec<_>>()
 }
 
 #[derive(Serialize)]
@@ -203,11 +199,11 @@ impl CommandObjectClangd {
     }
 }
 
-// impl From<CompileCommand> for CommandObjectClangd {
-//     fn from(value: CompileCommand) -> Self {
-//         Self {}
-//     }
-// }
+impl From<CompileCommand> for CommandObjectClangd {
+    fn from(value: CompileCommand) -> Self {
+        Self {}
+    }
+}
 
 // A source file and its corresponding artifacts
 pub struct SourceFile {
