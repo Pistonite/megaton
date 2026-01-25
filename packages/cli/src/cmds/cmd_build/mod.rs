@@ -440,9 +440,16 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
             let symbols = check::load_known_symbols(&bt_artifacts, &check).unwrap_or_default();
             let res = check::check_symbols(&elf_path, symbols, &check).unwrap();
             if !res.is_empty() {
-                cu::error!("Missing symbols found: {:#?}", res);
+                cu::error!("Check: Missing symbols found: {:#?}", res);
             } else {
                 cu::info!("Check: No missing symbols found");
+            }
+
+            let res = check::check_instructions(&elf_path, &check).unwrap();
+            if !res.is_empty() {
+                cu::error!("Check: Disallowed instructions found: {:#?}", res);
+            } else {
+                cu::info!("Check: No disallowed instructions found");
             }
         }
     }

@@ -4,6 +4,7 @@
 use std::{collections::BTreeSet, path::PathBuf};
 
 use cu::{PathExtension, Spawn};
+use regex::Regex;
 
 use crate::{cmds::cmd_build::{BTArtifacts, config::Check}};
 
@@ -35,6 +36,43 @@ pub fn check_symbols(elf_path: &PathBuf, expected_symbols: Symbols, check_config
             .collect::<Vec<_>>();
 
     Ok(missing_symbols)
+}
+
+pub fn check_instructions(elf_path: &PathBuf, check_config: &Check) -> cu::Result<Vec<String>> {
+    let (child, stdout_handle) = cu::which("objdump")?.command()
+        .arg("-d").arg(elf_path)
+        .stdout(cu::pio::string())
+        .stdie_null()
+        .spawn()?;
+
+    child.wait()?;
+
+    let stdout = stdout_handle.join()??;
+    let instructions = parse_objdump_insts(stdout);
+
+    let mut disallowed_regexes = vec![
+            Regex::new(r"^msr\s*spsel").unwrap(),
+            Regex::new(r"^msr\s*daifset").unwrap(),
+            Regex::new(r"^mrs\.*daif").unwrap(),
+            Regex::new(r"^mrs\.*tpidr_el1").unwrap(),
+            Regex::new(r"^msr\s*tpidr_el1").unwrap(),
+            Regex::new(r"^hlt").unwrap(),
+    ];
+    disallowed_regexes.extend(
+        check_config.disallowed_instructions.iter().filter_map(|inst| {
+            Regex::new(inst)
+                .inspect_err(|e| cu::error!("Failed to parse disallowed instruction {}. Error: {}", inst, e))
+                .ok()
+        })
+    );
+
+    let bad_instructions: Vec<String> = instructions.iter().filter(|inst| {
+        disallowed_regexes.iter().any(|r| r.is_match(&inst.1))
+    }).map(|bad_inst| format!("{}: {}", bad_inst.0, bad_inst.1))
+    .collect();
+
+    
+    Ok(bad_instructions)
 }
 
 pub fn load_known_symbols(btart: &BTArtifacts, config: &Check) -> cu::Result<Symbols> {
