@@ -460,6 +460,8 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let _ = compdb
         .save_command_log(&bt_artifacts.command_log_path)
         .inspect_err(|e| cu::error!("Failed to save command log! {}", e));
+    
+    compdb.save_cc_json(PathBuf::from(config.module.compdb).as_ref())?;
 
     Ok(())
 }

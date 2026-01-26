@@ -37,6 +37,20 @@ impl CompileDB {
         json::write(file, self)
     }
 
+    pub fn save_cc_json(&self, path: &Path) -> cu::Result<()> {
+        let file = std::fs::File::create(path)?;
+        let entries = self
+            .commands
+            .iter()
+            .filter_map(|rec| match rec {
+                CompileRecord::Compile(cc) => Some(CCJsonEntry::from(cc)),
+                CompileRecord::Link(_) => None,
+            })
+            .collect::<Vec<CCJsonEntry>>();
+
+        json::write_pretty(file, &entries)
+    }
+
     pub fn save_command_log(&self, path: &PathBuf) -> cu::Result<()> {
         let mut file = std::fs::File::create(path)?;
         let content = self
@@ -179,18 +193,13 @@ fn devkitpro_includes() -> Vec<String> {
 }
 
 #[derive(Serialize)]
-struct CompileCommandsClangd {
-    commands: Vec<CommandObjectClangd>,
-}
-
-#[derive(Serialize)]
-struct CommandObjectClangd {
+struct CCJsonEntry {
     arguments: Vec<String>,
     directory: String,
     file: String,
 }
 
-impl CommandObjectClangd {
+impl CCJsonEntry {
     fn new(arguments: Vec<String>, directory: String, file: String) -> Self {
         Self {
             arguments,
@@ -200,9 +209,10 @@ impl CommandObjectClangd {
     }
 }
 
-impl From<CompileCommand> for CommandObjectClangd {
-    fn from(value: CompileCommand) -> Self {
+impl From<&CompileCommand> for CCJsonEntry {
+    fn from(value: &CompileCommand) -> Self {
         let mut arguments = value
+            .clone()
             .args
             .into_iter()
             .filter(|x| {
