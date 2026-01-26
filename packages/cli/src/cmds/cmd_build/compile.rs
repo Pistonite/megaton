@@ -8,6 +8,7 @@ use std::{
 };
 
 use cu::pre::*;
+use regex::Regex;
 
 use super::Flags;
 use crate::{
@@ -133,7 +134,7 @@ impl CompileCommand {
             compiler: compiler_path.to_path_buf(),
             source: src_path,
             args,
-            sys_headers: devkitpro_includes()
+            sys_headers: devkitpro_includes(),
         })
     }
 
@@ -201,7 +202,33 @@ impl CommandObjectClangd {
 
 impl From<CompileCommand> for CommandObjectClangd {
     fn from(value: CompileCommand) -> Self {
-        Self {}
+        let mut arguments = value
+            .args
+            .into_iter()
+            .filter(|x| {
+                let re = Regex::new(r"-mtune=.+|-march=.+|-mtp=.+").unwrap();
+                !re.is_match(x)
+            })
+            .collect::<Vec<_>>();
+
+        arguments.extend(
+            devkitpro_includes()
+                .into_iter()
+                .map(|i| format!("-isystem {i}"))
+                .collect::<Vec<_>>(),
+        );
+
+        let directory = PathBuf::from(".")
+            .canonicalize()
+            .unwrap()
+            .display()
+            .to_string();
+        let file = value.source.display().to_string();
+        Self {
+            arguments,
+            directory,
+            file,
+        }
     }
 }
 

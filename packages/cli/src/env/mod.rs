@@ -48,7 +48,7 @@ impl Environment {
     }
 
     /// Get the home of the megaton cache directory
-    pub fn home_path(&self) -> &Path {
+    pub fn home(&self) -> &Path {
         &self.megaton_home
     }
     pub fn dkp_path(&self) -> &Path{
