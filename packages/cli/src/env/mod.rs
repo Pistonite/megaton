@@ -8,6 +8,7 @@ use cu::pre::*;
 
 // Core environment variables needed to run the tool
 // Includes paths to build/debug utilities and caches
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Environment {
     megaton_home: PathBuf,
@@ -51,7 +52,7 @@ impl Environment {
     pub fn home(&self) -> &Path {
         &self.megaton_home
     }
-    pub fn dkp_path(&self) -> &Path{
+    pub fn dkp_path(&self) -> &Path {
         &self.devkitpro
     }
     pub fn dkp_version(&self) -> &String {

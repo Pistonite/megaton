@@ -179,6 +179,7 @@ macro_rules! create_flags {
     };
 }
 
+#[allow(dead_code)]
 impl Flags {
     pub fn from_config(config: &FlagConfig) -> Self {
         let common = create_flags!(&config.common, DEFAULT_COMMON);

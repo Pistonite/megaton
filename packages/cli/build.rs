@@ -37,32 +37,32 @@ fn make_lib_targz() -> cu::Result<()> {
         builder
     };
 
-        let lib_path = {
-            let mut path = crate_path.parent_abs()?;
-            path.push("lib");
-            path
-        };
-        let mut walk = cu::fs::walk(&lib_path)?;
-        while let Some(entry) = walk.next() {
-            let entry = entry?;
-            let entry_path = entry.path();
-            if !entry_path.is_file() {
-                continue;
-            }
-            let rel_path = entry_path.try_to_rel_from(&lib_path);
-            cu::ensure!(
-                rel_path.is_relative(),
-                "not relative: {}",
-                rel_path.display()
-            );
-            let mut file = cu::check!(
-                File::open(&entry_path),
-                "failed to open '{}'",
-                entry_path.display()
-            )?;
-            println!("cargo::rerun-if-changed={}", entry_path.as_utf8()?);
-            tar_builder.append_file(&rel_path, &mut file)?;
+    let lib_path = {
+        let mut path = crate_path.parent_abs()?;
+        path.push("lib");
+        path
+    };
+    let mut walk = cu::fs::walk(&lib_path)?;
+    while let Some(entry) = walk.next() {
+        let entry = entry?;
+        let entry_path = entry.path();
+        if !entry_path.is_file() {
+            continue;
         }
+        let rel_path = entry_path.try_to_rel_from(&lib_path);
+        cu::ensure!(
+            rel_path.is_relative(),
+            "not relative: {}",
+            rel_path.display()
+        );
+        let mut file = cu::check!(
+            File::open(&entry_path),
+            "failed to open '{}'",
+            entry_path.display()
+        )?;
+        println!("cargo::rerun-if-changed={}", entry_path.as_utf8()?);
+        tar_builder.append_file(&rel_path, &mut file)?;
+    }
     tar_builder.into_inner()?.finish()?.flush()?;
     Ok(())
 }

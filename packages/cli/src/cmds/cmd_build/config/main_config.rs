@@ -4,7 +4,7 @@
 //! Config structures
 use std::path::{Path, PathBuf};
 
-use super::{Build, CaptureUnused, ExtendProfile, Profile, Validate, ValidateCtx, BASE_PROFILE};
+use super::{BASE_PROFILE, Build, CaptureUnused, ExtendProfile, Profile, Validate, ValidateCtx};
 use cu::pre::*;
 
 /// Load a Megaton.toml config file

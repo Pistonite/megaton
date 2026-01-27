@@ -125,7 +125,7 @@ pub fn load_known_symbols(btart: &BTArtifacts, config: &Check) -> cu::Result<Sym
 
 fn parse_objdump_syms(content: String) -> BTreeSet<String> {
     let mut lines = content.lines();
-    
+
     for line in lines.by_ref() {
         if line == "DYNAMIC SYMBOL TABLE:" {
             break;

@@ -62,6 +62,7 @@ static LIBRARY_TARGZ: &[u8] = include_bytes!("../../../libmegaton.tar.gz");
 //       - <module>.nso
 //       - ...: other output files and caches
 
+#[allow(dead_code)]
 struct BTArtifacts {
     project_root: PathBuf,
     target: PathBuf, // ./target/megaton
@@ -134,10 +135,9 @@ struct RustCrate {
 impl RustCrate {
     pub fn new(manifest_path: PathBuf) -> Self {
         Self {
-            manifest: manifest_path
-                .clone()
-                .canonicalize()
-                .unwrap_or_else(|_| panic!("Could not find Cargo.toml at {:?}", manifest_path.display())),
+            manifest: manifest_path.clone().canonicalize().unwrap_or_else(|_| {
+                panic!("Could not find Cargo.toml at {:?}", manifest_path.display())
+            }),
             got_built: false,
         }
     }
@@ -458,7 +458,7 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let _ = compdb
         .save_command_log(&bt_artifacts.command_log_path)
         .inspect_err(|e| cu::error!("Failed to save command log! {}", e));
-    
+
     compdb.save_cc_json(PathBuf::from(config.module.compdb).as_ref())?;
 
     Ok(())
