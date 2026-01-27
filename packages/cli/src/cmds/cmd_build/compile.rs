@@ -63,7 +63,7 @@ impl CompileDB {
             .collect::<Vec<_>>()
             .join("\n");
         let content = content + "\n";
-        file.write(content.as_bytes())?;
+        file.write_all(content.as_bytes())?;
         Ok(())
     }
 }
@@ -80,7 +80,7 @@ pub struct LinkCommand {
     args: Vec<String>,
 }
 impl LinkCommand {
-    pub fn new(ld_path: &Path, args: &Vec<String>) -> Self {
+    pub fn new(ld_path: &Path, args: &[String]) -> Self {
         Self {
             linker: ld_path.to_path_buf(),
             args: args.to_vec(),
@@ -107,10 +107,10 @@ impl CompileCommand {
         src_file: &Path,
         out_file: &Path,
         dep_file: &Path,
-        flags: &Vec<String>,
-        includes: Vec<String>,
+        flags: &[String],
+        includes: &[String],
     ) -> cu::Result<Self> {
-        let mut args = flags.clone();
+        let mut args = flags.to_owned();
         args.push("-MMD".to_owned());
         args.push("-MP".to_owned());
         args.push("-MF".to_owned());
@@ -131,7 +131,7 @@ impl CompileCommand {
 
         args.push(String::from("-c"));
 
-        args.push(format!("-o{}", out_file.display().to_string()));
+        args.push(format!("-o{}", out_file.display()));
 
         args.push(src_file.display().to_string());
 
@@ -158,7 +158,7 @@ impl CompileCommand {
             &self.compiler.display(),
             &self.args.join(" ")
         );
-        let child = cu::CommandBuilder::new(&self.compiler.as_os_str())
+        let child = cu::CommandBuilder::new(self.compiler.as_os_str())
             .args(self.args.clone())
             .stdoe(cu::pio::inherit()) // todo: log to file
             .stdin_null()
@@ -197,16 +197,6 @@ struct CCJsonEntry {
     arguments: Vec<String>,
     directory: String,
     file: String,
-}
-
-impl CCJsonEntry {
-    fn new(arguments: Vec<String>, directory: String, file: String) -> Self {
-        Self {
-            arguments,
-            directory,
-            file,
-        }
-    }
 }
 
 impl From<&CompileCommand> for CCJsonEntry {
@@ -272,7 +262,7 @@ impl SourceFile {
         output_path: &PathBuf,
     ) -> cu::Result<bool> {
         if !output_path.exists() {
-            cu::fs::make_dir(&output_path).unwrap();
+            cu::fs::make_dir(output_path).unwrap();
             cu::info!(
                 "Output path {:?} exists={}",
                 &output_path,
@@ -289,12 +279,7 @@ impl SourceFile {
         };
 
         let comp_command = CompileCommand::new(
-            comp_path,
-            &self.path,
-            &o_path,
-            &d_path,
-            &comp_flags,
-            includes,
+            comp_path, &self.path, &o_path, &d_path, comp_flags, &includes,
         )?;
 
         compile_db.update(CompileRecord::Compile(comp_command.clone()));
@@ -348,7 +333,7 @@ impl SourceFile {
         }
 
         let d_file_contents = cu::fs::read_string(d_path)?;
-        let depfile = match depfile::parse(&&d_file_contents) {
+        let depfile = match depfile::parse(&d_file_contents) {
             Ok(depfile) => depfile,
 
             // Make sure our errors are all cu compatible
@@ -386,8 +371,7 @@ pub enum Lang {
 
 fn get_obj_files_in(target: &PathBuf) -> Vec<PathBuf> {
     let paths = cu::fs::read_dir(target).unwrap();
-    let mut result: Vec<PathBuf> = vec![];
-
+    let mut result = Vec::new();
     for path in paths {
         if let Ok(path) = path
             && let Ok(ft) = path.file_type()
@@ -450,7 +434,7 @@ pub fn relink(
         .to_string();
     ldscripts.insert(0, main_ldscript_path);
 
-    let linker_args: Vec<Vec<String>> = vec![&build.libraries, &build.libpaths, &ldscripts].iter().map(|paths| {
+    let linker_args: Vec<Vec<String>> = [&build.libraries, &build.libpaths, &ldscripts].iter().map(|paths| {
         paths.iter().filter_map(|path| {
             match PathBuf::from(path).canonicalize() {
                 Ok(abs_path) => Some(abs_path.display().to_string()),
@@ -480,10 +464,7 @@ pub fn relink(
     args.push(format!("-Wl,-init={}", entrypoint));
     let verfile_path = &bt_artifacts.verfile_path;
     create_verfile(verfile_path, entrypoint)?;
-    args.push(format!(
-        "-Wl,--version-script={}",
-        verfile_path.display().to_string()
-    ));
+    args.push(format!("-Wl,--version-script={}", verfile_path.display()));
 
     args.extend(ldscripts);
     args.extend(libpaths);

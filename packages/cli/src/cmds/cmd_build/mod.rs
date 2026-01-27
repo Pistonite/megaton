@@ -137,12 +137,12 @@ impl RustCrate {
             manifest: manifest_path
                 .clone()
                 .canonicalize()
-                .expect(format!("Could not find Cargo.toml at {:?}", manifest_path).as_str()),
+                .unwrap_or_else(|_| panic!("Could not find Cargo.toml at {:?}", manifest_path.display())),
             got_built: false,
         }
     }
 
-    pub fn build(&mut self, build: &config::Build, build_flags: &Flags) -> cu::Result<()> {
+    pub fn build(&mut self, build_flags: &Flags) -> cu::Result<()> {
         cu::info!("Building rust crate!");
         let cargo = cu::which("cargo").context("cargo executable not found")?;
 
@@ -367,7 +367,7 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     let mut rust_staticlib_path: Option<PathBuf> = None;
     if config.cargo.enabled {
         let mut rust_crate = RustCrate::new(PathBuf::from(&config.cargo.manifest.clone().unwrap()));
-        rust_crate.build(&build_config, &build_flags).unwrap();
+        rust_crate.build(&build_flags).unwrap();
         compiler_did_something = compiler_did_something || rust_crate.got_built;
 
         cu::info!("Generating cxx bridge src!");
@@ -387,11 +387,10 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     sources
         .iter()
-        .map(|src| {
+        .flat_map(|src| {
             // todo: inspect and handle errs
             discover_source(PathBuf::from(src).as_path()).unwrap_or_default()
         })
-        .flatten()
         .for_each(|src| {
             let compilation_occurred = src
                 .compile(
@@ -436,7 +435,6 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
 
         if let Some(check) = &config.check {
             let check = check.get_profile(profile);
-            let res = check::load_known_symbols(&bt_artifacts, &check);
             let symbols = check::load_known_symbols(&bt_artifacts, &check).unwrap_or_default();
             let res = check::check_symbols(&elf_path, symbols, &check).unwrap();
             if !res.is_empty() {
