@@ -2,17 +2,34 @@
 // Copyright (c) 2025-2026 Megaton contributors
 
 //! Config structures
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::{BASE_PROFILE, Build, CaptureUnused, ExtendProfile, Profile, Validate, ValidateCtx};
 use cu::pre::*;
 
 /// Load a Megaton.toml config file
-pub fn load_config(path: impl AsRef<Path>) -> cu::Result<Config> {
-    let content = cu::fs::read_string(path)?;
-    let config = toml::parse::<Config>(&content).context("failed to parse Megaton config")?;
-    config.validate_root()?;
-    Ok(config)
+pub fn load_config(manifest_path: impl AsRef<Path>) -> cu::Result<Config> {
+    let cwd = PathBuf::from(".").canonicalize().unwrap();
+    let ancestors = cwd.ancestors();
+
+    for path in ancestors {
+        let p = PathBuf::from(path).join(&manifest_path).canonicalize();
+        match p {
+            Ok(p) => {
+                if p.exists() {
+                    std::env::set_current_dir(p.parent().unwrap())
+                        .expect("Could not open megaton project root");
+                    let content = cu::fs::read_string(p)?;
+                    let config = toml::parse::<Config>(&content)
+                        .context("failed to parse Megaton config")?;
+                    config.validate_root()?;
+                    return Ok(config);
+                }
+            }
+            Err(_) => continue,
+        }
+    }
+    Err(cu::Error::msg("Failed to find Megaton config"))
 }
 
 /// Config data read from Megaton.toml
@@ -69,18 +86,44 @@ impl Validate for Config {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CargoConfig {
-    // TODO: implement
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_manifest")]
+    pub manifest: Option<String>,
+    #[serde(flatten, default)]
+    unused: CaptureUnused,
 }
 
-// impl Default for CargoConfig {
-//     fn default() -> Self {
-//         Self {
-//             // TODO: Implement
-//         }
-//     }
-// }
+impl Default for CargoConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            manifest: Some("Cargo.toml".to_string()),
+            unused: Default::default(),
+        }
+    }
+}
+
+fn default_manifest() -> Option<String> {
+    Some("Cargo.toml".to_string())
+}
+
+impl Validate for CargoConfig {
+    fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
+        if self.enabled {
+            if self.manifest.as_ref().is_none_or(|x| x.is_empty()) {
+                cu::error!("Must have manifest if cargo is enabled");
+                ctx.bail()?
+            }
+        } else if self.manifest.is_some() {
+            cu::error!("Cargo must be enabled for manifest");
+            ctx.bail()?
+        }
+        self.unused.validate(ctx)
+    }
+}
 
 /// The `[megaton]` section
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -163,11 +206,13 @@ pub struct Module {
     pub title_id: u64,
 
     /// The target directory to put build files
-    pub target: Option<String>,
+    #[serde(default = "default_target")]
+    pub target: PathBuf,
 
     /// The compile_commands.json file to put/update compile commands
     /// for other tools like clangd
-    pub compdb: Option<String>,
+    #[serde(default = "default_comp_commands")]
+    pub compdb: String,
 
     #[serde(flatten, default)]
     unused: CaptureUnused,
@@ -200,6 +245,14 @@ impl Module {
     pub fn title_id_hex(&self) -> String {
         format!("{:016x}", self.title_id)
     }
+}
+
+fn default_target() -> PathBuf {
+    PathBuf::from("target")
+}
+
+fn default_comp_commands() -> String {
+    "compile_commands.json".to_string()
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

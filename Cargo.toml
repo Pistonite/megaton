@@ -9,5 +9,5 @@ members = [
 
 [workspace.dependencies.cu]
 package = "pistonite-cu"
-version = "0.5.2"
+version = "0.6.0"
 # path = "../../../cu/packages/copper"

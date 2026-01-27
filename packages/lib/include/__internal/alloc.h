@@ -10,8 +10,8 @@ namespace nn::mem {
     class StandardAllocator {
         public:
             StandardAllocator();
-            // StandardAllocator(void* address, size_t size);
-            // StandardAllocator(void* address, size_t size, bool enableCache);
+            StandardAllocator(void* address, size_t size);
+            StandardAllocator(void* address, size_t size, bool enableCache);
 
             ~StandardAllocator() {
                 if (mIsInitialized) {

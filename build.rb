@@ -8,16 +8,11 @@ require 'getoptlong'
 prefix = 'packages/'
 # location of c/c++ source files
 cxx_dirs = [
-  'sys',
-  'lib',
-  'nx',
-  'abi'
+  'lib'
 ]
 # location of rust source files
 rust_dirs = [
   'lib',
-  'nx',
-  'abi'
 ]
 
 # default cmdline option directories
