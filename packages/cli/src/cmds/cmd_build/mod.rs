@@ -21,7 +21,7 @@ mod scan;
 
 use scan::discover_source;
 
-use crate::cmds::cmd_build::compile::{CompileDB, build_nso};
+use crate::cmds::cmd_build::compile::{CompileDB, SourceFile, build_nso};
 
 static LIBRARY_TARGZ: &[u8] = include_bytes!("../../../libmegaton.tar.gz");
 
@@ -230,8 +230,8 @@ pub struct CmdBuild {
 }
 
 impl CmdBuild {
-    pub fn run(self) -> cu::Result<()> {
-        run_build(self)
+    pub async fn run(self) -> cu::Result<()> {
+        run_build(self).await
     }
 }
 
@@ -260,24 +260,27 @@ fn build_lib(
     // build lib
     let mut compiler_did_something = false;
     let lib_build_flags = build_flags.add_c_cpp_flags(vec!["-DMEGATON_LIB".to_string()]);
-    discover_source(btart.lib_src.as_path())
-        .unwrap_or_default()
-        .iter()
-        .for_each(|src| {
-            let compilation_occurred = src
-                .compile(
-                    &lib_build_flags,
-                    vec![
-                        btart.lib_include.display().to_string(),
-                        String::from("/opt/devkitpro/libnx/include/"),
-                    ],
-                    compdb,
-                    &btart.lib_obj,
-                )
-                .inspect_err(|e| cu::error!("Failed to compile! {:?}", e))
-                .unwrap();
-            compiler_did_something = compiler_did_something || compilation_occurred;
-        });
+    // let compile_handles = discover_source(btart.lib_src.as_path())
+    //     .unwrap_or_default()
+    //     .iter()
+    //     .map(|src: &SourceFile| {
+    //         src.compile(
+    //             &lib_build_flags,
+    //             vec![
+    //                 btart.lib_include.display().to_string(),
+    //                 String::from("/opt/devkitpro/libnx/include/"),
+    //             ],
+    //             compdb,
+    //             &btart.lib_obj,
+    //         )
+    //     });
+    //
+    // futures::future::try_join_all(compile_handles).await;
+    //
+    // .inspect_err(|e| cu::error!("Failed to compile! {:?}", e))
+    // .unwrap();
+    // compiler_did_something = compiler_did_something || compilation_occurred;
+
     // build rt
     let module_name = format!("-D MEGART_NX_MODULE_NAME={:?}", config.module.name);
     let module_name_len = format!("-D MEGART_NX_MODULE_NAME_LEN={:?}", module_name.len());
@@ -307,8 +310,8 @@ fn build_lib(
     Ok(compiler_did_something)
 }
 
-fn run_build(args: CmdBuild) -> cu::Result<()> {
-    // Load config stuff
+async fn run_build(args: CmdBuild) -> cu::Result<()> {
+    // Load config
     let config = config::load_config(&args.config).context("failed to load config")?;
     cu::hint!("run with -v to see additional output");
     cu::debug!("{config:#?}");
@@ -352,6 +355,7 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
         .unwrap_or_default()
     };
 
+    cu::info!("Building lib");
     let mut compiler_did_something = if config.megaton.library {
         build_lib(&config, &build_flags, &bt_artifacts, &mut compdb)
             .context("Failed to build library")?

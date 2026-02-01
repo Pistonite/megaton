@@ -67,6 +67,6 @@ impl ValidateCtx {
     }
 
     pub fn bail(&self) -> cu::Result<()> {
-        cu::bailfyi!("error found at config key: {}", self.key);
+        cu::bail!("error found at config key: {}", self.key);
     }
 }

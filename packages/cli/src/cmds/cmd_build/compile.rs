@@ -158,12 +158,11 @@ impl CompileCommand {
             &self.compiler.display(),
             &self.args.join(" ")
         );
-        let child = cu::CommandBuilder::new(self.compiler.as_os_str())
+        let _ = cu::CommandBuilder::new(self.compiler.as_os_str())
             .args(self.args.clone())
             .stdoe(cu::pio::inherit()) // todo: log to file
             .stdin_null()
             .spawn()?;
-        child.wait_nz()?;
         Ok(())
     }
 
@@ -242,7 +241,7 @@ pub struct SourceFile {
 
 impl SourceFile {
     pub fn new(lang: Lang, path: PathBuf) -> cu::Result<Self> {
-        let basename = cu::PathExtension::file_name_str(&path)
+        let basename = cu::str::PathExtension::file_name_str(&path)
             .context("path is not utf-8")?
             .to_owned();
         let pathhash = fxhash::hash(&path);
@@ -259,7 +258,7 @@ impl SourceFile {
         flags: &Flags,
         includes: Vec<String>,
         compile_db: &mut CompileDB,
-        output_path: &PathBuf,
+        output_path: &Path,
     ) -> cu::Result<bool> {
         if !output_path.exists() {
             cu::fs::make_dir(output_path).unwrap();

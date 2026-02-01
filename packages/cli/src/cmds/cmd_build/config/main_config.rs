@@ -21,7 +21,7 @@ pub fn load_config(manifest_path: impl AsRef<Path>) -> cu::Result<Config> {
                         .expect("Could not open megaton project root");
                     let content = cu::fs::read_string(p)?;
                     let config = toml::parse::<Config>(&content)
-                        .context("failed to parse Megaton config")?;
+                        .context("Failed to parse Megaton config")?;
                     config.validate_root()?;
                     return Ok(config);
                 }
@@ -221,17 +221,17 @@ pub struct Module {
 impl Validate for Module {
     fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
         if self.name.is_empty() {
-            cu::bailfyi!("module.name must be non-empty");
+            cu::bail!("module.name must be non-empty");
         }
         if self.name == "lib" {
-            cu::bailfyi!("'lib' is reserved and cannot be the module name");
+            cu::bail!("'lib' is reserved and cannot be the module name");
         }
         if self
             .name
             .chars()
             .any(|c| !c.is_alphanumeric() && c != '-' && c != '_')
         {
-            cu::bailfyi!(
+            cu::bail!(
                 "'{}' is not a valid module name (must only contain alphanumeric characters, - or _",
                 self.name
             );
@@ -298,7 +298,7 @@ impl ProfileConfig {
             ("none", Some(p)) if p.is_empty() => {
                 cu::error!("no profile specified!");
                 cu::hint!("- please specify a profile with -p PROFILE");
-                cu::bailfyi!("failed to selected a profile");
+                cu::bail!("failed to selected a profile");
             }
             ("none", Some(p)) => p,
             ("none", None) => BASE_PROFILE,
@@ -308,7 +308,7 @@ impl ProfileConfig {
         if !self.allow_base && profile == "none" {
             cu::error!("base profile is not allowed!");
             cu::hint!("- please specify a profile with -p PROFILE");
-            cu::bailfyi!("failed to selected a profile");
+            cu::bail!("failed to selected a profile");
         }
 
         Ok(profile)

@@ -3,7 +3,7 @@
 
 use std::{collections::BTreeSet, path::PathBuf};
 
-use cu::{PathExtension, Spawn};
+use cu::pre::*;
 use regex::Regex;
 
 use crate::cmds::cmd_build::{BTArtifacts, config::Check};
