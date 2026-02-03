@@ -79,9 +79,7 @@ struct BTArtifacts {
     nso_path: PathBuf,
 
     lib_root: PathBuf,
-    lib_obj: PathBuf,
     lib_src: PathBuf,
-    lib_rt: PathBuf,
     lib_include: PathBuf,
     lib_linkldscript: PathBuf,
     verfile_path: PathBuf,
@@ -113,11 +111,9 @@ impl BTArtifacts {
             nso_path: module_root.join(format!("{}.nso", module_name)),
 
             lib_root: lib_root.clone(),
-            lib_obj: lib_root.join("o"),
             lib_src: lib_src.clone(),
-            lib_rt: lib_root.clone().join("rt"),
             lib_include: lib_root.join("include"),
-            lib_linkldscript: lib_root.join("rt").join("link.ld"),
+            lib_linkldscript: lib_root.join("link.ld"),
             verfile_path: lib_root.join("verfile"),
 
             compdb_path: profile_root.join("compdb.cache"),
@@ -259,7 +255,17 @@ fn build_lib(
 ) -> cu::Result<bool> {
     // build lib
     let mut compiler_did_something = false;
-    let lib_build_flags = build_flags.add_c_cpp_flags(vec!["-DMEGATON_LIB".to_string()]);
+    // build lib
+    let module_name = format!("-D MEGART_NX_MODULE_NAME={:?}", config.module.name);
+    let module_name_len = format!("-D MEGART_NX_MODULE_NAME_LEN={:?}", module_name.len());
+    let title_id = format!("-D MEGART_TITLE_ID={:?}", config.module.title_id);
+    let title_id_hex = format!("-D MEGART_TITLE_ID_HEX={:016x}", config.module.title_id);
+    let mut lib_build_flags = vec![module_name, module_name_len, title_id, title_id_hex, "-DMEGATON_LIB".to_string()];
+    if config.cargo.enabled {
+        lib_build_flags.push("-DMEGART_RUST".to_string());
+        lib_build_flags.push("-DMEGART_RUST_MAIN".to_string());
+    }
+    let lib_build_flags = build_flags.add_c_cpp_flags(lib_build_flags);
     discover_source(btart.lib_src.as_path())
         .unwrap_or_default()
         .iter()
@@ -267,38 +273,11 @@ fn build_lib(
             let compilation_occurred = src
                 .compile(
                     &lib_build_flags,
-                    vec![
-                        btart.lib_include.display().to_string(),
-                        String::from("/opt/devkitpro/libnx/include/"),
+                    vec![btart.lib_include.display().to_string(),
+                                 String::from("/opt/devkitpro/libnx/include"),
                     ],
                     compdb,
-                    &btart.lib_obj,
-                )
-                .inspect_err(|e| cu::error!("Failed to compile! {:?}", e))
-                .unwrap();
-            compiler_did_something = compiler_did_something || compilation_occurred;
-        });
-    // build rt
-    let module_name = format!("-D MEGART_NX_MODULE_NAME={:?}", config.module.name);
-    let module_name_len = format!("-D MEGART_NX_MODULE_NAME_LEN={:?}", module_name.len());
-    let title_id = format!("-D MEGART_TITLE_ID={:?}", config.module.title_id);
-    let title_id_hex = format!("-D MEGART_TITLE_ID_HEX={:016x}", config.module.title_id);
-    let rt_build_flags = vec![module_name, module_name_len, title_id, title_id_hex];
-    // if config.cargo.enabled {
-    //     rt_build_flags.push("-DMEGART_RUST".to_string());
-    //     rt_build_flags.push("-DMEGART_RUST_MAIN".to_string());
-    // }
-    let rt_build_flags = build_flags.add_c_cpp_flags(rt_build_flags);
-    discover_source(btart.lib_rt.as_path())
-        .unwrap_or_default()
-        .iter()
-        .for_each(|src| {
-            let compilation_occurred = src
-                .compile(
-                    &rt_build_flags,
-                    vec![btart.lib_include.display().to_string()],
-                    compdb,
-                    &btart.lib_obj,
+                    &btart.module_obj,
                 )
                 .inspect_err(|e| cu::error!("Failed to compile! {:?}", e))
                 .unwrap();
