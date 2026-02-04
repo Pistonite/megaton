@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2025 Megaton contributors
+// Copyright (c) 2025-2026 Megaton contributors
 
 use std::fmt::Display;
 
@@ -179,6 +179,7 @@ macro_rules! create_flags {
     };
 }
 
+#[allow(dead_code)]
 impl Flags {
     pub fn from_config(config: &FlagConfig) -> Self {
         let common = create_flags!(&config.common, DEFAULT_COMMON);

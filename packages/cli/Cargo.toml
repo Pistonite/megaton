@@ -19,11 +19,15 @@ which = "8.0.0"
 walkdir = "2.5.0"
 fxhash = "0.2.1"
 depfile = "0.1.1"
-serde_json = "1"
+regex = "1.12.2"
 
 [build-dependencies.cu]
 workspace = true
 features = ["process"]
+
+[build-dependencies]
+flate2 = "1.1.2"
+tar = "0.4.44"
 
 
 [[bin]]

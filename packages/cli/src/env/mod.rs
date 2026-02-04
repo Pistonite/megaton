@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2025 Megaton contributors
+// Copyright (c) 2025-2026 Megaton contributors
 
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -8,10 +8,12 @@ use cu::pre::*;
 
 // Core environment variables needed to run the tool
 // Includes paths to build/debug utilities and caches
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Environment {
     megaton_home: PathBuf,
     devkitpro: PathBuf,
+    dkp_version: String,
     cc: PathBuf,  // C compiler
     cxx: PathBuf, // C++ compiler
     asm: PathBuf, // Assembler
@@ -30,10 +32,13 @@ impl Environment {
         let dkp_tools_bin = devkitpro.join("tools").join("bin");
         let npdmtool = dkp_tools_bin.join("npdmtool");
         let elf2nso = dkp_tools_bin.join("elf2nso");
+        let dkp_version = get_dkp_version(&devkitpro, &cc)
+            .expect("Failed to init environment: check that DKP is installed correctly");
 
         Self {
             megaton_home,
             devkitpro,
+            dkp_version,
             cc,
             cxx,
             asm,
@@ -47,6 +52,12 @@ impl Environment {
     pub fn home(&self) -> &Path {
         &self.megaton_home
     }
+    pub fn dkp_path(&self) -> &Path {
+        &self.devkitpro
+    }
+    pub fn dkp_version(&self) -> &String {
+        &self.dkp_version
+    }
     pub fn cc_path(&self) -> &Path {
         &self.cc
     }
@@ -56,6 +67,40 @@ impl Environment {
     pub fn asm_path(&self) -> &Path {
         &self.asm
     }
+    pub fn elf2nso_path(&self) -> &Path {
+        &self.elf2nso
+    }
+    pub fn npdmtool_path(&self) -> &Path {
+        &self.npdmtool
+    }
+}
+
+fn get_dkp_version(dkp: &Path, cc: &Path) -> cu::Result<String> {
+    // /opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/
+    let readdir = cu::fs::read_dir(
+        dkp.join("devkitA64")
+            .join("aarch64-none-elf")
+            .join("include")
+            .join("c++"),
+    )
+    .context("DKP include path does not exist")?;
+
+    let dir = readdir.filter_map(|x| x.ok()).collect::<Vec<_>>();
+    if dir.len() == 1 {
+        return Ok(dir[0].file_name().display().to_string());
+    }
+
+    // Fallback: query gcc for version
+    let (gcc, output) = cu::CommandBuilder::new(cc.as_os_str())
+        .arg("-v")
+        .stdout(cu::pio::lines()) // todo: log to file
+        .stderr_null()
+        .stdin_null()
+        .spawn()?;
+    gcc.wait_nz()?;
+    let verline = output.last().unwrap()?;
+    let verstring = verline.split(" ").nth(2).unwrap().to_owned();
+    Ok(verstring)
 }
 
 static ENVIRONMENT: OnceLock<Environment> = OnceLock::new();

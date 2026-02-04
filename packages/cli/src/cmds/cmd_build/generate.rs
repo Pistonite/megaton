@@ -1,19 +1,23 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2025 Megaton contributors
+// Copyright (c) 2025-2026 Megaton contributors
 
 use std::path::{Path, PathBuf};
 
 use cu::pre::*;
 
+use crate::cmds::cmd_build::BTArtifacts;
+
 use super::RustCrate;
 
-pub fn generate_cxx_bridge_src(rust_crate: &RustCrate, module_target_path: &Path) -> cu::Result<()> {
+pub fn generate_cxx_bridge_src(
+    rust_crate: &RustCrate,
+    bt_artifacts: &BTArtifacts,
+) -> cu::Result<()> {
+    let include_rust = &bt_artifacts.module_cxxbridge_include;
+    let cxx_src_dir = &bt_artifacts.module_cxxbridge_src;
 
-    let include_rust = module_target_path.join("include").join("rust");
-    let cxx_src_dir = module_target_path.join("src").join("cxxbridge");
-
-    cu::fs::make_dir(&include_rust)?;
-    cu::fs::make_dir(&cxx_src_dir)?;
+    cu::fs::make_dir(include_rust)?;
+    cu::fs::make_dir(cxx_src_dir)?;
 
     let bridge_files = find_bridge_files(rust_crate)?;
     if bridge_files.is_empty() {

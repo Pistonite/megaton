@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2025 Megaton contributors
+// Copyright (c) 2025-2026 Megaton contributors
 
 //! Config structures
 use std::path::{Path, PathBuf};
@@ -13,13 +13,20 @@ pub fn load_config(manifest_path: impl AsRef<Path>) -> cu::Result<Config> {
     let ancestors = cwd.ancestors();
 
     for path in ancestors {
-        let p = PathBuf::from(path).join(&manifest_path).canonicalize().unwrap();
-        if p.exists() {
-            std::env::set_current_dir(p.parent().unwrap()).expect("Could not open megaton project root");
-            let content = cu::fs::read_string(p)?;
-            let config = toml::parse::<Config>(&content).context("failed to parse Megaton config")?;
-            config.validate_root()?;
-            return Ok(config)
+        let p = PathBuf::from(path).join(&manifest_path).canonicalize();
+        match p {
+            Ok(p) => {
+                if p.exists() {
+                    std::env::set_current_dir(p.parent().unwrap())
+                        .expect("Could not open megaton project root");
+                    let content = cu::fs::read_string(p)?;
+                    let config = toml::parse::<Config>(&content)
+                        .context("failed to parse Megaton config")?;
+                    config.validate_root()?;
+                    return Ok(config);
+                }
+            }
+            Err(_) => continue,
         }
     }
     Err(cu::Error::msg("Failed to find Megaton config"))
@@ -110,10 +117,10 @@ impl Validate for CargoConfig {
                 cu::error!("Must have manifest if cargo is enabled");
                 ctx.bail()?
             }
-         } else if self.manifest.is_some() {
-             cu::error!("Cargo must be enabled for manifest");
-             ctx.bail()?
-         }
+        } else if self.manifest.is_some() {
+            cu::error!("Cargo must be enabled for manifest");
+            ctx.bail()?
+        }
         self.unused.validate(ctx)
     }
 }

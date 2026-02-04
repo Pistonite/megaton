@@ -503,15 +503,6 @@ name = "megaton"
 version = "0.1.0"
 dependencies = [
  "cxx",
- "megaton-abi",
-]
-
-[[package]]
-name = "megaton-abi"
-version = "0.0.0"
-dependencies = [
- "cxx",
- "megaton-nnsdk-sys",
 ]
 
 [[package]]
@@ -523,18 +514,11 @@ dependencies = [
  "flate2",
  "fxhash",
  "pistonite-cu",
+ "regex",
  "serde",
- "serde_json",
  "tar",
  "walkdir",
  "which",
-]
-
-[[package]]
-name = "megaton-nnsdk-sys"
-version = "0.0.0"
-dependencies = [
- "cxx",
 ]
 
 [[package]]
