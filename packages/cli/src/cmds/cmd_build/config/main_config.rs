@@ -86,12 +86,20 @@ impl Validate for Config {
     }
 }
 
+/// The `[cargo]` section
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct CargoConfig {
-    #[serde(default = "default_true")]
-    pub enabled: bool,
-    #[serde(default = "default_manifest")]
-    pub manifest: Option<String>,
+    pub enabled: Option<bool>,
+
+    pub manifest: Option<PathBuf>,
+
+    #[serde(default = "default_header_suffix")]
+    pub header_suffix: String,
+
+    #[serde(default = "default_sources")]
+    pub sources: Vec<PathBuf>,
+
     #[serde(flatten, default)]
     unused: CaptureUnused,
 }
@@ -99,28 +107,30 @@ pub struct CargoConfig {
 impl Default for CargoConfig {
     fn default() -> Self {
         Self {
-            enabled: true,
-            manifest: Some("Cargo.toml".to_string()),
+            enabled: None,
+            manifest: None,
+            header_suffix: default_header_suffix(),
+            sources: default_sources(),
             unused: Default::default(),
         }
     }
 }
 
-fn default_manifest() -> Option<String> {
-    Some("Cargo.toml".to_string())
+impl CargoConfig {
+    pub fn default_manifest_path() -> PathBuf {
+        PathBuf::from("Cargo.toml")
+    }
+}
+
+fn default_header_suffix() -> String {
+    String::from(".h")
+}
+fn default_sources() -> Vec<PathBuf> {
+    vec![PathBuf::from("src")]
 }
 
 impl Validate for CargoConfig {
     fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
-        if self.enabled {
-            if self.manifest.as_ref().is_none_or(|x| x.is_empty()) {
-                cu::error!("Must have manifest if cargo is enabled");
-                ctx.bail()?
-            }
-        } else if self.manifest.is_some() {
-            cu::error!("Cargo must be enabled for manifest");
-            ctx.bail()?
-        }
         self.unused.validate(ctx)
     }
 }

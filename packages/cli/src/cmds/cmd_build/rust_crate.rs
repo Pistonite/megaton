@@ -2,28 +2,58 @@ use std::path::{Path, PathBuf};
 
 use cu::pre::*;
 
-use super::config::Flags;
+use super::config::CargoConfig;
 
-// A rust crate that will be built as a component of the megaton lib or the mod
-struct RustCrate {
-    manifest: PathBuf,
-    got_built: bool,
+pub struct RustCrate {
+    pub manifest: PathBuf,
+    target_path: PathBuf, // Not necessarily the same as the Megaton target dir
+    source_paths: Vec<PathBuf>,
 }
 
 impl RustCrate {
-    pub fn new(manifest_path: &Path) -> cu::Result<Self> {
+    /// Gets the crate based on the cargo config. Returns `Ok(None)`. Errors if
+    /// cargo is explicitly enabled, but couldn't be be found for some reason.
+    pub fn from_config(cargo: CargoConfig) -> cu::Result<Option<Self>> {
+        let manifest = cargo
+            .manifest
+            .unwrap_or(CargoConfig::default_manifest_path());
+
+        match cargo.enabled {
+            None => Ok(RustCrate::new(&manifest, cargo.sources).ok()),
+            Some(true) => Ok(Some(
+                RustCrate::new(&manifest, cargo.sources)
+                    .context("Cargo enabled, but failed to find the crate")?,
+            )),
+            Some(false) => Ok(None),
+        }
+    }
+
+    /// Prefer to use `from_config(...)` when possible
+    fn new(manifest_path: &Path, sources: Vec<PathBuf>) -> cu::Result<Self> {
         let manifest = manifest_path.to_owned().canonicalize().context(format!(
             "Could not find Cargo.toml at {:?}",
             manifest_path.display()
         ))?;
 
+        let crate_root = manifest.parent().unwrap();
+
+        let source_paths = sources
+            .iter()
+            .map(|rel_path| crate_root.join(rel_path))
+            .collect::<Vec<_>>();
+
+        // This should always be target, even if the megaton target dir is differnt
+        let target_path = crate_root.join("target");
+
         Ok(Self {
             manifest,
-            got_built: false,
+            target_path,
+            source_paths,
         })
     }
 
-    pub async fn build(&mut self, cargoflags: &[String], rustflags: &str) -> cu::Result<bool> {
+    /// Build the rust crate with `cargo build +megaton`
+    pub async fn build(&self, cargoflags: &[String], rustflags: &str) -> cu::Result<bool> {
         cu::info!("Building rust crate!");
         let cargo = cu::which("cargo").context("Cargo executable not found")?;
 
@@ -41,26 +71,16 @@ impl RustCrate {
         command = command.args(cargoflags);
         command = command.env("RUSTFLAGS", rustflags);
 
-        let exit_code = command.co_spawn().await?.co_wait_nz();
-        if !exit_code.success() {
-            return Err(cu::Error::msg(format!(
-                "Cargo build failed with exit status {:?}",
-                exit_code
-            )));
-        }
+        let child = command.co_spawn().await?;
+        child.co_wait_nz().await.context("Cargo build failed")?;
 
-        self.got_built = true;
-        Ok(self.got_built)
+        // TODO: return false if cargo did nothing
+        Ok(true)
     }
 
-    pub fn get_source_folder(&self) -> Vec<PathBuf> {
-        vec![PathBuf::from("src")]
-    }
-
-    pub fn get_source_files(&self) -> cu::Result<Vec<PathBuf>> {
-        let source_dirs = self.get_source_folder();
+    fn get_source_files(&self) -> cu::Result<Vec<PathBuf>> {
         let mut source_files: Vec<PathBuf> = vec![];
-        for dir in source_dirs {
+        for dir in &self.source_paths {
             let mut walk = cu::fs::walk(dir)?;
             while let Some(entry) = walk.next() {
                 let p = entry?.path();
@@ -72,9 +92,14 @@ impl RustCrate {
         Ok(source_files)
     }
 
-    pub fn get_output_path(&self, target_path: &Path) -> cu::Result<PathBuf> {
-        // assuming cargo is in release mode
-        let rel_path = target_path.join("aarch64-unknown-hermit").join("release");
+    /// Gets the path to the static lib compiled by cargo
+    /// This should always be using the hermit target on release mode
+    /// Will panic if it fails to read the package name from Cargo.toml
+    pub fn get_output_path(&self) -> cu::Result<PathBuf> {
+        let rel_path = self
+            .target_path
+            .join("aarch64-unknown-hermit")
+            .join("release");
         let name = &cu::fs::read_string(&self.manifest)
             .unwrap()
             .parse::<toml::Table>()
@@ -83,8 +108,27 @@ impl RustCrate {
         let name = &name["package"]["name"].as_str().unwrap();
         let name = name.replace("-", "_");
         let filename = format!("lib{name}.a");
-        let path = rel_path.join(filename).canonicalize()?;
+        let path = rel_path
+            .join(&filename)
+            .canonicalize()
+            .context(format!("{} does not exist", &filename))?;
 
         Ok(path)
     }
+
+
+    /// Scan rust sources and generate cxxbridge sources and headers
+    pub async fn gen_cxxbridge(&self) -> cu::Result<()> {
+        Ok(())
+    }
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//
+//     #[test]
+//     fn test_new() {
+//
+//     }
+// }

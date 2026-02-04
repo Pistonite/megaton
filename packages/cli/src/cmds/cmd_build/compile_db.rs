@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 use crate::cmds::cmd_build::compile::{compile_command::{CompileCommand, devkitpro_includes}};
 
 
-
 #[derive(Serialize, Deserialize)]
 pub struct CompileRecord {
     pub args: Vec<String>,
