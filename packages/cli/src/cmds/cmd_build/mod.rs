@@ -12,8 +12,12 @@ use flate2::bufread::GzDecoder;
 
 use config::Flags;
 
+use crate::cmds::cmd_build::compile::compile::run_compilation;
+
 mod rust_crate;
 mod config;
+mod compile_db;
+mod compile;
 
 // The compressed library source archive. Extracted and compiled by the build command
 static LIBRARY_TARGZ: &[u8] = include_bytes!("../../../libmegaton.tar.gz");
