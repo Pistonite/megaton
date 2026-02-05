@@ -111,38 +111,6 @@ impl SourceFile {
         )
     }
 
-    pub async fn compile(
-        &self,
-        flags: &Flags,
-        includes: &[String],
-        output_path: &Path,
-    ) -> cu::Result<CompileCommand> {
-        if !output_path.exists() {
-            cu::fs::make_dir(output_path).unwrap();
-            cu::info!(
-                "Output path {:?} exists={}",
-                &output_path,
-                &output_path.exists()
-            );
-        }
-
-        let comp_command = self.build_compile_command(output_path, flags, includes);
-
-        // compile_db.update(comp_command.clone());
-        // Ensure source and artifacts have the same timestamp
-        let src_time = cu::fs::get_mtime(&self.path)?.unwrap();
-
-        // Compile and update record
-        comp_command.execute()?;
-        let (o_path, d_path) = (self.get_o_path(output_path), self.get_d_path(output_path));
-        cu::fs::set_mtime(o_path, src_time)?;
-        if d_path.exists() {
-            cu::fs::set_mtime(d_path, src_time)?;
-        }
-        Ok(comp_command)
-    } 
-        
-    
     pub fn need_recompile(
         &self,
         old_record: Option<&CompileRecord>,

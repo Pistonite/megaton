@@ -26,20 +26,26 @@ pub async fn run_compilation(
         })
         .collect::<Vec<_>>();
 
-    let compilation_futures = sources.iter().filter_map(|src| {
-        let compile_command = src.build_compile_command(&output_path, flags, &includes);
+    let sources = sources.iter().map(|src| (src, src.build_compile_command(&output_path, flags, &includes))).collect::<Vec<_>>();
+    let mut compilation_futures = vec![];
+    sources.
+        iter().for_each(|(src, compile_command)| { 
         let old_record = prev_compile_db.find_record(src.pathhash);
-        if src
-            .need_recompile(old_record, &output_path, &compile_command)
-            .unwrap_or(true)
-        {
-            let val = src.compile(flags, &includes, &output_path);
-            Some(val)
-        } else {
-            None
+        if src.need_recompile(old_record, &output_path, &compile_command).unwrap_or(true) {
+            let child = compile_command.execute();
+            compilation_futures.push((child, compile_command));
         }
     });
 
-    let compilation_results = join_all(compilation_futures).await;
+    // await compilation of all source files
+    let mut compilation_results= vec![];
+    for (future, cc) in compilation_futures {
+        let child = future.await?;
+        let result = child.co_wait_nz().await;
+        if result.is_ok(){
+            compilation_results.push(cc)
+        }
+    }
+
     Ok(CompileDB::new(compilation_results))
 }

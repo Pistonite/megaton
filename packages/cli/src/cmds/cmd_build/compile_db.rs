@@ -30,9 +30,9 @@ pub struct CompileDB {
 }
 
 impl CompileDB {
-    pub fn new(compilation_results: Vec<cu::Result<CompileCommand>>) -> Self {
+    pub fn new(compilation_results: Vec<&CompileCommand>) -> Self {
         let successful_compilations = compilation_results.iter()
-            .filter_map(|result| result.as_ref().map(|r| CompileRecord::from(r)).ok())
+            .map(|cc| CompileRecord::from(*cc))
             .collect::<Vec<_>>();
         Self { commands: successful_compilations }
     }
