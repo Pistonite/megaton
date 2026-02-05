@@ -138,7 +138,7 @@ Inheritance: Append
 Default: []
 
 ### Key: `build.libpaths` (array of strings)
-Paths to library directories to be passed to the compiler as -L flags.
+Paths to library directories to be passed to the linker as -L flags.
 
 Inheritance: Append
 

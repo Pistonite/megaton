@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025-2026 Megaton contributors
 
-use super::{CaptureUnused, ExtendProfile, FlagConfig, Validate, ValidateCtx};
+use std::path::PathBuf;
+
 use cu::pre::*;
+
+use super::{CaptureUnused, ExtendProfile, FlagConfig, Validate, ValidateCtx};
 
 /// Config in the `[build]` section
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -10,7 +13,7 @@ use cu::pre::*;
 pub struct Build {
     /// C/C++ Source directories, relative to Megaton.toml
     #[serde(default)]
-    pub sources: Vec<String>,
+    pub sources: Vec<PathBuf>,
 
     /// C/C++ Include directories, relative to Megaton.toml
     #[serde(default)]

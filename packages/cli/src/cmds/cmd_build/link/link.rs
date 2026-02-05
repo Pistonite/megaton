@@ -10,7 +10,7 @@ use std::{
 use cu::pre::*;
 use regex::Regex;
 
-use crate::{cmds::cmd_build::{compile_db::CompileDB, config::Build}, env::environment};
+use crate::{env::environment};
 
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub struct LinkCommand {

@@ -14,12 +14,16 @@ pub struct Environment {
     megaton_home: PathBuf,
     devkitpro: PathBuf,
     dkp_version: String,
-    cc: PathBuf,  // C compiler
-    cxx: PathBuf, // C++ compiler
-    asm: PathBuf, // Assembler
+    dkp_includes: Vec<String>,
     libnx_include: PathBuf,
     npdmtool: PathBuf,
     elf2nso: PathBuf,
+    cc: PathBuf,  // C compiler
+    cxx: PathBuf, // C++ compiler
+    asm: PathBuf, // Assembler
+    cc_version: String,
+    cxx_version: String,
+    asm_version: String,
 }
 
 impl Environment {
@@ -27,24 +31,33 @@ impl Environment {
         let dkp_bin = devkitpro.join("devkitA64").join("bin");
         let cc = dkp_bin.join("aarch64-none-elf-gcc");
         let cxx = dkp_bin.join("aarch64-none-elf-g++");
-        let asm = dkp_bin.join("aarch64-none-elf-gcc"); // Use gcc for now
+        let asm = dkp_bin.join("aarch64-none-elf-gcc");
         let libnx_include = devkitpro.join("libnx").join("include");
         let dkp_tools_bin = devkitpro.join("tools").join("bin");
         let npdmtool = dkp_tools_bin.join("npdmtool");
         let elf2nso = dkp_tools_bin.join("elf2nso");
         let dkp_version = get_dkp_version(&devkitpro, &cc)
             .expect("Failed to init environment: check that DKP is installed correctly");
+        let dkp_includes = get_dkp_includes(&devkitpro, &dkp_version);
+        let cc_version = get_cc_version(&cc)
+            .expect("Failed to init environment: error when checking compiler version");
+        let cxx_version = cc_version.clone(); // These should be the same, maybe merge
+        let asm_version = cc_version.clone(); // these at some point in the future
 
         Self {
             megaton_home,
             devkitpro,
             dkp_version,
-            cc,
-            cxx,
-            asm,
+            dkp_includes,
             libnx_include,
             npdmtool,
             elf2nso,
+            cc,
+            cxx,
+            asm,
+            cc_version,
+            cxx_version,
+            asm_version,
         }
     }
 
@@ -55,8 +68,14 @@ impl Environment {
     pub fn dkp_path(&self) -> &Path {
         &self.devkitpro
     }
-    pub fn dkp_version(&self) -> &String {
+    pub fn dkp_version(&self) -> &str {
         &self.dkp_version
+    }
+    pub fn dkp_includes(&self) -> &[String] {
+        &self.dkp_includes
+    }
+    pub fn libnx_include(&self) -> &Path {
+        &self.libnx_include
     }
     pub fn cc_path(&self) -> &Path {
         &self.cc
@@ -69,6 +88,15 @@ impl Environment {
     }
     pub fn elf2nso_path(&self) -> &Path {
         &self.elf2nso
+    }
+    pub fn cc_version(&self) -> &str {
+        &self.cc_version
+    }
+    pub fn cxx_version(&self) -> &str {
+        &self.cxx_version
+    }
+    pub fn asm_version(&self) -> &str {
+        &self.asm_version
     }
 }
 
@@ -83,21 +111,44 @@ fn get_dkp_version(dkp: &Path, cc: &Path) -> cu::Result<String> {
     .context("DKP include path does not exist")?;
 
     let dir = readdir.filter_map(|x| x.ok()).collect::<Vec<_>>();
-    if dir.len() == 1 {
-        return Ok(dir[0].file_name().display().to_string());
-    }
 
-    // Fallback: query gcc for version
-    let (gcc, output) = cu::CommandBuilder::new(cc.as_os_str())
+    if dir.len() == 1 {
+        Ok(dir[0].file_name().display().to_string())
+    } else {
+        // Fallback: query gcc for version
+        get_cc_version(cc)
+    }
+}
+
+fn get_cc_version(cc_path: &Path) -> cu::Result<String> {
+    let (child, _, lines) = cu::CommandBuilder::new(cc_path.as_os_str())
         .arg("-v")
-        .stdout(cu::pio::lines()) // todo: log to file
-        .stderr_null()
+        .stdout_null()
+        .stderr(cu::pio::lines())
         .stdin_null()
         .spawn()?;
-    gcc.wait_nz()?;
-    let verline = output.last().unwrap()?;
+    child.wait_nz()?;
+    let verline = lines.last().unwrap()?;
     let verstring = verline.split(" ").nth(2).unwrap().to_owned();
     Ok(verstring)
+}
+
+fn get_dkp_includes(dkp: &Path, dkp_version: &str) -> Vec<String> {
+    [
+        "devkitA64/aarch64-none-elf/include/c++/?ver?",
+        "devkitA64/aarch64-none-elf/include/c++/?ver?/aarch64-none-elf",
+        "devkitA64/aarch64-none-elf/include/c++/?ver?/backward",
+        "devkitA64/lib/gcc/aarch64-none-elf/?ver?/include",
+        "devkitA64/lib/gcc/aarch64-none-elf/?ver?/include-fixed",
+        "devkitA64/aarch64-none-elf/include",
+    ]
+    .iter()
+    .map(|path| {
+        dkp.join(path.replace("?ver?", dkp_version))
+            .display()
+            .to_string()
+    })
+    .collect::<Vec<_>>()
 }
 
 static ENVIRONMENT: OnceLock<Environment> = OnceLock::new();

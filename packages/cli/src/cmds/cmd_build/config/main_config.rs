@@ -83,6 +83,10 @@ impl Validate for Config {
             check.validate_property(ctx, "check")?;
         }
 
+        if !self.megaton.lib_enabled() && self.cargo.enabled.is_some_and(|val| val) {
+            cu::bail!("rust cannot be enabled unless libmegaton is enabled");
+        }
+
         self.unused.validate(ctx)
     }
 }
@@ -126,6 +130,7 @@ impl CargoConfig {
 fn default_header_suffix() -> String {
     String::from(".h")
 }
+
 fn default_sources() -> Vec<PathBuf> {
     vec![PathBuf::from("src")]
 }
@@ -145,20 +150,9 @@ pub struct MegatonConfig {
     /// `N` means the build tool must be version `0.N.x` (x can be anything)
     pub version: Option<u32>,
 
-    /// Whether to use libmegaton (default is true)
-    ///
-    /// If false, the module won't link with libmegaton
-    /// and you won't be able to use megaton's runtime features. This is useful
-    /// if you want to bring your own runtime. Note that this is required for
-    /// Rust support
-    ///
-    /// If libmegaton is not used, you also must set `entry` to the
-    /// name of the entrypoint function
-    #[serde(default = "default_true")]
-    pub library: bool,
-
-    /// Entry point symbol for the module. Only allowed if `megaton` is false
-    pub entry: Option<String>,
+    /// Custom entry point symbol for the module. This should only be set if libmegaton is disabled.
+    /// Using this disables the libmegaton runtime, which also means rust support will be disabled.
+    pub custom_entry: Option<String>,
 
     #[serde(flatten, default)]
     unused: CaptureUnused,
@@ -168,8 +162,7 @@ impl Default for MegatonConfig {
     fn default() -> Self {
         Self {
             version: None,
-            library: true,
-            entry: None,
+            custom_entry: None,
             unused: Default::default(),
         }
     }
@@ -178,22 +171,6 @@ impl Default for MegatonConfig {
 impl Validate for MegatonConfig {
     fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
         cu::hint!("TODO: implement version check");
-        if self.library {
-            if self.entry.is_some() {
-                cu::error!("megaton.entry can only be used when megaton.library = false!");
-                cu::hint!(
-                    "- consider setting megaton.library to false if you want to use your own library instead of megaton."
-                );
-                ctx.bail()?;
-            }
-        } else if self.entry.is_none() {
-            cu::error!("megaton.entry must be specified when megaton.library = false!");
-            cu::hint!(
-                "- consider specifying build.entry to the symbol of your module's entry point"
-            );
-            cu::hint!("- alternatively, set megaton.library to true to use megaton library");
-            ctx.bail()?;
-        }
         self.unused.validate(ctx)
     }
 }
@@ -201,10 +178,21 @@ impl Validate for MegatonConfig {
 impl MegatonConfig {
     /// Get the entry point symbol name
     pub fn entry_point(&self) -> &str {
-        match &self.entry {
-            Some(entry) => entry,
+        match &self.custom_entry {
             None => "__megaton_module_entry",
+            Some(entry) => {
+                if entry == "" {
+                    "__megaton_module_entry"
+                } else {
+                    entry
+                }
+            }
         }
+    }
+
+    /// Checks if libmegaton enabled
+    pub fn lib_enabled(&self) -> bool {
+        self.custom_entry.clone().is_none_or(|val| val == "")
     }
 }
 
