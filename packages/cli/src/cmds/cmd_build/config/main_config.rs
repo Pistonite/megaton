@@ -76,8 +76,9 @@ impl Validate for Config {
         self.module.validate_property(ctx, "module")?;
         self.profile.validate_property(ctx, "profile")?;
         self.megaton.validate_property(ctx, "megaton")?;
-        cu::hint!("TODO: add cargo config");
+        self.cargo.validate_property(ctx, "cargo")?;
         self.build.validate_property(ctx, "build")?;
+
         if let Some(check) = &self.check {
             check.validate_property(ctx, "check")?;
         }
@@ -131,6 +132,7 @@ fn default_sources() -> Vec<PathBuf> {
 
 impl Validate for CargoConfig {
     fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
+        cu::hint!("TODO: validate cargo config");
         self.unused.validate(ctx)
     }
 }

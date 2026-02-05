@@ -1,18 +1,16 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025-2026 Megaton contributors
 
-use std::path::Path;
-
 use cu::pre::*;
 use derive_more::AsRef;
 
 use config::Flags;
-use rust_crate::RustCrate;
+use rust_context::RustCtx;
 
 mod compile;
 mod compile_db;
 mod config;
-mod rust_crate;
+mod rust_context;
 
 // // The compressed library source archive. Extracted and compiled by the build command
 // static LIBRARY_TARGZ: &[u8] = include_bytes!("../../../libmegaton.tar.gz");
@@ -72,18 +70,20 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     cu::debug!("title_id_hex={title_id_hex}");
 
     ////////// Build rust //////////
-    let rust_crate = RustCrate::from_config(config.cargo)?;
-    if !rust_crate.is_none() {
-        let rust_crate = rust_crate.unwrap();
-        cu::debug!("cargo manifest: {}", rust_crate.manifest.display());
+    let rust_ctx = RustCtx::from_config(config.cargo);
+    if let Some(rust_ctx) = rust_ctx {
+        let rust_ctx = rust_ctx?;
+        cu::debug!("cargo manifest: {}", rust_ctx.manifest.display());
 
-        rust_crate
+        let cargo_changed= rust_ctx
             .build(&build_flags.cargoflags, &build_flags.rustflags)
             .await?;
 
-        cu::debug!("cargo output={}", rust_crate.get_output_path()?.display());
+        if cargo_changed {
+            cu::debug!("rust static lib was updated");
+        }
 
-        rust_crate.gen_cxxbridge().await?;
+        rust_ctx.gen_cxxbridge().await?;
     }
 
     Ok(())
