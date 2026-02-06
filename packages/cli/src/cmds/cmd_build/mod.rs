@@ -11,6 +11,7 @@ mod compile;
 mod compile_db;
 mod config;
 mod rust_context;
+mod link;
 
 // // The compressed library source archive. Extracted and compiled by the build command
 // static LIBRARY_TARGZ: &[u8] = include_bytes!("../../../libmegaton.tar.gz");
