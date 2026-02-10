@@ -13,11 +13,11 @@ pub fn generate_cxx_bridge_src(
     rust_crate: &RustCrate,
     bt_artifacts: &BTArtifacts,
 ) -> cu::Result<()> {
-    let include_rust = &bt_artifacts.module_cxxbridge_include;
-    let cxx_src_dir = &bt_artifacts.module_cxxbridge_src;
+    let include_rust = &bt_artifacts.module_include;
+    let cxx_src_dir = &bt_artifacts.module_src;
 
-    cu::fs::make_dir(include_rust)?;
-    cu::fs::make_dir(cxx_src_dir)?;
+    // cu::fs::make_dir(include_rust)?;
+    // cu::fs::make_dir(cxx_src_dir)?;
 
     let bridge_files = find_bridge_files(rust_crate)?;
     if bridge_files.is_empty() {
@@ -28,16 +28,51 @@ pub fn generate_cxx_bridge_src(
     let exe =
         cu::which("cxxbridge").context("cxxbridge not found; `cargo install cxxbridge-cmd`")?;
 
+    let (cxx_child, cxx_stdout, cxx_stderr) = cu::Command::new(&exe)
+        .arg("--header")
+        .stdout(cu::pio::buffer())
+        .stderr(cu::pio::buffer())
+        .stdin_null()
+        .spawn()
+        .with_context(|| format!("spawn {} --header", exe.display()))?;
+
+    let status = cxx_child.wait()?;
+    let cxx_stdout_bytes = cxx_stdout.join()??;
+    let cxx_stderr_bytes = cxx_stderr.join()??;
+
+    if !status.success() {
+        cu::bail!(
+            "cxxbridge --header failed failed: {}",
+            String::from_utf8_lossy(&cxx_stderr_bytes).trim()
+        );
+    }
+
+    write_if_changed(
+        &include_rust.join("rust").join("cxx.h"),
+        &cxx_stdout_bytes,
+    )?;
+
     for rs in bridge_files {
         let stem_os = rs
             .file_stem()
             .ok_or_else(|| cu::fmterr!("invalid file name: {}", rs.display()))?;
 
         let stem = stem_os.to_string_lossy();
+        let suffix = rust_crate.header_suffix.clone();
+        let path_to_rs = rs.canonicalize().unwrap();
 
-        let out_h = include_rust.join(format!("{stem}.h"));
-        let out_cc = cxx_src_dir.join(format!("{stem}.cc"));
-
+        // let out_h = include_rust.join(format!("{stem}.{suffix}"));
+        // let out_cc = cxx_src_dir.join(format!("{stem}.cc"));
+        let rel_source_path = rust_crate.source_paths.iter().find(|p| {
+            let v = path_to_rs.starts_with(p);
+            cu::info!("pref {:?} rs {:?} v {:?}", p, path_to_rs, v);
+            v}
+        ).unwrap();
+        let rel_source_path = path_to_rs.strip_prefix(rel_source_path)?;
+        let mut out_h = bt_artifacts.module_include.join(rel_source_path);
+        let mut out_cc = bt_artifacts.module_src.join(rel_source_path);
+        out_h.set_file_name(format!("{stem}{suffix}"));
+        out_cc.set_file_name(format!("{stem}.cc"));
         if let Some(p) = out_h.parent() {
             cu::fs::make_dir(p)?;
         }
