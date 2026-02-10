@@ -21,7 +21,10 @@ mod scan;
 
 use scan::discover_source;
 
-use crate::cmds::cmd_build::{compile::{CompileDB, build_nso}, config::CargoConfig};
+use crate::cmds::cmd_build::{
+    compile::{CompileDB, build_nso},
+    config::CargoConfig,
+};
 
 static LIBRARY_TARGZ: &[u8] = include_bytes!("../../../libmegaton.tar.gz");
 
@@ -134,7 +137,7 @@ pub struct RustCrate {
     pub manifest: PathBuf,
     pub target_path: PathBuf, // Not necessarily the same as the Megaton target dir
     pub source_paths: Vec<PathBuf>,
-    pub header_suffix: String
+    pub header_suffix: String,
 }
 
 impl RustCrate {
@@ -155,7 +158,7 @@ impl RustCrate {
         }
     }
 
-   fn new(manifest_path: &Path, sources: Vec<PathBuf>, header_suffix: String) -> cu::Result<Self> {
+    fn new(manifest_path: &Path, sources: Vec<PathBuf>, header_suffix: String) -> cu::Result<Self> {
         let manifest = manifest_path.to_owned().canonicalize().context(format!(
             "Could not find Cargo.toml at {:?}",
             manifest_path.display()
@@ -307,7 +310,7 @@ fn build_lib(
         title_id_hex,
         "-DMEGATON_LIB".to_string(),
     ];
-    if config.cargo.enabled.is_some_and(|e| e)  {
+    if config.cargo.enabled.is_some_and(|e| e) {
         lib_build_flags.push("-DMEGART_RUST".to_string());
         lib_build_flags.push("-DMEGART_RUST_MAIN".to_string());
     }

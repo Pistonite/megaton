@@ -47,10 +47,7 @@ pub fn generate_cxx_bridge_src(
         );
     }
 
-    write_if_changed(
-        &include_rust.join("rust").join("cxx.h"),
-        &cxx_stdout_bytes,
-    )?;
+    write_if_changed(&include_rust.join("rust").join("cxx.h"), &cxx_stdout_bytes)?;
 
     for rs in bridge_files {
         let stem_os = rs
@@ -63,11 +60,15 @@ pub fn generate_cxx_bridge_src(
 
         // let out_h = include_rust.join(format!("{stem}.{suffix}"));
         // let out_cc = cxx_src_dir.join(format!("{stem}.cc"));
-        let rel_source_path = rust_crate.source_paths.iter().find(|p| {
-            let v = path_to_rs.starts_with(p);
-            cu::info!("pref {:?} rs {:?} v {:?}", p, path_to_rs, v);
-            v}
-        ).unwrap();
+        let rel_source_path = rust_crate
+            .source_paths
+            .iter()
+            .find(|p| {
+                let v = path_to_rs.starts_with(p);
+                cu::info!("pref {:?} rs {:?} v {:?}", p, path_to_rs, v);
+                v
+            })
+            .unwrap();
         let rel_source_path = path_to_rs.strip_prefix(rel_source_path)?;
         let mut out_h = bt_artifacts.module_include.join(rel_source_path);
         let mut out_cc = bt_artifacts.module_src.join(rel_source_path);
