@@ -135,6 +135,7 @@ impl BTArtifacts {
 // A rust crate that will be built as a component of the megaton lib or the mod
 pub struct RustCrate {
     pub manifest: PathBuf,
+    #[allow(dead_code)]
     pub target_path: PathBuf, // Not necessarily the same as the Megaton target dir
     pub source_paths: Vec<PathBuf>,
     pub header_suffix: String,
