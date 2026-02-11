@@ -17,6 +17,7 @@ pub struct Environment {
     cc: PathBuf,  // C compiler
     cxx: PathBuf, // C++ compiler
     asm: PathBuf, // Assembler
+    ar: PathBuf, // Archiver
     libnx_include: PathBuf,
     npdmtool: PathBuf,
     elf2nso: PathBuf,
@@ -28,6 +29,7 @@ impl Environment {
         let cc = dkp_bin.join("aarch64-none-elf-gcc");
         let cxx = dkp_bin.join("aarch64-none-elf-g++");
         let asm = dkp_bin.join("aarch64-none-elf-gcc"); // Use gcc for now
+        let ar = dkp_bin.join("aarch64-none-elf-ar"); // Use gcc for now
         let libnx_include = devkitpro.join("libnx").join("include");
         let dkp_tools_bin = devkitpro.join("tools").join("bin");
         let npdmtool = dkp_tools_bin.join("npdmtool");
@@ -42,6 +44,7 @@ impl Environment {
             cc,
             cxx,
             asm,
+            ar,
             libnx_include,
             npdmtool,
             elf2nso,
@@ -66,6 +69,9 @@ impl Environment {
     }
     pub fn asm_path(&self) -> &Path {
         &self.asm
+    }
+    pub fn ar_path(&self) -> &Path {
+        &self.ar
     }
     pub fn elf2nso_path(&self) -> &Path {
         &self.elf2nso

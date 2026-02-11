@@ -21,10 +21,10 @@ mod scan;
 
 use scan::discover_source;
 
-use crate::cmds::cmd_build::{
+use crate::{cmds::cmd_build::{
     compile::{CompileDB, build_nso},
     config::CargoConfig,
-};
+}, env::environment};
 
 static LIBRARY_TARGZ: &[u8] = include_bytes!("../../../libmegaton.tar.gz");
 
@@ -200,7 +200,9 @@ impl RustCrate {
 
         command = command.args(&build_flags.cargoflags);
         command = command.env("RUSTFLAGS", build_flags.rustflags.clone());
-
+        command = command.env("CC", environment().cc_path());
+        command = command.env("CXX", environment().cxx_path());
+        command = command.env("AR", environment().ar_path());
         let exit_code = command.spawn()?.wait()?;
         if !exit_code.success() {
             return Err(cu::Error::msg(format!(
