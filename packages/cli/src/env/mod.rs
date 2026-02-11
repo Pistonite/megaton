@@ -17,7 +17,7 @@ pub struct Environment {
     cc: PathBuf,  // C compiler
     cxx: PathBuf, // C++ compiler
     asm: PathBuf, // Assembler
-    ar: PathBuf, // Archiver
+    ar: PathBuf,  // Archiver
     libnx_include: PathBuf,
     npdmtool: PathBuf,
     elf2nso: PathBuf,

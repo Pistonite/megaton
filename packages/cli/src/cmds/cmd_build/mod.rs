@@ -21,10 +21,13 @@ mod scan;
 
 use scan::discover_source;
 
-use crate::{cmds::cmd_build::{
-    compile::{CompileDB, build_nso},
-    config::CargoConfig,
-}, env::environment};
+use crate::{
+    cmds::cmd_build::{
+        compile::{CompileDB, build_nso},
+        config::CargoConfig,
+    },
+    env::environment,
+};
 
 static LIBRARY_TARGZ: &[u8] = include_bytes!("../../../libmegaton.tar.gz");
 
