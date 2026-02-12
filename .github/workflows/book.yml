@@ -1,0 +1,37 @@
+name: deploy-docs
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: Pistonight/mono-dev/actions/setup@main
+        with:
+          mono-dev: packages
+          rust: stable
+          tool-mdbook: true
+      - run: task exec -- docs:build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: packages/docs/book
+          retention-days: 3
+  deploy:
+    needs:
+      - build
+    if: github.event_name != 'pull_request'
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
