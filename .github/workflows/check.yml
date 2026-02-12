@@ -29,4 +29,5 @@ jobs:
           mono-dev: packages
           rust: stable
           tool-mdbook: true
+      - run: task exec -- docs:install
       - run: task build
