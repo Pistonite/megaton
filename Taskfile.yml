@@ -6,13 +6,14 @@ includes:
     optional: true
     flatten: true
 
-  cli: { taskfile: packages/cli, dir: packages/cli, internal: true }
-
-  # docs:
-  #   taskfile: ./docs
-  #   dir: ./docs
+  cli:  { taskfile: packages/cli,  dir: packages/cli,  internal: true }
+  docs: { taskfile: packages/docs, dir: packages/docs, internal: true }
 
 tasks:
+  install:
+    - task: docs:install
+    - task: install-mono
+
   install-mono:
     - rm -rf packages/mono-dev
     - git clone https://github.com/Pistonight/mono-dev --depth 1 packages/mono-dev
@@ -22,7 +23,7 @@ tasks:
     cmds:
       - task: cargo-binstall
         vars:
-          PACKAGES: lisensor
+          PACKAGES: lisensor mdbook@0.4 mdbook-admonish cargo-watch live-server
 
   check:
     desc: run ALL of the checks
@@ -34,6 +35,7 @@ tasks:
     desc: make sure everything can build
     cmds:
       - task: cli:build
+      - task: docs:build
 
   license:
     desc: check or fix license notices (-- -f to fix)
