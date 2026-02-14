@@ -21,7 +21,8 @@ mod scan;
 
 use scan::discover_source;
 
-use crate::cmds::cmd_build::compile::{CompileDB, build_nso};
+use crate::{cmds::cmd_build::compile::{CompileDB, build_nso}, env::environment};
+use crate::env::Environment;
 
 static LIBRARY_TARGZ: &[u8] = include_bytes!("../../../libmegaton.tar.gz");
 
@@ -84,6 +85,8 @@ struct BTArtifacts {
     lib_rt: PathBuf,
     lib_include: PathBuf,
     lib_linkldscript: PathBuf,
+    npdm_template_path: PathBuf,
+
     verfile_path: PathBuf,
 
     compdb_path: PathBuf,
@@ -118,6 +121,7 @@ impl BTArtifacts {
             lib_rt: lib_root.clone().join("rt"),
             lib_include: lib_root.join("include"),
             lib_linkldscript: lib_root.join("rt").join("link.ld"),
+            npdm_template_path: lib_root.join("rt").join("npdm_template.json"),
             verfile_path: lib_root.join("verfile"),
 
             compdb_path: profile_root.join("compdb.cache"),
@@ -450,6 +454,8 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
                 cu::info!("Check: No disallowed instructions found");
             }
         }
+
+        create_npdm(&bt_artifacts, &title_id_hex)?;
     }
 
     let _ = compdb
@@ -463,3 +469,31 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     Ok(())
 }
+
+fn create_npdm(artifacts: &BTArtifacts, title_id: &str) -> cu::Result<()> {
+    cu::info!("Creating main.npdm");
+
+    let env = environment();
+    let template_path = artifacts.lib_root.join("npdm_template.json");
+    let npdm_json_path = artifacts.module_root.join("main.npdm.json");
+    let main_npdm_path = artifacts.module_root.join("main.npdm");
+
+
+    let reader = cu::fs::reader(&artifacts.npdm_template_path)?;
+    let mut npdm_data: cu::json::Value = cu::json::read(reader)?;
+
+
+    npdm_data["title_id"] = cu::json!(format!("0x{}", title_id));
+
+    let writer = cu::fs::writer(&npdm_json_path)?;
+    cu::json::write_pretty(writer, &npdm_data)?;
+
+    env.npdmtool_path()
+        .command()
+        .add(cu::args![&npdm_json_path, &main_npdm_path])
+        .all_null()
+        .wait_nz()?;
+
+    Ok(())
+}
+

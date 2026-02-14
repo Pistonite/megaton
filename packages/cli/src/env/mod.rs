@@ -70,6 +70,9 @@ impl Environment {
     pub fn elf2nso_path(&self) -> &Path {
         &self.elf2nso
     }
+    pub fn npdmtool_path(&self) -> &Path {
+        &self.npdmtool
+    }
 }
 
 fn get_dkp_version(dkp: &Path, cc: &Path) -> cu::Result<String> {

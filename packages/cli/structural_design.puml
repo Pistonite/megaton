@@ -1,0 +1,95 @@
+@startuml
+package cmd_build {
+
+
+struct _ {
+    + run_build(args: CmdBuild): Result<()>
+    - build_crate(manifest: &Path, config: CargoConfig): Result<()>
+    - generate_cxxbridge(): Result<()>
+    - incremental_compile(): Result<()>
+}
+
+
+struct CmdBuild {
+    +profile: String
+    +configure_only: bool
+    +config: String
+    +common: cu::cli::Flags
+}
+
+package config{
+
+
+struct Config {
+// Subsections defined similarly
+    + module: Module
+    + profile: ProfileConfig
+    + megaton: MegatonConfig
+    + cargo: CargoConfig
+    + build: Profile<Build>
+    + check: Option<Profile<Check>>
+    
+    +load_config(path: &Path): Result<Config>
+    +validate(): Result<()>
+}
+}
+package env {
+struct BuildEnv {
+    +megaton_home: PathBuf
+    +dkp: PathBuf
+    +cc: PathBuf
+    ...
+    init(): Result
+    get(): &'static BuildEnv
+}
+}
+package generate {
+    struct _ {
+        generate_cxxbridge_source(config): Result
+    }
+}
+generate .[hidden].> scan
+package scan {
+    struct _ {
+        discover_sources(source_dir: &Path): Vec<SourceFile>
+    }
+}
+scan .[hidden].> compile
+
+package compile {
+    struct SourceFile {
+        lang: Lang
+        path: PathBuf
+        basename: String
+        hash: usize
+        needs_recompile(env, compdb,\n  o_path, d_path, command): bool
+        compile(env, flags, compdb): Result
+    }
+    struct CompileDB {
+        commands: BTreeMap<String, CompileRecord>,
+        cc_version: String,
+        cxx_version: String,
+        new(): Result<CompileDB>
+        update(command: CompileCommand): Result<()>
+        export_compile_commands(path: &Path): Result<()>
+    }
+    struct CompileRecord {
+        command: CompileCommand
+        // Maybe unneeded?
+    }
+    struct CompileCommand {
+        compiler: PathBuf
+        source: PathBuf
+        args: Vec<String>
+        execute(): Result<()>
+    }
+}
+compile .[hidden]d.> link
+package link {
+    struct _ {
+    }
+}
+
+
+}
+@enduml
