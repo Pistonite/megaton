@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2025-2026 Megaton contributors
 
-#include "__internal/futex.h"
+#include <megaton/__internal/futex.h>
 #include <errno.h>
 #include <optional>
 

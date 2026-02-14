@@ -49,6 +49,9 @@ void __megaton_lib_init() {
     megaton::hook::init();
 }
 
+void __megaton_librs_init() {
+        return;
+}
 // TODO: this can probably be removed with rtld/reloc
 void __megaton_rtld_init() {}
 }

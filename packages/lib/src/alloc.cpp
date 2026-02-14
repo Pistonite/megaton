@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2025-2026 Megaton contributors
 
-#include <__internal/alloc.h>
+#include <megaton/__internal/alloc.h>
 // #include <toolkit/tcp.hpp>
 
 static u8 bss_alloc[BSS_ALLOC_SIZE] = {0};

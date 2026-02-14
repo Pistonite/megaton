@@ -21,7 +21,13 @@ mod scan;
 
 use scan::discover_source;
 
-use crate::cmds::cmd_build::compile::{CompileDB, build_nso};
+use crate::{
+    cmds::cmd_build::{
+        compile::{CompileDB, build_nso},
+        config::CargoConfig,
+    },
+    env::environment,
+};
 
 static LIBRARY_TARGZ: &[u8] = include_bytes!("../../../libmegaton.tar.gz");
 
@@ -73,15 +79,14 @@ struct BTArtifacts {
     module_obj: PathBuf, // module/o
     module_src: PathBuf,
     module_include: PathBuf,
-    module_cxxbridge_src: PathBuf,
-    module_cxxbridge_include: PathBuf,
+    // module_cxxbridge_src: PathBuf,
+    // module_cxxbridge_include: PathBuf,
     elf_path: PathBuf,
     nso_path: PathBuf,
 
     lib_root: PathBuf,
-    lib_obj: PathBuf,
+    cxxbridge_bin: PathBuf,
     lib_src: PathBuf,
-    lib_rt: PathBuf,
     lib_include: PathBuf,
     lib_linkldscript: PathBuf,
     verfile_path: PathBuf,
@@ -107,17 +112,16 @@ impl BTArtifacts {
             module_obj: module_root.join("o"),
             module_src: module_root.join("src"),
             module_include: module_root.join("include"),
-            module_cxxbridge_include: module_root.join("include").join("cxxbridge"),
-            module_cxxbridge_src: module_root.join("src").join("cxxbridge"),
+            // module_cxxbridge_include: module_root.join("include").join("cxxbridge"),
+            // module_cxxbridge_src: module_root.join("src").join("cxxbridge"),
             elf_path: module_root.join(format!("{}.elf", module_name)),
             nso_path: module_root.join(format!("{}.nso", module_name)),
 
             lib_root: lib_root.clone(),
-            lib_obj: lib_root.join("o"),
+            cxxbridge_bin: lib_root.join("bin/cxxbridge"),
             lib_src: lib_src.clone(),
-            lib_rt: lib_root.clone().join("rt"),
             lib_include: lib_root.join("include"),
-            lib_linkldscript: lib_root.join("rt").join("link.ld"),
+            lib_linkldscript: lib_root.join("link.ld"),
             verfile_path: lib_root.join("verfile"),
 
             compdb_path: profile_root.join("compdb.cache"),
@@ -125,21 +129,61 @@ impl BTArtifacts {
         }
     }
 }
+
+// #[allow(dead_code)]
+// struct RustCrate {
+//     manifest: PathBuf,
+//     got_built: bool,
+// }
 // A rust crate that will be built as a component of the megaton lib or the mod
-#[allow(dead_code)]
-struct RustCrate {
-    manifest: PathBuf,
-    got_built: bool,
+pub struct RustCrate {
+    pub manifest: PathBuf,
+    #[allow(dead_code)]
+    pub target_path: PathBuf, // Not necessarily the same as the Megaton target dir
+    pub source_paths: Vec<PathBuf>,
+    pub header_suffix: String,
 }
 
 impl RustCrate {
-    pub fn new(manifest_path: PathBuf) -> Self {
-        Self {
-            manifest: manifest_path.clone().canonicalize().unwrap_or_else(|_| {
-                panic!("Could not find Cargo.toml at {:?}", manifest_path.display())
-            }),
-            got_built: false,
+    /// Gets the crate based on the cargo config. Returns `Ok(None)`. Errors if
+    /// cargo is explicitly enabled, but couldn't be be found for some reason.
+    pub fn from_config(cargo: CargoConfig) -> cu::Result<Option<Self>> {
+        let manifest = cargo
+            .manifest
+            .unwrap_or(CargoConfig::default_manifest_path());
+
+        match cargo.enabled {
+            None => Ok(RustCrate::new(&manifest, cargo.sources, cargo.header_suffix).ok()),
+            Some(true) => Ok(Some(
+                RustCrate::new(&manifest, cargo.sources, cargo.header_suffix)
+                    .context("Cargo enabled, but failed to find the crate")?,
+            )),
+            Some(false) => Ok(None),
         }
+    }
+
+    fn new(manifest_path: &Path, sources: Vec<PathBuf>, header_suffix: String) -> cu::Result<Self> {
+        let manifest = manifest_path.to_owned().canonicalize().context(format!(
+            "Could not find Cargo.toml at {:?}",
+            manifest_path.display()
+        ))?;
+
+        let crate_root = manifest.parent().unwrap();
+
+        let source_paths = sources
+            .iter()
+            .map(|rel_path| crate_root.join(rel_path))
+            .collect::<Vec<_>>();
+
+        // This should always be target, even if the megaton target dir is differnt
+        let target_path = crate_root.join("target");
+
+        Ok(Self {
+            manifest,
+            target_path,
+            source_paths,
+            header_suffix,
+        })
     }
 
     pub fn build(&mut self, build_flags: &Flags) -> cu::Result<()> {
@@ -159,7 +203,9 @@ impl RustCrate {
 
         command = command.args(&build_flags.cargoflags);
         command = command.env("RUSTFLAGS", build_flags.rustflags.clone());
-
+        command = command.env("CC", environment().cc_path());
+        command = command.env("CXX", environment().cxx_path());
+        command = command.env("AR", environment().ar_path());
         let exit_code = command.spawn()?.wait()?;
         if !exit_code.success() {
             return Err(cu::Error::msg(format!(
@@ -167,7 +213,6 @@ impl RustCrate {
                 exit_code
             )));
         }
-        self.got_built = true;
 
         Ok(())
     }
@@ -259,7 +304,23 @@ fn build_lib(
 ) -> cu::Result<bool> {
     // build lib
     let mut compiler_did_something = false;
-    let lib_build_flags = build_flags.add_c_cpp_flags(vec!["-DMEGATON_LIB".to_string()]);
+    // build lib
+    let module_name = format!("-D MEGART_NX_MODULE_NAME={:?}", config.module.name);
+    let module_name_len = format!("-D MEGART_NX_MODULE_NAME_LEN={:?}", module_name.len());
+    let title_id = format!("-D MEGART_TITLE_ID={:?}", config.module.title_id);
+    let title_id_hex = format!("-D MEGART_TITLE_ID_HEX={:016x}", config.module.title_id);
+    let mut lib_build_flags = vec![
+        module_name,
+        module_name_len,
+        title_id,
+        title_id_hex,
+        "-DMEGATON_LIB".to_string(),
+    ];
+    if config.cargo.enabled.is_some_and(|e| e) {
+        lib_build_flags.push("-DMEGART_RUST".to_string());
+        lib_build_flags.push("-DMEGART_RUST_MAIN".to_string());
+    }
+    let lib_build_flags = build_flags.add_c_cpp_flags(lib_build_flags);
     discover_source(btart.lib_src.as_path())
         .unwrap_or_default()
         .iter()
@@ -269,36 +330,10 @@ fn build_lib(
                     &lib_build_flags,
                     vec![
                         btart.lib_include.display().to_string(),
-                        String::from("/opt/devkitpro/libnx/include/"),
+                        String::from("/opt/devkitpro/libnx/include"),
                     ],
                     compdb,
-                    &btart.lib_obj,
-                )
-                .inspect_err(|e| cu::error!("Failed to compile! {:?}", e))
-                .unwrap();
-            compiler_did_something = compiler_did_something || compilation_occurred;
-        });
-    // build rt
-    let module_name = format!("-D MEGART_NX_MODULE_NAME={:?}", config.module.name);
-    let module_name_len = format!("-D MEGART_NX_MODULE_NAME_LEN={:?}", module_name.len());
-    let title_id = format!("-D MEGART_TITLE_ID={:?}", config.module.title_id);
-    let title_id_hex = format!("-D MEGART_TITLE_ID_HEX={:016x}", config.module.title_id);
-    let rt_build_flags = vec![module_name, module_name_len, title_id, title_id_hex];
-    // if config.cargo.enabled {
-    //     rt_build_flags.push("-DMEGART_RUST".to_string());
-    //     rt_build_flags.push("-DMEGART_RUST_MAIN".to_string());
-    // }
-    let rt_build_flags = build_flags.add_c_cpp_flags(rt_build_flags);
-    discover_source(btart.lib_rt.as_path())
-        .unwrap_or_default()
-        .iter()
-        .for_each(|src| {
-            let compilation_occurred = src
-                .compile(
-                    &rt_build_flags,
-                    vec![btart.lib_include.display().to_string()],
-                    compdb,
-                    &btart.lib_obj,
+                    &btart.module_obj,
                 )
                 .inspect_err(|e| cu::error!("Failed to compile! {:?}", e))
                 .unwrap();
@@ -360,21 +395,23 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     };
 
     let mut sources = build_config.sources.clone();
+    sources.push(bt_artifacts.module_src.display().to_string());
     let mut includes = build_config.includes.clone();
+    includes.push(bt_artifacts.module_include.display().to_string());
     includes.push(bt_artifacts.lib_include.display().to_string());
     includes.push("/opt/devkitpro/libnx/include".to_owned());
 
     let mut rust_staticlib_path: Option<PathBuf> = None;
-    if config.cargo.enabled {
-        let mut rust_crate = RustCrate::new(PathBuf::from(&config.cargo.manifest.clone().unwrap()));
+    let rust_crate = RustCrate::from_config(config.cargo.clone())?;
+    if let Some(mut rust_crate) = rust_crate {
         rust_crate.build(&build_flags).unwrap();
-        compiler_did_something = compiler_did_something || rust_crate.got_built;
+        //compiler_did_something = compiler_did_something;
 
         cu::info!("Generating cxx bridge src!");
         generate_cxx_bridge_src(&rust_crate, &bt_artifacts)?;
 
-        sources.push(bt_artifacts.module_cxxbridge_src.display().to_string());
-        includes.push(bt_artifacts.module_cxxbridge_include.display().to_string());
+        // sources.push(bt_artifacts.module_cxxbridge_src.display().to_string());
+        // includes.push(bt_artifacts.module_cxxbridge_include.display().to_string());
         rust_staticlib_path = rust_crate
             .get_output_path(&bt_artifacts.target)
             .inspect_err(|e| {
