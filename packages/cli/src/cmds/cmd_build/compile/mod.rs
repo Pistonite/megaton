@@ -1,8 +1,9 @@
-use std::{ path::{Path, PathBuf},
+use std::{
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
-use futures::future::{try_join_all};
+use futures::future::try_join_all;
 
 use super::config::Flags;
 use compile_db::{CompileDB, CompileRecord};
@@ -69,12 +70,10 @@ pub async fn compile_all(contexts: &[CompileCtx], compile_db_path: &Path) -> cu:
         Ok((did_compile, rec)) => {
             something_compiled |= did_compile;
             compile_db.update(rec.source_hash, rec.clone());
-        },
+        }
         Err(_) => {
-            // TODO: Fix so this isnt a result. Any errors should be
-            // returned earlier in try_join_all
-            panic!("Error while parsing compile job result (idk why this would happen)");
-        },
+            cu::warn!("something brokey");
+        }
     });
 
     compile_db.save(compile_db_path)?;

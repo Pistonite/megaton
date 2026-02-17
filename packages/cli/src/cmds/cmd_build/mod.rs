@@ -123,7 +123,6 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
             &format!("MEGART_TITLE_ID={}", &config.module.title_id),
             &format!("MEGART_TITLE_ID_HEX={:016x}", &config.module.title_id),
         ]);
-        lib_flags.add_includes([environment().libnx_include().display()]);
         if rust_enabled {
             lib_flags.add_defines(["MEGART_RUST", "MEGART_RUST_MAIN"]);
         }
