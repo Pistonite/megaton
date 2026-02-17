@@ -17,11 +17,11 @@ pub struct Build {
 
     /// C/C++ Include directories, relative to Megaton.toml
     #[serde(default)]
-    pub includes: Vec<String>,
+    pub includes: Vec<PathBuf>,
 
     /// Additional Library paths
     #[serde(default)]
-    pub libpaths: Vec<String>,
+    pub libpaths: Vec<PathBuf>,
 
     /// Additional Libraries to link with
     #[serde(default)]

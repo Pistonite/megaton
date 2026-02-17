@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025-2026 Megaton contributors
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use cu::pre::*;
 use derive_more::AsRef;
@@ -18,19 +18,11 @@ mod config;
 mod link;
 mod rust;
 
-static LIBRARY_TARGZ: &[u8] = include_bytes!("../../../libmegaton.tar.gz");
-fn unpack_lib(lib_root_path: &Path) -> cu::Result<()> {
-    let library_tar = GzDecoder::new(LIBRARY_TARGZ);
-    let mut library_archive = tar::Archive::new(library_tar);
-    library_archive.unpack(lib_root_path)?;
-    Ok(())
-}
-
 /// `megaton` project
 #[derive(Debug, Clone, AsRef, clap::Parser)]
 pub struct CmdBuild {
     /// Select profile to build
-    #[clap(short, long, default_value = "none")]
+    #[clap(short, long, default_value = "base")]
     pub profile: String,
 
     /// Emit configuration files only (such as compile_commands.json),
@@ -41,6 +33,11 @@ pub struct CmdBuild {
     /// Specify the location of the config file
     #[clap(short = 'c', long, default_value = "Megaton.toml")]
     pub config: String,
+
+    /// Unpack the library archive before building, even if it already
+    /// exists and is up to date
+    #[clap(short = 'u', long)]
+    pub unpack_lib: bool,
 
     #[clap(flatten)]
     #[as_ref]
@@ -63,6 +60,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     let mut build_flags = Flags::from_config(&build_config.flags);
     let profile_target = config.module.target.join("megaton").join(profile);
     cu::fs::make_dir(&profile_target)?;
+    let profile_target = profile_target.canonicalize()?;
 
     cu::debug!("profile: {profile}");
 
@@ -92,9 +90,6 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     ////////// Compile sources //////////
     build_flags.add_includes(environment().dkp_includes());
-    let mut contexts = vec![];
-
-    // Create module context
     let target_mod = profile_target.join(&config.module.name);
     let target_mod_src = target_mod.join("src");
     let target_mod_include = target_mod.join("include");
@@ -104,16 +99,22 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     cu::fs::make_dir(&target_mod_include)?;
     cu::fs::make_dir(&target_mod_o)?;
 
-    let mut module_flags = build_flags.clone();
-    module_flags.add_includes(&build_config.includes);
-
-    let mod_ctx = CompileCtx::new(build_config.sources, target_mod_o.clone(), module_flags);
-    contexts.push(mod_ctx);
+    let mut contexts = vec![];
 
     // If libmegaton enabled, create library context
     if config.megaton.lib_enabled() {
         cu::debug!("libmegaton enabled");
         let target_lib = profile_target.join("lib");
+
+        if args.unpack_lib {
+            // TODO: Unpack automatically if libary files dont exist
+            cu::debug!("unpacking library archive");
+            unpack_lib(&target_lib).context("Failed to unpack library archive")?;
+        }
+
+        // Add public library includes
+        build_flags.add_includes([target_lib.join("include").display()]);
+
         let mut lib_flags = build_flags.clone();
         lib_flags.add_defines([
             "MEGATON_LIB",
@@ -122,10 +123,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
             &format!("MEGART_TITLE_ID={}", &config.module.title_id),
             &format!("MEGART_TITLE_ID_HEX={:016x}", &config.module.title_id),
         ]);
-        lib_flags.add_includes([
-            target_lib.join("include").display(),
-            environment().libnx_include().display(),
-        ]);
+        lib_flags.add_includes([environment().libnx_include().display()]);
         if rust_enabled {
             lib_flags.add_defines(["MEGART_RUST", "MEGART_RUST_MAIN"]);
         }
@@ -137,6 +135,47 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
         contexts.push(lib_ctx);
     }
 
+    // Create module context
+    let build_includes: Vec<String> = build_config
+        .includes
+        .clone()
+        .iter()
+        .filter_map(|path| match path.canonicalize() {
+            Ok(path) => Some(path.display().to_string()),
+            Err(e) => {
+                cu::warn!("Can't canonicalise {}: {e}", path.display());
+                None
+            }
+        })
+        .collect();
+
+    if &build_includes.len() != &build_config.includes.len() {
+        cu::bail!("Failed to canonicalize an include path");
+    }
+
+    let build_sources: Vec<PathBuf> = build_config
+        .sources
+        .clone()
+        .iter()
+        .filter_map(|path| match path.canonicalize() {
+            Ok(path) => Some(path),
+            Err(e) => {
+                cu::warn!("Can't canonicalise {}: {e}", path.display());
+                None
+            }
+        })
+        .collect();
+
+    if &build_sources.len() != &build_config.sources.len() {
+        cu::bail!("Failed to canonicalize a source path");
+    }
+
+    let mut module_flags = build_flags.clone();
+    module_flags.add_includes(build_includes);
+
+    let mod_ctx = CompileCtx::new(build_sources, target_mod_o.clone(), module_flags);
+    contexts.push(mod_ctx);
+
     need_relink |= compile_all(&contexts, &compiledb_path).await?;
 
     ////////// Link & Check //////////
@@ -147,5 +186,13 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     cu::debug!("title_id={}", config.module.title_id_hex());
     cu::debug!("entry={}", config.megaton.entry_point());
 
+    Ok(())
+}
+
+static LIBRARY_TARGZ: &[u8] = include_bytes!("../../../libmegaton.tar.gz");
+fn unpack_lib(lib_root_path: &Path) -> cu::Result<()> {
+    let library_tar = GzDecoder::new(LIBRARY_TARGZ);
+    let mut library_archive = tar::Archive::new(library_tar);
+    library_archive.unpack(lib_root_path)?;
     Ok(())
 }

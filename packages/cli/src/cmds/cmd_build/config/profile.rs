@@ -10,7 +10,7 @@ use cu::pre::*;
 use super::{Validate, ValidateCtx};
 
 /// Name of the default profile
-pub static BASE_PROFILE: &str = "none";
+pub static BASE_PROFILE: &str = "base";
 
 /// Check whether a profile name is legal
 pub fn is_profile_name_allowed(name: &str) -> bool {
@@ -33,12 +33,12 @@ pub struct Profile<T: ExtendProfile> {
 impl<T: ExtendProfile> Profile<T> {
     /// Get a profile by name
     ///
-    /// If the name is "none", or there is no profile with that name,
+    /// If the name is "base", or there is no profile with that name,
     /// the base profile will be returned. Otherwise, returns the base profile
     /// extended with the profile with the given name.
     pub fn get_profile(&self, name: &str) -> T {
         let mut base = self.base.clone();
-        if name != "none" {
+        if name != "base" {
             if let Some(profile) = self.profiles.0.get(name) {
                 base.extend_profile(profile);
             }

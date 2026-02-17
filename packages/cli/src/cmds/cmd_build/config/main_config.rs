@@ -257,12 +257,12 @@ fn default_comp_commands() -> String {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProfileConfig {
-    /// Set the profile to use when profile is "none"
+    /// Set the profile to use when profile is unspecified
     ///
     /// If `Some("")`, a profile must be specified in command line or megaton will error
     pub default: Option<String>,
 
-    /// Allow the base (`none`) profile to be used
+    /// Allow the base (`base`) profile to be used
     #[serde(default = "default_true")]
     pub allow_base: bool,
 
@@ -295,17 +295,17 @@ impl ProfileConfig {
         'b: 'a, // lifetime: cli should live longer since that's parsed before config
     {
         let profile = match (cli_profile, &self.default) {
-            ("none", Some(p)) if p.is_empty() => {
+            ("base", Some(p)) if p.is_empty() => {
                 cu::error!("no profile specified!");
                 cu::hint!("- please specify a profile with -p PROFILE");
                 cu::bail!("failed to selected a profile");
             }
-            ("none", Some(p)) => p,
-            ("none", None) => BASE_PROFILE,
+            ("base", Some(p)) => p,
+            ("base", None) => BASE_PROFILE,
             (profile, _) => profile,
         };
 
-        if !self.allow_base && profile == "none" {
+        if !self.allow_base && profile == "base" {
             cu::error!("base profile is not allowed!");
             cu::hint!("- please specify a profile with -p PROFILE");
             cu::bail!("failed to selected a profile");
