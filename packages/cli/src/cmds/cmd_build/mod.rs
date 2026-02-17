@@ -116,6 +116,10 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
         build_flags.add_includes([target_lib.join("include").display()]);
 
         let mut lib_flags = build_flags.clone();
+
+        // TODO: Remove this and copy libnx headers into the library
+        lib_flags.add_includes([environment().libnx_include().display()]);
+
         lib_flags.add_defines([
             "MEGATON_LIB",
             &format!("MEGART_NX_MODULE_NAME={}", &config.module.name),

@@ -38,14 +38,22 @@ impl CompileDB {
     /// Loads the compiledb, or makes a new one if one can't be found at the given path
     pub fn load(path: &Path) -> Self {
         if let Ok(file) = cu::fs::read(path) {
-            cu::warn!(
-                "compdb at {} not readable, making a new one",
-                path.display()
-            );
-            return json::read::<CompileDB>(file.as_slice()).unwrap_or(Self::new());
+            let json = json::read::<CompileDB>(file.as_slice());
+            match json {
+                Ok(compdb) => compdb,
+                Err(e) => {
+                    cu::warn!(
+                        "compdb at {} not readable due to error: {e}",
+                        path.display()
+                    );
+                    cu::debug!("generating new compiledb");
+                    Self::new()
+                }
+            }
+        } else {
+            cu::debug!("generating new compiledb");
+            Self::new()
         }
-        cu::debug!("compdb not found at {}, making a new one", path.display());
-        Self::new()
     }
 
     /// Check if the recorded compiler versions are the same as in the environment
@@ -60,7 +68,7 @@ impl CompileDB {
     /// If the file already exists, it will be truncated and overwritten
     pub fn save(&self, path: &Path) -> cu::Result<()> {
         let file = std::fs::File::create(path)?;
-        json::write(file, self)
+        json::write_pretty(file, self)
     }
 
     pub fn find_record(&self, path_hash: usize) -> Option<&CompileRecord> {

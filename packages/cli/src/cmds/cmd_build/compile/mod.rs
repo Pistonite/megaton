@@ -3,6 +3,7 @@ use std::{
     sync::Arc,
 };
 
+use cu::Context;
 use futures::future::try_join_all;
 
 use super::config::Flags;
@@ -65,16 +66,22 @@ pub async fn compile_all(contexts: &[CompileCtx], compile_db_path: &Path) -> cu:
     let mut something_compiled = false;
 
     // Join all compilation jobs
-    let results = try_join_all(handles.into_iter().map(|h| h.co_join())).await?;
-    results.iter().for_each(|rec| match rec {
-        Ok((did_compile, rec)) => {
-            something_compiled |= did_compile;
-            compile_db.update(rec.source_hash, rec.clone());
+    let results = try_join_all(handles.into_iter().map(|h| h.co_join()))
+        .await
+        .context("A thread panicked when attempting to join")?;
+    for res in results {
+        match res {
+            Ok((did_compile, rec)) => {
+                something_compiled |= did_compile;
+                compile_db.update(rec.source_hash, rec.clone());
+            }
+            Err(e) => {
+                return Err(cu::Error::msg(format!(
+                    "Error while compiling some source: {e}"
+                )));
+            }
         }
-        Err(_) => {
-            cu::warn!("something brokey");
-        }
-    });
+    }
 
     compile_db.save(compile_db_path)?;
     Ok(something_compiled)
