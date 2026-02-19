@@ -81,9 +81,15 @@ impl SourceFile {
             return Ok((false, record.unwrap()));
         }
 
-        let src_time = cu::fs::get_mtime(&self.path)?.unwrap();
+        let start_time = cu::fs::Time::now();
 
-        cu::debug!("compiling: {} -> {}\n|\n{} {}\n\n", self.path.display(), o_path.display(), compiler.display(), args.join(" "));
+        cu::debug!(
+            "compiling: {} -> {}\n|\n{} {}\n\n",
+            self.path.display(),
+            o_path.display(),
+            compiler.display(),
+            args.join(" ")
+        );
         compiler
             .command()
             .stdout(cu::lv::T)
@@ -95,10 +101,10 @@ impl SourceFile {
             .co_wait_nz()
             .await?;
 
-        // Set artifact timestamps to the same thing as the source
-        cu::fs::set_mtime(o_path, src_time)?;
+        cu::fs::set_mtime(&self.path, start_time)?;
+        cu::fs::set_mtime(o_path, start_time)?;
         if d_path.exists() {
-            cu::fs::set_mtime(d_path, src_time)?;
+            cu::fs::set_mtime(d_path, start_time)?;
         }
 
         Ok((
@@ -121,7 +127,9 @@ impl SourceFile {
         // Chech that record exists
         let record = match record {
             Some(rec) => rec,
-            None => return Ok(false),
+            None => {
+                return Ok(false);
+            }
         };
 
         // Check that arguments have not changed
@@ -133,19 +141,26 @@ impl SourceFile {
         let d_path = self.get_d_path(output_path);
 
         // Check that artifacts exist
-        if !o_path.exists() || !d_path.exists() {
+        if !o_path.exists() || (!d_path.exists() && self.lang != Lang::S) {
             return Ok(false);
         }
 
-        // Check that source has not changed since last compilation
-        if cu::fs::get_mtime(&o_path)? != cu::fs::get_mtime(&self.path)?
-            || cu::fs::get_mtime(&d_path)? != cu::fs::get_mtime(&self.path)?
-        {
+        // Check that source time = o time
+        if cu::fs::get_mtime(&o_path)? != cu::fs::get_mtime(&self.path)? {
+            return Ok(false);
+        }
+
+        // Assembly files don't need dependency checks
+        if self.lang == Lang::S {
+            return Ok(true);
+        }
+
+        // Check that source time = d time
+        if cu::fs::get_mtime(&d_path)? != cu::fs::get_mtime(&self.path)? {
             return Ok(false);
         }
 
         let d_file_contents = cu::fs::read_string(&d_path)?;
-
         let depfile = match depfile::parse(&d_file_contents) {
             Ok(depfile) => depfile,
             Err(pos) => {
@@ -158,7 +173,9 @@ impl SourceFile {
 
         // Check that all dependencies are up to date
         for dep in depfile.recurse_deps(o_path.as_utf8()?) {
-            if cu::fs::get_mtime(PathBuf::from(dep))? != cu::fs::get_mtime(&self.path)? {
+            if cu::fs::get_mtime(PathBuf::from(dep))?.unwrap()
+                > cu::fs::get_mtime(&self.path)?.unwrap()
+            {
                 return Ok(false);
             }
         }

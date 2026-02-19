@@ -137,7 +137,13 @@ impl RustCtx {
         include_out_path: &Path,
     ) -> cu::Result<bool> {
         let mut something_changed =
-            cxxbridge_cmd(None, true, &include_out_path.join("rust").join("cxx.h")).await?;
+            if cxxbridge_cmd(None, true, &include_out_path.join("rust").join("cxx.h")).await? {
+                cu::debug!("generated rust/cxx.h");
+                true
+            } else {
+                cu::debug!("up to date: rust/cxx.h");
+                false
+            };
 
         let suffix = Arc::new(self.header_suffix.clone());
         let source_paths = Arc::new(self.source_paths.clone());
@@ -210,10 +216,23 @@ async fn cxxbridge_process(
     out_h.set_file_name(format!("{stem}{header_suffix}"));
     out_cc.set_file_name(format!("{stem}.cc"));
 
-    let something_changed = cxxbridge_cmd(Some(&file), true, &out_h).await?
-        || cxxbridge_cmd(Some(&file), false, &out_cc).await?;
+    let header_updated = if cxxbridge_cmd(Some(&file), true, &out_h).await? {
+        cu::debug!("generated header {}", &out_h.display());
+        true
+    } else {
+        cu::debug!("header up to date: {}", &out_h.display());
+        false
+    };
 
-    Ok(something_changed)
+    let source_updated = if cxxbridge_cmd(Some(&file), false, &out_cc).await? {
+        cu::debug!("generated source {}", &out_cc.display());
+        true
+    } else {
+        cu::debug!("source up to date: {}", &out_cc.display());
+        false
+    };
+
+    Ok(header_updated || source_updated)
 }
 // Run the cxxbridge cmd and update the corresponding file if changed
 // returns Ok(true) iff new code was generated and written
@@ -229,8 +248,6 @@ async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::
         args.push("--header");
     }
 
-    cu::debug!("generating: cxxbridge {}", args.join(" "));
-
     let exe =
         cu::which("cxxbridge").context("cxxbridge not found; `cargo install cxxbridge-cmd`")?;
     let command = exe
@@ -239,7 +256,6 @@ async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::
         .stderr(cu::pio::string())
         .stdin_null()
         .args(args);
-
 
     let (child, stdout, stderr) = command
         .co_spawn()

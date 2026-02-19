@@ -38,6 +38,7 @@ pub async fn compile_all(contexts: &[CompileCtx], compile_db_path: &Path) -> cu:
     let mut compile_db = CompileDB::try_load_or_new(compile_db_path);
 
     if !compile_db.version_is_correct() {
+        cu::info!("Compiler version has changed, recompiling");
         compile_db = CompileDB::new();
     }
 

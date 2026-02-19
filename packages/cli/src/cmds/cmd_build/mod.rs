@@ -62,7 +62,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     cu::fs::make_dir(&profile_target)?;
 
     // Set up target paths
-    let profile_target = profile_target.canonicalize()?;
+    let profile_target = profile_target.normalize()?;
     let target_mod = profile_target.join(&config.module.name);
     let target_mod_src = target_mod.join("src");
     let target_mod_include = target_mod.join("include");
@@ -147,11 +147,11 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     }
 
     // Create module context
-    let mut build_includes = vec![];
+    let mut build_includes = vec![target_mod_include.into_utf8()?];
     for include in build_config.includes {
         build_includes.push(include.normalize_exists()?.into_utf8()?);
     }
-    let mut build_sources = vec![];
+    let mut build_sources = vec![target_mod_src];
     for source in build_config.sources {
         build_sources.push(source.normalize_exists()?);
     }

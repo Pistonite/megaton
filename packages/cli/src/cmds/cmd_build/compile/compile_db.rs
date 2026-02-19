@@ -24,6 +24,31 @@ pub struct CompileRecord {
 }
 
 impl CompileDB {
+    /// Loads the compiledb, or makes a new one if one can't be found at the given path
+    pub fn try_load_or_new(path: &Path) -> Self {
+        match Self::try_load(path) {
+            Ok(db) => {
+                cu::debug!("CompileDB loaded successfully");
+                db
+            },
+            Err(e) => {
+                cu::debug!("CompileDB failed to load: {e}");
+                cu::info!("Generating a new CompileDB: {e}");
+                Self::new()
+            },
+        }
+    }
+
+    /// Attempt to load the compiledb from the given path
+    /// Errors if it can't be read, or if json parsing fails
+    pub fn try_load(path: &Path) -> cu::Result<Self> {
+        if let Ok(file) = cu::fs::read(path) {
+            json::read::<CompileDB>(file.as_slice())
+        } else {
+            Err(cu::fmterr!("CompileDB not found at {}", path.display()))
+        }
+    }
+
     /// Generate a new compiledb with empty record table
     pub fn new() -> Self {
         let env = environment();
@@ -32,27 +57,6 @@ impl CompileDB {
             cc_version: env.cc_version().to_string(),
             cxx_version: env.cxx_version().to_string(),
             asm_version: env.asm_version().to_string(),
-        }
-    }
-
-    /// Loads the compiledb, or makes a new one if one can't be found at the given path
-    pub fn try_load_or_new(path: &Path) -> Self {
-        if let Ok(file) = cu::fs::read(path) {
-            let json = json::read::<CompileDB>(file.as_slice());
-            match json {
-                Ok(compdb) => compdb,
-                Err(e) => {
-                    cu::warn!(
-                        "compdb at {} not readable due to error: {e}",
-                        path.display()
-                    );
-                    cu::debug!("generating new compiledb");
-                    Self::new()
-                }
-            }
-        } else {
-            cu::debug!("generating new compiledb");
-            Self::new()
         }
     }
 
