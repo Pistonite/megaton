@@ -15,7 +15,6 @@ pub struct Environment {
     devkitpro: PathBuf,
     dkp_version: String,
     dkp_includes: Vec<String>,
-    libnx_include: PathBuf,
     npdmtool: PathBuf,
     elf2nso: PathBuf,
     cc: PathBuf,  // C compiler
@@ -32,7 +31,6 @@ impl Environment {
         let cc = dkp_bin.join("aarch64-none-elf-gcc");
         let cxx = dkp_bin.join("aarch64-none-elf-g++");
         let asm = dkp_bin.join("aarch64-none-elf-gcc");
-        let libnx_include = devkitpro.join("libnx").join("include");
         let dkp_tools_bin = devkitpro.join("tools").join("bin");
         let npdmtool = dkp_tools_bin.join("npdmtool");
         let elf2nso = dkp_tools_bin.join("elf2nso");
@@ -49,7 +47,6 @@ impl Environment {
             devkitpro,
             dkp_version,
             dkp_includes,
-            libnx_include,
             npdmtool,
             elf2nso,
             cc,
@@ -73,9 +70,6 @@ impl Environment {
     }
     pub fn dkp_includes(&self) -> &[String] {
         &self.dkp_includes
-    }
-    pub fn libnx_include(&self) -> &Path {
-        &self.libnx_include
     }
     pub fn cc_path(&self) -> &Path {
         &self.cc

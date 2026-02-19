@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025-2026 Megaton contributors
 
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 
 use cu::pre::*;
 use derive_more::AsRef;
@@ -60,7 +60,17 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     let mut build_flags = Flags::from_config(&build_config.flags);
     let profile_target = config.module.target.join("megaton").join(profile);
     cu::fs::make_dir(&profile_target)?;
+
+    // Set up target paths
     let profile_target = profile_target.canonicalize()?;
+    let target_mod = profile_target.join(&config.module.name);
+    let target_mod_src = target_mod.join("src");
+    let target_mod_include = target_mod.join("include");
+    let target_mod_o = target_mod.join("o");
+    let compiledb_path = target_mod.join("compiledb.cache");
+    cu::fs::make_dir(&target_mod_src)?;
+    cu::fs::make_dir(&target_mod_include)?;
+    cu::fs::make_dir(&target_mod_o)?;
 
     cu::debug!("profile: {profile}");
 
@@ -85,19 +95,13 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
             need_relink = true;
         }
 
-        rust_ctx.gen_cxxbridge().await?;
+        rust_ctx
+            .gen_cxxbridge(&target_mod_src, &target_mod_include)
+            .await?;
     }
 
     ////////// Compile sources //////////
     build_flags.add_includes(environment().dkp_includes());
-    let target_mod = profile_target.join(&config.module.name);
-    let target_mod_src = target_mod.join("src");
-    let target_mod_include = target_mod.join("include");
-    let target_mod_o = target_mod.join("o");
-    let compiledb_path = target_mod.join("compiledb.cache");
-    cu::fs::make_dir(&target_mod_src)?;
-    cu::fs::make_dir(&target_mod_include)?;
-    cu::fs::make_dir(&target_mod_o)?;
 
     let mut contexts = vec![];
 
@@ -113,12 +117,16 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
         }
 
         // Add public library includes
-        build_flags.add_includes([target_lib.join("include").display()]);
+        build_flags.add_includes([target_lib.join("include").into_utf8()?]);
 
         let mut lib_flags = build_flags.clone();
 
-        // TODO: Remove this and copy libnx headers into the library
-        lib_flags.add_includes([environment().libnx_include().display()]);
+        cu::hint!("TODO: remove libnx includes");
+        lib_flags.add_includes([environment()
+            .dkp_path()
+            .join("libnx")
+            .join("include")
+            .into_utf8()?]);
 
         lib_flags.add_defines([
             "MEGATON_LIB",
@@ -139,46 +147,21 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     }
 
     // Create module context
-    let build_includes: Vec<String> = build_config
-        .includes
-        .clone()
-        .iter()
-        .filter_map(|path| match path.canonicalize() {
-            Ok(path) => Some(path.display().to_string()),
-            Err(e) => {
-                cu::warn!("Can't canonicalise {}: {e}", path.display());
-                None
-            }
-        })
-        .collect();
-
-    if &build_includes.len() != &build_config.includes.len() {
-        cu::bail!("Failed to canonicalize an include path");
+    let mut build_includes = vec![];
+    for include in build_config.includes {
+        build_includes.push(include.normalize_exists()?.into_utf8()?);
     }
-
-    let build_sources: Vec<PathBuf> = build_config
-        .sources
-        .clone()
-        .iter()
-        .filter_map(|path| match path.canonicalize() {
-            Ok(path) => Some(path),
-            Err(e) => {
-                cu::warn!("Can't canonicalise {}: {e}", path.display());
-                None
-            }
-        })
-        .collect();
-
-    if &build_sources.len() != &build_config.sources.len() {
-        cu::bail!("Failed to canonicalize a source path");
+    let mut build_sources = vec![];
+    for source in build_config.sources {
+        build_sources.push(source.normalize_exists()?);
     }
-
     let mut module_flags = build_flags.clone();
     module_flags.add_includes(build_includes);
 
     let mod_ctx = CompileCtx::new(build_sources, target_mod_o.clone(), module_flags);
     contexts.push(mod_ctx);
 
+    // Compile both contexts
     need_relink |= compile_all(&contexts, &compiledb_path).await?;
 
     ////////// Link & Check //////////

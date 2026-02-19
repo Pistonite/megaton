@@ -9,11 +9,11 @@ use cu::pre::*;
 
 /// Load a Megaton.toml config file
 pub fn load_config(manifest_path: impl AsRef<Path>) -> cu::Result<Config> {
-    let cwd = PathBuf::from(".").canonicalize().unwrap();
+    let cwd = PathBuf::from(".").normalize().unwrap();
     let ancestors = cwd.ancestors();
 
     for path in ancestors {
-        let p = PathBuf::from(path).join(&manifest_path).canonicalize();
+        let p = PathBuf::from(path).join(&manifest_path).normalize();
         match p {
             Ok(p) => {
                 if p.exists() {

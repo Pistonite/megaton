@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use cu::pre::*;
 
@@ -6,7 +9,7 @@ use super::config::CargoConfig;
 
 pub struct RustCtx {
     pub manifest: PathBuf,
-    target_path: PathBuf, // Not necessarily the same as the Megaton target dir
+    target_path: PathBuf,
     source_paths: Vec<PathBuf>,
     header_suffix: String,
 }
@@ -37,7 +40,7 @@ impl RustCtx {
 
     // Not public since callers should use `from_config()` instead
     fn new(manifest_path: &Path, sources: Vec<PathBuf>, header_suffix: String) -> cu::Result<Self> {
-        let manifest = manifest_path.to_owned().canonicalize().context(format!(
+        let manifest = manifest_path.to_owned().normalize().context(format!(
             "Could not find Cargo.toml at {:?}",
             manifest_path.display()
         ))?;
@@ -123,17 +126,156 @@ impl RustCtx {
         let name = name.replace("-", "_");
         let filename = format!("lib{name}.a");
 
-        rel_path.join(&filename).canonicalize().ok()
+        rel_path.join(&filename).normalize().ok()
     }
 
     /// Scan rust sources and generate cxxbridge sources and headers
-    pub async fn gen_cxxbridge(&self) -> cu::Result<()> {
-        cu::debug!("header suffix={}", &self.header_suffix);
-        for src in &self.get_source_files()? {
-            cu::debug!("rust source to scan={}", src.display())
+    /// Returns Ok(true) if any file was generated/changed
+    pub async fn gen_cxxbridge(
+        self,
+        src_out_path: &Path,
+        include_out_path: &Path,
+    ) -> cu::Result<bool> {
+        let mut something_changed =
+            cxxbridge_cmd(None, true, &include_out_path.join("rust").join("cxx.h")).await?;
+
+        let suffix = Arc::new(self.header_suffix.clone());
+        let source_paths = Arc::new(self.source_paths.clone());
+        let src_out_path = Arc::new(src_out_path.to_owned());
+        let include_out_path = Arc::new(include_out_path.to_owned());
+        let pool = cu::co::pool(0);
+        let mut handles = vec![];
+        for file in self.get_source_files()? {
+            handles.push(pool.spawn(cxxbridge_process(
+                file,
+                src_out_path.clone(),
+                include_out_path.clone(),
+                suffix.clone(),
+                source_paths.clone(),
+            )));
         }
-        Ok(())
+        let mut set = cu::co::set(handles);
+
+        let mut errors = vec![];
+        while let Some(joined) = set.next().await {
+            let res = joined.context("Failed to join handle")?;
+            match res {
+                Ok(updated) => {
+                    something_changed |= updated;
+                }
+                Err(e) => {
+                    errors.push(e);
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(something_changed)
+        } else {
+            let num = errors.len();
+            let errorstring = errors
+                .iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>()
+                .join("\n");
+            Err(cu::fmterr!(
+                "Cxxbridge failed due to {num} errors: \n{errorstring}"
+            ))
+        }
     }
+}
+
+async fn cxxbridge_process(
+    file: PathBuf,
+    src_out_path: Arc<PathBuf>,
+    include_out_path: Arc<PathBuf>,
+    header_suffix: Arc<String>,
+    source_paths: Arc<Vec<PathBuf>>,
+) -> cu::Result<bool> {
+    let stem_os = file
+        .file_stem()
+        .ok_or_else(|| cu::fmterr!("invalid file name: {}", file.display()))?;
+
+    let stem = stem_os.as_utf8()?;
+    let path_to_rs = file.normalize()?;
+
+    // TODO: Kinda icky, maybe find a way to get relative path that doesnt require searching
+    let rel_source_path = source_paths
+        .iter()
+        .find(|p| path_to_rs.starts_with(p))
+        .unwrap();
+    let rel_source_path = path_to_rs.strip_prefix(rel_source_path)?;
+    let mut out_h = include_out_path.join(rel_source_path);
+    let mut out_cc = src_out_path.join(rel_source_path);
+    out_h.set_file_name(format!("{stem}{header_suffix}"));
+    out_cc.set_file_name(format!("{stem}.cc"));
+
+    let something_changed = cxxbridge_cmd(Some(&file), true, &out_h).await?
+        || cxxbridge_cmd(Some(&file), false, &out_cc).await?;
+
+    Ok(something_changed)
+}
+// Run the cxxbridge cmd and update the corresponding file if changed
+// returns Ok(true) iff new code was generated and written
+async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::Result<bool> {
+    let mut args = vec![];
+    if let Some(file) = file {
+        args.push(
+            file.to_str()
+                .ok_or_else(|| cu::fmterr!("Not utf-8: {}", file.display()))?,
+        );
+    }
+    if header {
+        args.push("--header");
+    }
+
+    cu::debug!("generating: cxxbridge {}", args.join(" "));
+
+    let exe =
+        cu::which("cxxbridge").context("cxxbridge not found; `cargo install cxxbridge-cmd`")?;
+    let command = exe
+        .command()
+        .stdout(cu::pio::buffer())
+        .stderr(cu::pio::string())
+        .stdin_null()
+        .args(args);
+
+
+    let (child, stdout, stderr) = command
+        .co_spawn()
+        .await
+        .context("Failed to spawn cxxbridge")?;
+    let status = child.co_wait().await.context("Failed to wait cxxbridge")?;
+
+    match status.code() {
+        Some(0) => {
+            let stdout = stdout.co_join().await??;
+            write_if_changed(output, &stdout)
+        }
+        Some(1) => Ok(false),
+        Some(other) => {
+            let stderr = stderr.co_join().await??;
+            Err(cu::Error::msg(format!(
+                "cxxbridge exited with unexpected status ({other})\n{stderr}"
+            )))
+        }
+        None => Err(cu::Error::msg(
+            "cxxbridge exited with no status code for some reason",
+        )),
+    }
+}
+
+fn write_if_changed(path: &Path, bytes: &[u8]) -> cu::Result<bool> {
+    let changed = match cu::fs::read(path) {
+        Ok(existing) => existing != bytes,
+        Err(_) => true,
+    };
+
+    if changed {
+        cu::fs::write(&path, bytes)?;
+    }
+
+    Ok(changed)
 }
 
 // #[cfg(test)]

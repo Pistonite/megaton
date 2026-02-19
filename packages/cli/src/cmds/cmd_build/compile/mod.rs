@@ -3,8 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use cu::Context;
-use futures::future::try_join_all;
+use cu::pre::*;
 
 use super::config::Flags;
 use compile_db::{CompileDB, CompileRecord};
@@ -36,7 +35,7 @@ impl CompileCtx {
 /// Returns true if anything actually compiled
 pub async fn compile_all(contexts: &[CompileCtx], compile_db_path: &Path) -> cu::Result<bool> {
     // Get compile_db
-    let mut compile_db = CompileDB::load(compile_db_path);
+    let mut compile_db = CompileDB::try_load_or_new(compile_db_path);
 
     if !compile_db.version_is_correct() {
         compile_db = CompileDB::new();
@@ -64,25 +63,34 @@ pub async fn compile_all(contexts: &[CompileCtx], compile_db_path: &Path) -> cu:
     }
 
     let mut something_compiled = false;
-
-    // Join all compilation jobs
-    let results = try_join_all(handles.into_iter().map(|h| h.co_join()))
-        .await
-        .context("A thread panicked when attempting to join")?;
-    for res in results {
+    let mut errors = vec![];
+    let mut set = cu::co::set(handles);
+    while let Some(joined) = set.next().await {
+        let res = joined.context("Failed to join handle")?;
         match res {
             Ok((did_compile, rec)) => {
                 something_compiled |= did_compile;
                 compile_db.update(rec.source_hash, rec.clone());
             }
             Err(e) => {
-                return Err(cu::Error::msg(format!(
-                    "Error while compiling some source: {e}"
-                )));
+                errors.push(e);
             }
         }
     }
 
     compile_db.save(compile_db_path)?;
-    Ok(something_compiled)
+
+    if errors.is_empty() {
+        Ok(something_compiled)
+    } else {
+        let num = errors.len();
+        let errorstring = errors
+            .iter()
+            .map(|e| e.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        Err(cu::fmterr!(
+            "Compilation failed with {num} errors: \n{errorstring}"
+        ))
+    }
 }

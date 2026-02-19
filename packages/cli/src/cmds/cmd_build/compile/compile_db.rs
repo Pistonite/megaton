@@ -36,7 +36,7 @@ impl CompileDB {
     }
 
     /// Loads the compiledb, or makes a new one if one can't be found at the given path
-    pub fn load(path: &Path) -> Self {
+    pub fn try_load_or_new(path: &Path) -> Self {
         if let Ok(file) = cu::fs::read(path) {
             let json = json::read::<CompileDB>(file.as_slice());
             match json {
