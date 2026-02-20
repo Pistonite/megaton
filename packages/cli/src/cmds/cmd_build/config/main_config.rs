@@ -126,13 +126,23 @@ impl CargoConfig {
 fn default_header_suffix() -> String {
     String::from(".h")
 }
+
 fn default_sources() -> Vec<PathBuf> {
     vec![PathBuf::from("src")]
 }
 
 impl Validate for CargoConfig {
     fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
-        cu::hint!("TODO: validate cargo config");
+        if self.enabled {
+            if self.manifest.as_ref().is_none_or(|x| x.is_empty()) {
+                cu::error!("Must have manifest if cargo is enabled");
+                ctx.bail()?
+            }
+        } else if self.manifest.is_some() {
+            cu::error!("Cargo must be enabled for manifest");
+            ctx.bail()?
+        }
+
         self.unused.validate(ctx)
     }
 }

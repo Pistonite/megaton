@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 description = "The `megaton` CLI command"
+repository = "https://github.com/Pistonite/megaton"
 publish = false
 
 [dependencies.cu]
@@ -34,3 +35,7 @@ tar = "0.4.44"
 [[bin]]
 name = "megaton"
 path = "src/main.rs"
+
+[package.metadata.binstall.signing]
+algorithm = "minisign"
+pubkey = "RWThJQKJaXayoZBe0YV5LV4KFkQwcqQ6Fg9dJBz18JnpHGdf/cHUyKs+"
