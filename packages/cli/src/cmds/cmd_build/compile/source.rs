@@ -54,12 +54,13 @@ impl SourceFile {
     /// Return values:
     /// 0 : bool - true if anything actually compiled, false if compilation was skipped
     /// 1 : CompileRecord - record of the most recent compilation
+    /// 1 : CompileRecord - path to generated object
     pub async fn compile(
         self,
         flags: Arc<Flags>,
         output_path: Arc<PathBuf>,
         record: Option<CompileRecord>,
-    ) -> cu::Result<(bool, CompileRecord)> {
+    ) -> cu::Result<(bool, CompileRecord, PathBuf)> {
         let compiler = self.lang.get_compiler_path();
         let mut args = self.lang.get_flags(&flags).clone();
 
@@ -78,7 +79,7 @@ impl SourceFile {
 
         if self.up_to_date(&record, &output_path, &args)? {
             cu::debug!("{} up to date", o_path.display());
-            return Ok((false, record.unwrap()));
+            return Ok((false, record.unwrap(), o_path));
         }
 
         let start_time = cu::fs::Time::now();
@@ -102,7 +103,7 @@ impl SourceFile {
             .await?;
 
         cu::fs::set_mtime(&self.path, start_time)?;
-        cu::fs::set_mtime(o_path, start_time)?;
+        cu::fs::set_mtime(&o_path, start_time)?;
         if d_path.exists() {
             cu::fs::set_mtime(d_path, start_time)?;
         }
@@ -115,6 +116,7 @@ impl SourceFile {
                 compiler: compiler.to_owned(),
                 args,
             },
+            o_path
         ))
     }
 
@@ -193,10 +195,11 @@ enum Lang {
 
 impl Lang {
     fn get_compiler_path(&self) -> &Path {
+        let env = environment();
         match self {
-            Lang::C => environment().cc_path(),
-            Lang::Cpp => environment().cxx_path(),
-            Lang::S => environment().cc_path(),
+            Lang::C => env.cc_path(),
+            Lang::Cpp => env.cxx_path(),
+            Lang::S => env.cc_path(),
         }
     }
 

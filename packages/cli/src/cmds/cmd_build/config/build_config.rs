@@ -29,11 +29,11 @@ pub struct Build {
 
     /// Additional Linker scripts
     #[serde(default)]
-    pub ldscripts: Vec<String>,
+    pub ldscripts: Vec<PathBuf>,
 
     /// Additional objects to link
     #[serde(default)]
-    pub objects: Vec<String>,
+    pub objects: Vec<PathBuf>,
 
     #[serde(default)]
     pub flags: FlagConfig,

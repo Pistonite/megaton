@@ -33,7 +33,7 @@ impl CompileCtx {
 /// Will wait until all compilation jobs finish before returning
 /// Handles loading, updating, and saving the compile db
 /// Returns true if anything actually compiled
-pub async fn compile_all(contexts: &[CompileCtx], compile_db_path: &Path) -> cu::Result<bool> {
+pub async fn compile_all(contexts: &[CompileCtx], compile_db_path: &Path) -> cu::Result<(bool, Vec<PathBuf>)> {
     // Get compile_db
     let mut compile_db = CompileDB::try_load_or_new(compile_db_path);
 
@@ -43,7 +43,7 @@ pub async fn compile_all(contexts: &[CompileCtx], compile_db_path: &Path) -> cu:
     }
 
     let pool = cu::co::pool(0);
-    let mut handles: Vec<cu::co::Handle<cu::Result<(bool, CompileRecord)>>> = vec![];
+    let mut handles: Vec<cu::co::Handle<cu::Result<(bool, CompileRecord, PathBuf)>>> = vec![];
 
     // Start compilation for all contexts
     for ctx in contexts {
@@ -64,13 +64,15 @@ pub async fn compile_all(contexts: &[CompileCtx], compile_db_path: &Path) -> cu:
     }
 
     let mut something_compiled = false;
+    let mut objects = vec![];
     let mut errors = vec![];
     let mut set = cu::co::set(handles);
     while let Some(joined) = set.next().await {
         let res = joined.context("Failed to join handle")?;
         match res {
-            Ok((did_compile, rec)) => {
+            Ok((did_compile, rec, o_path)) => {
                 something_compiled |= did_compile;
+                objects.push(o_path);
                 compile_db.update(rec.source_hash, rec.clone());
             }
             Err(e) => {
@@ -82,7 +84,7 @@ pub async fn compile_all(contexts: &[CompileCtx], compile_db_path: &Path) -> cu:
     compile_db.save(compile_db_path)?;
 
     if errors.is_empty() {
-        Ok(something_compiled)
+        Ok((something_compiled, objects))
     } else {
         let num = errors.len();
         let errorstring = errors

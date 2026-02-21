@@ -126,7 +126,7 @@ impl RustCtx {
         let name = name.replace("-", "_");
         let filename = format!("lib{name}.a");
 
-        rel_path.join(&filename).normalize().ok()
+        rel_path.join(&filename).normalize_exists().ok()
     }
 
     /// Scan rust sources and generate cxxbridge sources and headers

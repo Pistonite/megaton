@@ -88,8 +88,13 @@ mod onto the switch.
 #### `<module>/verfile`
 Sets the entry point for the mod, needed by the linker.
 
-#### `<module>/compdb.cache`
+#### `<module>/compiledb.cache`
 The cached compilation database used by the build tool. This records every
 command in the build process to keep track of what objects have been built
 and what command was used to build them. This keeps track of the incremental
 build for both the library and the module.
+
+#### `<module>/linkcmd.cache`
+The cached link command to used by the build tool. This record the command
+previously used to link the nso. If the mod doesn't need relinked and this
+command hasn't been changed, the link step will be skipped.

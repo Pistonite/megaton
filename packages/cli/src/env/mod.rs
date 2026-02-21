@@ -8,7 +8,6 @@ use cu::pre::*;
 
 // Core environment variables needed to run the tool
 // Includes paths to build/debug utilities and caches
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Environment {
     megaton_home: PathBuf,
