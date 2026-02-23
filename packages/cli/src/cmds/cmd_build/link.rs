@@ -11,7 +11,7 @@ use crate::env::environment;
 /// Link a list of artifacts into an elf file.
 pub async fn build_elf(
     need_link: bool,
-    artifacts: Vec<PathBuf>,
+    mut artifacts: Vec<PathBuf>,
     ldflags: Vec<String>,
     out_path: &Path,
     link_cmd_path: &Path,
@@ -19,6 +19,7 @@ pub async fn build_elf(
     let env = environment();
 
     let mut args = ldflags;
+    artifacts.sort(); // sort alphabetically so consecutive link command args are always in the same order
     for artifact in artifacts {
         args.push(artifact.into_utf8()?);
     }
@@ -50,7 +51,7 @@ pub async fn build_elf(
     Ok(true)
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug)]
 struct LinkCmd {
     pub linker: PathBuf,
     pub args: Vec<String>,
