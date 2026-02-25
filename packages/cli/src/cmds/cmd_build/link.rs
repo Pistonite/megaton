@@ -17,9 +17,10 @@ pub async fn build_elf(
     link_cmd_path: &Path,
 ) -> cu::Result<bool> {
     let env = environment();
-
     let mut args = ldflags;
-    artifacts.sort(); // sort alphabetically so consecutive link command args are always in the same order
+
+    // sort so args are always comparable regardless of compilation order
+    artifacts.sort();
     for artifact in artifacts {
         args.push(artifact.into_utf8()?);
     }
@@ -32,15 +33,9 @@ pub async fn build_elf(
 
     if let Some(old_link_cmd) = old_link_cmd {
         cu::debug!("linkcmd successfully loaded");
-        if !need_link {
-            cu::debug!("link not needed");
-            if link_cmd.args == old_link_cmd.args {
-                cu::debug!("link command unchanged");
-                return Ok(false);
-            }
-            if link_cmd.args != old_link_cmd.args {
-                cu::debug!("link command different");
-            }
+        if !need_link  && link_cmd == old_link_cmd {
+            cu::debug!("linkcmd up to date");
+            return Ok(false);
         }
     }
 

@@ -19,6 +19,7 @@ pub struct Environment {
     cc: PathBuf,  // C compiler
     cxx: PathBuf, // C++ compiler
     asm: PathBuf, // Assembler
+    objdump: PathBuf,
     cc_version: String,
     cxx_version: String,
     asm_version: String,
@@ -30,6 +31,7 @@ impl Environment {
         let cc = dkp_bin.join("aarch64-none-elf-gcc");
         let cxx = dkp_bin.join("aarch64-none-elf-g++");
         let asm = dkp_bin.join("aarch64-none-elf-gcc");
+        let objdump = dkp_bin.join("aarch64-none-elf-objdump");
         let dkp_tools_bin = devkitpro.join("tools").join("bin");
         let npdmtool = dkp_tools_bin.join("npdmtool");
         let elf2nso = dkp_tools_bin.join("elf2nso");
@@ -51,6 +53,7 @@ impl Environment {
             cc,
             cxx,
             asm,
+            objdump,
             cc_version,
             cxx_version,
             asm_version,
@@ -78,6 +81,12 @@ impl Environment {
     }
     pub fn asm_path(&self) -> &Path {
         &self.asm
+    }
+    pub fn objdump(&self) -> &Path {
+        &self.objdump
+    }
+    pub fn npdmtool(&self) -> &Path {
+        &self.npdmtool
     }
     pub fn elf2nso_path(&self) -> &Path {
         &self.elf2nso
@@ -159,6 +168,7 @@ pub fn commit() -> &'static str {
 /// # Safety
 /// Only safe to call when only one thread exists
 pub unsafe fn init_env() -> cu::Result<()> {
+    // TODO: decide if we really need megaton_home since caches just go in the target dir
     let megaton_home = cu::env_var("MEGATON_HOME").unwrap_or_default();
     let megaton_home = if megaton_home.is_empty() {
         cu::debug!("MEGATON_HOME not specified, using default path ~/.cache/megaton");

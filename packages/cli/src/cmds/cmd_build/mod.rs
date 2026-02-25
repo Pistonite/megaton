@@ -10,6 +10,7 @@ use flate2::bufread::GzDecoder;
 use crate::env::environment;
 use config::Flags;
 
+mod check;
 mod compile;
 mod config;
 mod link;
@@ -195,7 +196,8 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     }
 
     let elf_path = target_mod.join(format!("{}.elf", config.module.name));
-    let linked = link::build_elf(
+    // I dont care what oxford says, lunk is the past tense of link
+    let lunk = link::build_elf(
         need_link,
         artifacts,
         build_flags.ldflags,
@@ -205,7 +207,23 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     .await?;
 
     let nso_path = target_mod.join(format!("{}.nso", config.module.name));
-    if linked {
+    if lunk && nso_path.exists() {
+        // TODO: check while building nso, delete nso afterwards if check fails
+        if let Some(check_config) = config.check {
+            let check_config = check_config.get_profile(profile);
+            let mut symbol_files = vec![];
+            for symbol_file in check_config.symbols {
+                symbol_files.push(symbol_file.normalize_exists()?);
+            }
+            check::check_all(
+                &elf_path,
+                &check_config.ignore,
+                &check_config.disallowed_instructions,
+                &symbol_files,
+            )
+            .await
+            .context("Check failed")?;
+        }
         link::build_nso(&elf_path, &nso_path).await?;
     }
 

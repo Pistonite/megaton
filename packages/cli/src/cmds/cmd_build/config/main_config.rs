@@ -324,7 +324,7 @@ pub struct Check {
     pub ignore: Vec<String>,
     /// Paths to *.syms file (output of objdump) that contains dynamic symbols accessible by the module
     #[serde(default)]
-    pub symbols: Vec<String>,
+    pub symbols: Vec<PathBuf>,
     /// Extra instructions to disallow (like `"msr"`). Values are regular expressions.
     #[serde(default)]
     pub disallowed_instructions: Vec<String>,

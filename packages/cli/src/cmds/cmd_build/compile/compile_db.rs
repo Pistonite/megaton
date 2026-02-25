@@ -7,9 +7,11 @@ use cu::pre::*;
 
 use crate::env::environment;
 
+type Records = HashMap<usize, CompileRecord>;
+
 #[derive(Serialize, Deserialize, Default)]
 pub struct CompileDB {
-    records: HashMap<usize, CompileRecord>,
+    records: Records,
     cc_version: String,
     cxx_version: String,
     asm_version: String,
@@ -53,7 +55,7 @@ impl CompileDB {
     pub fn new() -> Self {
         let env = environment();
         Self {
-            records: HashMap::default(),
+            records: Records::default(),
             cc_version: env.cc_version().to_string(),
             cxx_version: env.cxx_version().to_string(),
             asm_version: env.asm_version().to_string(),
