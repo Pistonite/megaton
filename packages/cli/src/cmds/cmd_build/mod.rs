@@ -506,30 +506,23 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
     Ok(())
 }
 
-fn create_npdm(artifacts: &BTArtifacts, title_id: &str) -> cu::Result<()> {
-    cu::info!("Creating main.npdm");
+fn create_npdm(artifacts: &BTArtifacts, title_id_hex: &str) -> cu::Result<()> {
+    cu::debug!("creating main.npdm");
+    let mut npdm_data: json::Value = json::parse(include_str!("../../../template.npdm.json"))?;
+    npdm_data["title_id"] = json!(format!("0x{}", title_id_hex));
 
-    let env = environment();
-    let template_path = artifacts.lib_root.join("npdm_template.json");
-    let npdm_json_path = artifacts.module_root.join("main.npdm.json");
-    let main_npdm_path = artifacts.module_root.join("main.npdm");
+    let main_npdm_json = artifacts.module_root.join("main.npdm.json");
+    let main_npdm = artifacts.module_root.join("main.npdm");
 
+    cu::fs::write_json_pretty(&main_npdm_json, &npdm_data)?;
 
-    let reader = cu::fs::reader(&artifacts.npdm_template_path)?;
-    let mut npdm_data: cu::json::Value = cu::json::read(reader)?;
-
-
-    npdm_data["title_id"] = cu::json!(format!("0x{}", title_id));
-
-    let writer = cu::fs::writer(&npdm_json_path)?;
-    cu::json::write_pretty(writer, &npdm_data)?;
-
-    env.npdmtool_path()
+    environment()
+        .npdmtool_path()
         .command()
-        .add(cu::args![&npdm_json_path, &main_npdm_path])
+        .add(cu::args![&main_npdm_json, &main_npdm])
         .all_null()
+        .spawn()?
         .wait_nz()?;
 
     Ok(())
 }
-
