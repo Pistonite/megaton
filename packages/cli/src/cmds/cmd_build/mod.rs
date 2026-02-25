@@ -89,6 +89,8 @@ struct BTArtifacts {
     lib_src: PathBuf,
     lib_include: PathBuf,
     lib_linkldscript: PathBuf,
+    npdm_template_path: PathBuf,
+
     verfile_path: PathBuf,
 
     compdb_path: PathBuf,
@@ -121,6 +123,7 @@ impl BTArtifacts {
             cxxbridge_bin: lib_root.join("bin/cxxbridge"),
             lib_src: lib_src.clone(),
             lib_include: lib_root.join("include"),
+            npdm_template_path: lib_root.join("rt").join("npdm_template.json"),
             lib_linkldscript: lib_root.join("link.ld"),
             verfile_path: lib_root.join("verfile"),
 
@@ -487,6 +490,8 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
                 cu::info!("Check: No disallowed instructions found");
             }
         }
+
+        create_npdm(&bt_artifacts, &title_id_hex)?;
     }
 
     let _ = compdb
@@ -497,6 +502,27 @@ fn run_build(args: CmdBuild) -> cu::Result<()> {
         .inspect_err(|e| cu::error!("Failed to save command log! {}", e));
 
     compdb.save_cc_json(PathBuf::from(config.module.compdb).as_ref())?;
+
+    Ok(())
+}
+
+fn create_npdm(artifacts: &BTArtifacts, title_id_hex: &str) -> cu::Result<()> {
+    cu::debug!("creating main.npdm");
+    let mut npdm_data: json::Value = json::parse(include_str!("../../../template.npdm.json"))?;
+    npdm_data["title_id"] = json!(format!("0x{}", title_id_hex));
+
+    let main_npdm_json = artifacts.module_root.join("main.npdm.json");
+    let main_npdm = artifacts.module_root.join("main.npdm");
+
+    cu::fs::write_json_pretty(&main_npdm_json, &npdm_data)?;
+
+    environment()
+        .npdmtool_path()
+        .command()
+        .add(cu::args![&main_npdm_json, &main_npdm])
+        .all_null()
+        .spawn()?
+        .wait_nz()?;
 
     Ok(())
 }
