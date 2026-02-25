@@ -53,7 +53,7 @@ fn load_known_symbols(symbol_files: &[PathBuf]) -> cu::Result<Symbols> {
     let mut symbols = HashSet::new();
 
     for symbol_file in symbol_files {
-        let content = cu::fs::read_string(&symbol_file).context(format!(
+        let content = cu::fs::read_string(symbol_file).context(format!(
             "failed to read symbol file {}",
             &symbol_file.display()
         ))?;

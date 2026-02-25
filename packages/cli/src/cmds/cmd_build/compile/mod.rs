@@ -6,7 +6,7 @@ use std::{
 use cu::pre::*;
 
 use super::config::Flags;
-use compile_db::{CompileDB, CompileRecord};
+use compile_db::CompileDB;
 
 mod compile_db;
 mod source;
@@ -33,34 +33,36 @@ impl CompileCtx {
 /// Will wait until all compilation jobs finish before returning
 /// Handles loading, updating, and saving the compile db
 /// Returns true if anything actually compiled
-pub async fn compile_all(contexts: &[CompileCtx], compile_db_path: &Path) -> cu::Result<(bool, Vec<PathBuf>)> {
+pub async fn compile_all(
+    contexts: &[CompileCtx],
+    compile_db_path: &Path,
+) -> cu::Result<(bool, Vec<PathBuf>)> {
     // Get compile_db
     let mut compile_db = CompileDB::try_load_or_new(compile_db_path);
 
-    if !compile_db.version_is_correct() {
+    if !compile_db.is_version_correct() {
         cu::info!("Compiler version has changed, recompiling");
         compile_db = CompileDB::new();
     }
 
     let pool = cu::co::pool(0);
-    let mut handles: Vec<cu::co::Handle<cu::Result<(bool, CompileRecord, PathBuf)>>> = vec![];
+    let mut handles = vec![];
 
     // Start compilation for all contexts
     for ctx in contexts {
-        source::scan(&ctx.source_paths)
-            .map(|src| {
-                let flags = ctx.flags.clone();
-                let output_path = ctx.output_path.clone();
-                let record = compile_db.find_record(src.pathhash);
-                if let Some(record) = record {
-                    // Previous record found
-                    pool.spawn(src.compile(flags, output_path, Some(record.to_owned())))
-                } else {
-                    // No record of this file found
-                    pool.spawn(src.compile(flags, output_path, None))
-                }
-            })
-            .for_each(|handle| handles.push(handle));
+        source::scan(&ctx.source_paths).for_each(|src| {
+            let flags = ctx.flags.clone();
+            let output_path = ctx.output_path.clone();
+            let record = compile_db.find_record(src.pathhash);
+            let handle = if let Some(record) = record {
+                // Previous record found
+                pool.spawn(src.compile(flags, output_path, Some(record.to_owned())))
+            } else {
+                // No record of this file found
+                pool.spawn(src.compile(flags, output_path, None))
+            };
+            handles.push(handle);
+        });
     }
 
     let mut something_compiled = false;

@@ -33,7 +33,7 @@ pub async fn build_elf(
 
     if let Some(old_link_cmd) = old_link_cmd {
         cu::debug!("linkcmd successfully loaded");
-        if !need_link  && link_cmd == old_link_cmd {
+        if !need_link && link_cmd == old_link_cmd {
             cu::debug!("linkcmd up to date");
             return Ok(false);
         }

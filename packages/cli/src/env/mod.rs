@@ -31,7 +31,6 @@ pub struct Environment {
 
 impl Environment {
     fn new(megaton_home: PathBuf, devkitpro: PathBuf) -> Self {
-
         let dkp_bin = devkitpro.join("devkitA64").join("bin");
         let cc = dkp_bin.join("aarch64-none-elf-gcc");
         let cxx = dkp_bin.join("aarch64-none-elf-g++");

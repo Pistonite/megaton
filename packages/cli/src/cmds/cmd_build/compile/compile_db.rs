@@ -32,12 +32,12 @@ impl CompileDB {
             Ok(db) => {
                 cu::debug!("CompileDB loaded successfully");
                 db
-            },
+            }
             Err(e) => {
                 cu::debug!("CompileDB failed to load: {e}");
                 cu::info!("Generating a new CompileDB: {e}");
                 Self::new()
-            },
+            }
         }
     }
 
@@ -63,18 +63,17 @@ impl CompileDB {
     }
 
     /// Check if the recorded compiler versions are the same as in the environment
-    pub fn version_is_correct(&self) -> bool {
+    pub fn is_version_correct(&self) -> bool {
         let env = environment();
-        return env.cc_version() == self.cc_version
+        env.cc_version() == self.cc_version
             && env.cxx_version() == self.cxx_version
-            && env.asm_version() == self.asm_version;
+            && env.asm_version() == self.asm_version
     }
 
     /// Saves the compiledb to the disk, erroring if the path doesn't exist
     /// If the file already exists, it will be truncated and overwritten
     pub fn save(&self, path: &Path) -> cu::Result<()> {
-        let file = std::fs::File::create(path)?;
-        json::write_pretty(file, self)
+        cu::fs::write_json_pretty(path, self)
     }
 
     pub fn find_record(&self, path_hash: usize) -> Option<&CompileRecord> {
@@ -84,57 +83,4 @@ impl CompileDB {
     pub fn update(&mut self, path_hash: usize, record: CompileRecord) {
         self.records.insert(path_hash, record);
     }
-
-    // pub fn save_cc_json(&self, path: &Path) -> cu::Result<()> {
-    //     let file = std::fs::File::create(path)?;
-    //     let entries = self
-    //         .commands
-    //         .iter()
-    //         .map(|cc| CCJsonEntry::from(cc))
-    //         .collect::<Vec<CCJsonEntry>>();
-    //
-    //     json::write_pretty(file, &entries)
-    // }
 }
-
-// #[derive(Serialize, Deserialize)]
-// struct CCJsonEntry {
-//     arguments: Vec<String>,
-//     directory: String,
-//     file: String,
-// }
-//
-// impl From<&CompileRecord> for CCJsonEntry {
-//     fn from(value: &CompileRecord) -> Self {
-//         // Get rid of architecture-specific flags
-//         let mut arguments = value
-//             .args
-//             .clone()
-//             .into_iter()
-//             .filter(|x| {
-//                 let re = Regex::new(r"-mtune=.+|-march=.+|-mtp=.+").unwrap();
-//                 !re.is_match(x)
-//             })
-//             .collect::<Vec<_>>();
-//
-//         arguments.extend(
-//             environment()
-//                 .dkp_headers()
-//                 .into_iter()
-//                 .map(|i| format!("-isystem {i}"))
-//                 .collect::<Vec<_>>(),
-//         );
-//
-//         let directory = PathBuf::from(".")
-//             .canonicalize()
-//             .unwrap()
-//             .display()
-//             .to_string();
-//         let file = value.source.display().to_string();
-//         Self {
-//             arguments,
-//             directory,
-//             file,
-//         }
-//     }
-// }

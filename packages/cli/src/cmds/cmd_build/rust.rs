@@ -94,21 +94,6 @@ impl RustCtx {
         Ok(new_mtime != old_mtime)
     }
 
-    fn get_source_files(&self) -> cu::Result<Vec<PathBuf>> {
-        // TODO: try to make this return an iterator
-        let mut source_files: Vec<PathBuf> = vec![];
-        for dir in &self.source_paths {
-            let mut walk = cu::fs::walk(dir)?;
-            while let Some(entry) = walk.next() {
-                let p = entry?.path();
-                if p.extension().is_some_and(|e| e == "rs") {
-                    source_files.push(p);
-                }
-            }
-        }
-        Ok(source_files)
-    }
-
     /// Gets the path to the static lib compiled by cargo
     /// This should always be using the hermit target on release mode
     /// Will panic if it fails to read the package name from Cargo.toml
@@ -189,6 +174,21 @@ impl RustCtx {
             ))
         }
     }
+
+    fn get_source_files(&self) -> cu::Result<Vec<PathBuf>> {
+        // TODO: try to make this return an iterator
+        let mut source_files: Vec<PathBuf> = vec![];
+        for dir in &self.source_paths {
+            let mut walk = cu::fs::walk(dir)?;
+            while let Some(entry) = walk.next() {
+                let p = entry?.path();
+                if p.extension().is_some_and(|e| e == "rs") {
+                    source_files.push(p);
+                }
+            }
+        }
+        Ok(source_files)
+    }
 }
 
 async fn cxxbridge_process(
@@ -234,6 +234,7 @@ async fn cxxbridge_process(
 
     Ok(header_updated || source_updated)
 }
+
 // Run the cxxbridge cmd and update the corresponding file if changed
 // returns Ok(true) iff new code was generated and written
 async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::Result<bool> {
@@ -288,7 +289,7 @@ fn write_if_changed(path: &Path, bytes: &[u8]) -> cu::Result<bool> {
     };
 
     if changed {
-        cu::fs::write(&path, bytes)?;
+        cu::fs::write(path, bytes)?;
     }
 
     Ok(changed)

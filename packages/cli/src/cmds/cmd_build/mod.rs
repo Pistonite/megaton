@@ -50,7 +50,6 @@ impl CmdBuild {
 
 async fn run_build(args: CmdBuild) -> cu::Result<()> {
     let env = environment();
-    cu::hint!("run with -v to see additional output");
 
     ////////// Load config //////////
     let config = config::load_config(&args.config).context("failed to load config")?;
@@ -71,6 +70,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     cu::fs::make_dir(&target_mod_src)?;
     cu::fs::make_dir(&target_mod_include)?;
     cu::fs::make_dir(&target_mod_o)?;
+    make_npdm_json(&target_mod, &config.module.title_id_hex()).await?;
 
     cu::debug!("profile: {profile}");
 
@@ -224,9 +224,9 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
             .context("Check failed")?;
         }
         link::build_nso(&elf_path, &nso_path).await?;
+    } else {
+        cu::hint!("Up to date")
     }
-
-    make_npdm_json(&target_mod, &config.module.title_id_hex()).await?;
 
     Ok(())
 }
@@ -254,8 +254,10 @@ async fn make_npdm_json(output_dir: &Path, title_id_hex: &str) -> cu::Result<()>
         .command()
         .add(cu::args![&main_npdm_json, &main_npdm])
         .all_null()
-        .co_spawn().await?
-        .co_wait_nz().await?;
+        .co_spawn()
+        .await?
+        .co_wait_nz()
+        .await?;
 
     Ok(())
 }
@@ -278,7 +280,7 @@ fn write_if_changed(path: &Path, bytes: &[u8]) -> cu::Result<bool> {
         Err(_) => true,
     };
     if changed {
-        cu::fs::write(&path, bytes)?;
+        cu::fs::write(path, bytes)?;
     }
     Ok(changed)
 }

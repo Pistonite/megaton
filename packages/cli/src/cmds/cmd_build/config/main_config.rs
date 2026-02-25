@@ -143,7 +143,7 @@ impl Validate for CargoConfig {
 }
 
 /// The `[megaton]` section
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MegatonConfig {
     /// If specified, megaton will run version check
     ///
@@ -156,16 +156,6 @@ pub struct MegatonConfig {
 
     #[serde(flatten, default)]
     unused: CaptureUnused,
-}
-
-impl Default for MegatonConfig {
-    fn default() -> Self {
-        Self {
-            version: None,
-            custom_entry: None,
-            unused: Default::default(),
-        }
-    }
 }
 
 impl Validate for MegatonConfig {
@@ -181,7 +171,7 @@ impl MegatonConfig {
         match &self.custom_entry {
             None => "__megaton_module_entry",
             Some(entry) => {
-                if entry == "" {
+                if entry.is_empty() {
                     "__megaton_module_entry"
                 } else {
                     entry
@@ -192,7 +182,7 @@ impl MegatonConfig {
 
     /// Checks if libmegaton enabled
     pub fn lib_enabled(&self) -> bool {
-        self.custom_entry.clone().is_none_or(|val| val == "")
+        self.custom_entry.clone().is_none_or(|val| val.is_empty())
     }
 }
 

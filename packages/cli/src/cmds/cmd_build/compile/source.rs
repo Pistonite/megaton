@@ -43,13 +43,6 @@ impl SourceFile {
         })
     }
 
-    pub fn get_o_path(&self, output_path: &Path) -> PathBuf {
-        output_path.join(format!("{}-{}.o", self.basename, self.pathhash))
-    }
-    pub fn get_d_path(&self, output_path: &Path) -> PathBuf {
-        output_path.join(format!("{}-{}.d", self.basename, self.pathhash))
-    }
-
     /// Compiles all sources in the context
     /// Return values:
     /// 0 : bool - true if anything actually compiled, false if compilation was skipped
@@ -184,6 +177,14 @@ impl SourceFile {
 
         Ok(true)
     }
+
+    fn get_o_path(&self, output_path: &Path) -> PathBuf {
+        output_path.join(format!("{}-{}.o", self.basename, self.pathhash))
+    }
+
+    fn get_d_path(&self, output_path: &Path) -> PathBuf {
+        output_path.join(format!("{}-{}.d", self.basename, self.pathhash))
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -212,6 +213,21 @@ impl Lang {
     }
 }
 
+pub fn scan(dirs: &[PathBuf]) -> SourceIterator {
+    let walks = dirs
+        .iter()
+        .filter_map(|dir| cu::fs::walk(dir).ok())
+        .collect::<Vec<_>>();
+    let num_walks = walks.len();
+
+    SourceIterator {
+        walks,
+        num_walks,
+        idx: 0,
+    }
+}
+
+// TODO: https://github.com/Pistonite/megaton/issues/77
 pub struct SourceIterator {
     walks: Vec<cu::fs::Walk>,
     num_walks: usize,
@@ -232,20 +248,4 @@ impl Iterator for SourceIterator {
         }
         None
     }
-}
-
-pub fn scan(dirs: &[PathBuf]) -> SourceIterator {
-    let walks = dirs
-        .iter()
-        .filter_map(|dir| cu::fs::walk(dir).ok())
-        .collect::<Vec<_>>();
-    let num_walks = walks.len();
-
-    let src_iter = SourceIterator {
-        walks,
-        num_walks,
-        idx: 0,
-    };
-
-    src_iter
 }
