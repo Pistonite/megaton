@@ -412,11 +412,6 @@ pub fn relink(
         .iter()
         .map(|o| o.display().to_string())
         .collect(); // scan target folder (BuildConfig)
-    // TODO: Unpack lib
-    let lib_objs: Vec<String> = get_obj_files_in(&bt_artifacts.lib_obj)
-        .iter()
-        .map(|o| o.display().to_string())
-        .collect();
 
     let output_arg = [
         "-o".to_string(),
@@ -473,7 +468,7 @@ pub fn relink(
     if let Some(rust_staticlib_path) = rust_staticlib {
         args.push(rust_staticlib_path.display().to_string());
     }
-    args.extend(lib_objs);
+    // args.extend(lib_objs);
     args.extend(output_arg);
     let cxx = env.cxx_path();
 
