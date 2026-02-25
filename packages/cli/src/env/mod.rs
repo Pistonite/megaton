@@ -8,19 +8,25 @@ use cu::pre::*;
 
 // Core environment variables needed to run the tool
 // Includes paths to build/debug utilities and caches
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Environment {
     megaton_home: PathBuf,
-    devkitpro: PathBuf,
-    dkp_version: String,
+
     cc: PathBuf,  // C compiler
     cxx: PathBuf, // C++ compiler
     asm: PathBuf, // Assembler
     ar: PathBuf,  // Archiver
-    libnx_include: PathBuf,
+    objdump: PathBuf,
     npdmtool: PathBuf,
     elf2nso: PathBuf,
+
+    cc_version: String,
+    cxx_version: String,
+    asm_version: String,
+
+    devkitpro: PathBuf,
+    dkp_version: String,
+    dkp_includes: Vec<String>,
 }
 
 impl Environment {
@@ -28,26 +34,38 @@ impl Environment {
         let dkp_bin = devkitpro.join("devkitA64").join("bin");
         let cc = dkp_bin.join("aarch64-none-elf-gcc");
         let cxx = dkp_bin.join("aarch64-none-elf-g++");
-        let asm = dkp_bin.join("aarch64-none-elf-gcc"); // Use gcc for now
-        let ar = dkp_bin.join("aarch64-none-elf-ar"); // Use gcc for now
-        let libnx_include = devkitpro.join("libnx").join("include");
+        let asm = dkp_bin.join("aarch64-none-elf-gcc");
+        let ar = dkp_bin.join("aarch64-none-elf-ar");
+        let objdump = dkp_bin.join("aarch64-none-elf-objdump");
+
         let dkp_tools_bin = devkitpro.join("tools").join("bin");
         let npdmtool = dkp_tools_bin.join("npdmtool");
         let elf2nso = dkp_tools_bin.join("elf2nso");
+
+        let cc_version = get_cc_version(&cc)
+            .expect("Failed to init environment: error when checking compiler version");
+        let cxx_version = cc_version.clone(); // These should be the same, maybe merge
+        let asm_version = cc_version.clone(); // these at some point in the future
+
         let dkp_version = get_dkp_version(&devkitpro, &cc)
             .expect("Failed to init environment: check that DKP is installed correctly");
+        let dkp_includes = get_dkp_includes(&devkitpro, &dkp_version);
 
         Self {
             megaton_home,
-            devkitpro,
-            dkp_version,
             cc,
             cxx,
             asm,
             ar,
-            libnx_include,
+            objdump,
             npdmtool,
             elf2nso,
+            cc_version,
+            cxx_version,
+            asm_version,
+            devkitpro,
+            dkp_version,
+            dkp_includes,
         }
     }
 
@@ -58,26 +76,41 @@ impl Environment {
     pub fn dkp_path(&self) -> &Path {
         &self.devkitpro
     }
-    pub fn dkp_version(&self) -> &String {
+    pub fn dkp_version(&self) -> &str {
         &self.dkp_version
     }
-    pub fn cc_path(&self) -> &Path {
+    pub fn dkp_includes(&self) -> &[String] {
+        &self.dkp_includes
+    }
+    pub fn cc(&self) -> &Path {
         &self.cc
     }
-    pub fn cxx_path(&self) -> &Path {
+    pub fn cxx(&self) -> &Path {
         &self.cxx
     }
-    pub fn asm_path(&self) -> &Path {
+    pub fn asm(&self) -> &Path {
         &self.asm
     }
-    pub fn ar_path(&self) -> &Path {
+    pub fn ar(&self) -> &Path {
         &self.ar
     }
-    pub fn elf2nso_path(&self) -> &Path {
+    pub fn objdump(&self) -> &Path {
+        &self.objdump
+    }
+    pub fn npdmtool(&self) -> &Path {
+        &self.npdmtool
+    }
+    pub fn elf2nso(&self) -> &Path {
         &self.elf2nso
     }
-    pub fn npdmtool_path(&self) -> &Path {
-        &self.npdmtool
+    pub fn cc_version(&self) -> &str {
+        &self.cc_version
+    }
+    pub fn cxx_version(&self) -> &str {
+        &self.cxx_version
+    }
+    pub fn asm_version(&self) -> &str {
+        &self.asm_version
     }
 }
 
@@ -92,21 +125,44 @@ fn get_dkp_version(dkp: &Path, cc: &Path) -> cu::Result<String> {
     .context("DKP include path does not exist")?;
 
     let dir = readdir.filter_map(|x| x.ok()).collect::<Vec<_>>();
-    if dir.len() == 1 {
-        return Ok(dir[0].file_name().display().to_string());
-    }
 
-    // Fallback: query gcc for version
-    let (gcc, output) = cu::CommandBuilder::new(cc.as_os_str())
+    if dir.len() == 1 {
+        Ok(dir[0].file_name().display().to_string())
+    } else {
+        // Fallback: query gcc for version
+        get_cc_version(cc)
+    }
+}
+
+fn get_cc_version(cc_path: &Path) -> cu::Result<String> {
+    let (child, _, lines) = cu::CommandBuilder::new(cc_path.as_os_str())
         .arg("-v")
-        .stdout(cu::pio::lines()) // todo: log to file
-        .stderr_null()
+        .stdout_null()
+        .stderr(cu::pio::lines())
         .stdin_null()
         .spawn()?;
-    gcc.wait_nz()?;
-    let verline = output.last().unwrap()?;
+    child.wait_nz()?;
+    let verline = lines.last().unwrap()?;
     let verstring = verline.split(" ").nth(2).unwrap().to_owned();
     Ok(verstring)
+}
+
+fn get_dkp_includes(dkp: &Path, dkp_version: &str) -> Vec<String> {
+    [
+        "devkitA64/aarch64-none-elf/include/c++/?ver?",
+        "devkitA64/aarch64-none-elf/include/c++/?ver?/aarch64-none-elf",
+        "devkitA64/aarch64-none-elf/include/c++/?ver?/backward",
+        "devkitA64/lib/gcc/aarch64-none-elf/?ver?/include",
+        "devkitA64/lib/gcc/aarch64-none-elf/?ver?/include-fixed",
+        "devkitA64/aarch64-none-elf/include",
+    ]
+    .iter()
+    .map(|path| {
+        dkp.join(path.replace("?ver?", dkp_version))
+            .display()
+            .to_string()
+    })
+    .collect::<Vec<_>>()
 }
 
 static ENVIRONMENT: OnceLock<Environment> = OnceLock::new();
@@ -124,6 +180,7 @@ pub fn commit() -> &'static str {
 /// # Safety
 /// Only safe to call when only one thread exists
 pub unsafe fn init_env() -> cu::Result<()> {
+    // TODO: decide if we really need megaton_home since caches just go in the target dir
     let megaton_home = cu::env_var("MEGATON_HOME").unwrap_or_default();
     let megaton_home = if megaton_home.is_empty() {
         cu::debug!("MEGATON_HOME not specified, using default path ~/.cache/megaton");

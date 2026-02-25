@@ -54,7 +54,7 @@ fn make_lib_targz() -> cu::Result<()> {
             rel_path.is_relative(),
             "not relative: {}",
             rel_path.display()
-        );
+        )?;
         let mut file = cu::check!(
             File::open(&entry_path),
             "failed to open '{}'",

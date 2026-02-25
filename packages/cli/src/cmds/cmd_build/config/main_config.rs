@@ -9,11 +9,11 @@ use cu::pre::*;
 
 /// Load a Megaton.toml config file
 pub fn load_config(manifest_path: impl AsRef<Path>) -> cu::Result<Config> {
-    let cwd = PathBuf::from(".").canonicalize().unwrap();
+    let cwd = PathBuf::from(".").normalize().unwrap();
     let ancestors = cwd.ancestors();
 
     for path in ancestors {
-        let p = PathBuf::from(path).join(&manifest_path).canonicalize();
+        let p = PathBuf::from(path).join(&manifest_path).normalize();
         match p {
             Ok(p) => {
                 if p.exists() {
@@ -21,7 +21,7 @@ pub fn load_config(manifest_path: impl AsRef<Path>) -> cu::Result<Config> {
                         .expect("Could not open megaton project root");
                     let content = cu::fs::read_string(p)?;
                     let config = toml::parse::<Config>(&content)
-                        .context("failed to parse Megaton config")?;
+                        .context("Failed to parse Megaton config")?;
                     config.validate_root()?;
                     return Ok(config);
                 }
@@ -76,17 +76,24 @@ impl Validate for Config {
         self.module.validate_property(ctx, "module")?;
         self.profile.validate_property(ctx, "profile")?;
         self.megaton.validate_property(ctx, "megaton")?;
-        cu::hint!("TODO: add cargo config");
+        self.cargo.validate_property(ctx, "cargo")?;
         self.build.validate_property(ctx, "build")?;
+
         if let Some(check) = &self.check {
             check.validate_property(ctx, "check")?;
+        }
+
+        if !self.megaton.lib_enabled() && self.cargo.enabled.is_some_and(|val| val) {
+            cu::bail!("rust cannot be enabled unless libmegaton is enabled");
         }
 
         self.unused.validate(ctx)
     }
 }
 
+/// The `[cargo]` section
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct CargoConfig {
     pub enabled: Option<bool>,
 
@@ -130,76 +137,30 @@ fn default_sources() -> Vec<PathBuf> {
 
 impl Validate for CargoConfig {
     fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
-        // if self.enabled {
-        //     if self.manifest.as_ref().is_none_or(|x| x.is_empty()) {
-        //         cu::error!("Must have manifest if cargo is enabled");
-        //         ctx.bail()?
-        //     }
-        // } else if self.manifest.is_some() {
-        //     cu::error!("Cargo must be enabled for manifest");
-        //     ctx.bail()?
-        // }
+        cu::hint!("TODO: validate cargo config");
         self.unused.validate(ctx)
     }
 }
 
 /// The `[megaton]` section
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MegatonConfig {
     /// If specified, megaton will run version check
     ///
     /// `N` means the build tool must be version `0.N.x` (x can be anything)
     pub version: Option<u32>,
 
-    /// Whether to use libmegaton (default is true)
-    ///
-    /// If false, the module won't link with libmegaton
-    /// and you won't be able to use megaton's runtime features. This is useful
-    /// if you want to bring your own runtime. Note that this is required for
-    /// Rust support
-    ///
-    /// If libmegaton is not used, you also must set `entry` to the
-    /// name of the entrypoint function
-    #[serde(default = "default_true")]
-    pub library: bool,
-
-    /// Entry point symbol for the module. Only allowed if `megaton` is false
-    pub entry: Option<String>,
+    /// Custom entry point symbol for the module. This should only be set if libmegaton is disabled.
+    /// Using this disables the libmegaton runtime, which also means rust support will be disabled.
+    pub custom_entry: Option<String>,
 
     #[serde(flatten, default)]
     unused: CaptureUnused,
 }
 
-impl Default for MegatonConfig {
-    fn default() -> Self {
-        Self {
-            version: None,
-            library: true,
-            entry: None,
-            unused: Default::default(),
-        }
-    }
-}
-
 impl Validate for MegatonConfig {
     fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
         cu::hint!("TODO: implement version check");
-        if self.library {
-            if self.entry.is_some() {
-                cu::error!("megaton.entry can only be used when megaton.library = false!");
-                cu::hint!(
-                    "- consider setting megaton.library to false if you want to use your own library instead of megaton."
-                );
-                ctx.bail()?;
-            }
-        } else if self.entry.is_none() {
-            cu::error!("megaton.entry must be specified when megaton.library = false!");
-            cu::hint!(
-                "- consider specifying build.entry to the symbol of your module's entry point"
-            );
-            cu::hint!("- alternatively, set megaton.library to true to use megaton library");
-            ctx.bail()?;
-        }
         self.unused.validate(ctx)
     }
 }
@@ -207,10 +168,21 @@ impl Validate for MegatonConfig {
 impl MegatonConfig {
     /// Get the entry point symbol name
     pub fn entry_point(&self) -> &str {
-        match &self.entry {
-            Some(entry) => entry,
+        match &self.custom_entry {
             None => "__megaton_module_entry",
+            Some(entry) => {
+                if entry.is_empty() {
+                    "__megaton_module_entry"
+                } else {
+                    entry
+                }
+            }
         }
+    }
+
+    /// Checks if libmegaton enabled
+    pub fn lib_enabled(&self) -> bool {
+        self.custom_entry.clone().is_none_or(|val| val.is_empty())
     }
 }
 
@@ -239,17 +211,17 @@ pub struct Module {
 impl Validate for Module {
     fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
         if self.name.is_empty() {
-            cu::bailfyi!("module.name must be non-empty");
+            cu::bail!("module.name must be non-empty");
         }
         if self.name == "lib" {
-            cu::bailfyi!("'lib' is reserved and cannot be the module name");
+            cu::bail!("'lib' is reserved and cannot be the module name");
         }
         if self
             .name
             .chars()
             .any(|c| !c.is_alphanumeric() && c != '-' && c != '_')
         {
-            cu::bailfyi!(
+            cu::bail!(
                 "'{}' is not a valid module name (must only contain alphanumeric characters, - or _",
                 self.name
             );
@@ -275,12 +247,12 @@ fn default_comp_commands() -> String {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProfileConfig {
-    /// Set the profile to use when profile is "none"
+    /// Set the profile to use when profile is unspecified
     ///
     /// If `Some("")`, a profile must be specified in command line or megaton will error
     pub default: Option<String>,
 
-    /// Allow the base (`none`) profile to be used
+    /// Allow the base (`base`) profile to be used
     #[serde(default = "default_true")]
     pub allow_base: bool,
 
@@ -313,20 +285,20 @@ impl ProfileConfig {
         'b: 'a, // lifetime: cli should live longer since that's parsed before config
     {
         let profile = match (cli_profile, &self.default) {
-            ("none", Some(p)) if p.is_empty() => {
+            ("base", Some(p)) if p.is_empty() => {
                 cu::error!("no profile specified!");
                 cu::hint!("- please specify a profile with -p PROFILE");
-                cu::bailfyi!("failed to selected a profile");
+                cu::bail!("failed to selected a profile");
             }
-            ("none", Some(p)) => p,
-            ("none", None) => BASE_PROFILE,
+            ("base", Some(p)) => p,
+            ("base", None) => BASE_PROFILE,
             (profile, _) => profile,
         };
 
-        if !self.allow_base && profile == "none" {
+        if !self.allow_base && profile == "base" {
             cu::error!("base profile is not allowed!");
             cu::hint!("- please specify a profile with -p PROFILE");
-            cu::bailfyi!("failed to selected a profile");
+            cu::bail!("failed to selected a profile");
         }
 
         Ok(profile)
@@ -342,7 +314,7 @@ pub struct Check {
     pub ignore: Vec<String>,
     /// Paths to *.syms file (output of objdump) that contains dynamic symbols accessible by the module
     #[serde(default)]
-    pub symbols: Vec<String>,
+    pub symbols: Vec<PathBuf>,
     /// Extra instructions to disallow (like `"msr"`). Values are regular expressions.
     #[serde(default)]
     pub disallowed_instructions: Vec<String>,

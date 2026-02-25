@@ -64,9 +64,11 @@ pub fn main(cmd: CmdMegaton) -> cu::Result<()> {
     }
     // safety: program is single threaded at this point
     unsafe { env::init_env()? };
+
     match cmd.sub {
         CmdMegatonSub::Version(_) => unreachable!(),
-        CmdMegatonSub::Build(cmd) => cmd.run(),
+        // Start of async
+        CmdMegatonSub::Build(cmd) => cu::co::run(async move { cmd.run().await }),
         CmdMegatonSub::Toolchain { cmd } => cmd.run(),
     }
 }
@@ -77,5 +79,5 @@ fn print_version() {
         env!("CARGO_PKG_VERSION"),
         &env::commit()[0..8]
     );
-    cu::disable_print_time();
+    cu::lv::disable_print_time();
 }

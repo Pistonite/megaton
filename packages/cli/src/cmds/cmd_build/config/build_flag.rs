@@ -179,7 +179,6 @@ macro_rules! create_flags {
     };
 }
 
-#[allow(dead_code)]
 impl Flags {
     pub fn from_config(config: &FlagConfig) -> Self {
         let common = create_flags!(&config.common, DEFAULT_COMMON);
@@ -187,7 +186,7 @@ impl Flags {
 
         // no need to check if the flag already exists.. that's O(N)
         // we already said in the docs don't do that
-        let color_flag = if cu::color_enabled() {
+        let color_flag = if cu::lv::color_enabled() {
             "never"
         } else {
             "always"

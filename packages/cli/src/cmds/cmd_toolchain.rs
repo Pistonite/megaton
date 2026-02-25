@@ -85,7 +85,7 @@ fn install(keep: bool, clean: bool) -> cu::Result<()> {
                             cu::rethrow!(e);
                         }
                         Ok(false) => {
-                            cu::bailfyi!("aborted by user");
+                            cu::bail!("aborted by user");
                         }
                         Ok(true) => {}
                     }
@@ -98,7 +98,7 @@ fn install(keep: bool, clean: bool) -> cu::Result<()> {
                         cu::hint!(
                             "if you want to reinstall it, remove it first with 'megaton toolchain remove'."
                         );
-                        cu::bailfyi!("toolchain already installed");
+                        cu::bail!("toolchain already installed");
                     }
                     // older toolchain installed, proceed with reinstallment
                     cu::info!("found older toolchain installation with commit hash: {hash}");
@@ -226,7 +226,7 @@ fn install(keep: bool, clean: bool) -> cu::Result<()> {
     cu::info!("building and installing rust");
     cu::hint!(" - this may take a while, please be patient.");
     {
-        let debug_log = cu::log_enabled(cu::lv::D);
+        let debug_log = cu::lv::D.enabled();
         let command = cu::bin::resolve("rust-x", rust_path.join("x"))?
             .command()
             .current_dir(&rust_path)
@@ -282,7 +282,7 @@ fn install(keep: bool, clean: bool) -> cu::Result<()> {
     if !keep {
         cu::info!("removing build artifacts to free disk space");
         cu::hint!("- use --keep if you want to keep them");
-        let _bar = cu::progress_unbounded("removing build artifacts");
+        let _bar = cu::progress("removing build artifacts");
         cu::fs::rec_remove(rust_path)?;
     } else {
         cu::hint!("keeping build artifacts since --keep is specified");
@@ -320,7 +320,7 @@ fn remove() -> cu::Result<()> {
 fn clean() -> cu::Result<()> {
     let rust_path = rust_source_location();
     if rust_path.exists() {
-        let _bar = cu::progress_unbounded("removing rust repo");
+        let _bar = cu::progress("removing rust repo");
         if let Err(e) = cu::fs::rec_remove(rust_path) {
             cu::warn!("failed to remove rust repo: {e}");
         }
@@ -339,9 +339,9 @@ fn remove_toolchain_internal() -> cu::Result<()> {
         .stdio_null()
         .wait_nz()?;
     if let Ok(Some(_)) = check_toolchain(false) {
-        cu::bailand!(warn!(
+        cu::bail!(
             "failed to uninstall toolchain. Please run 'rustup toolchain uninstall {TOOLCHAIN_NAME}' to uninstall it manually, then try again."
-        ));
+        );
     }
 
     let install_path = toolchain_install_location();

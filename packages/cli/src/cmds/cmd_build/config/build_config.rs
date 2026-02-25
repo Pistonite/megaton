@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025-2026 Megaton contributors
 
-use super::{CaptureUnused, ExtendProfile, FlagConfig, Validate, ValidateCtx};
+use std::path::PathBuf;
+
 use cu::pre::*;
+
+use super::{CaptureUnused, ExtendProfile, FlagConfig, Validate, ValidateCtx};
 
 /// Config in the `[build]` section
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -10,15 +13,15 @@ use cu::pre::*;
 pub struct Build {
     /// C/C++ Source directories, relative to Megaton.toml
     #[serde(default)]
-    pub sources: Vec<String>,
+    pub sources: Vec<PathBuf>,
 
     /// C/C++ Include directories, relative to Megaton.toml
     #[serde(default)]
-    pub includes: Vec<String>,
+    pub includes: Vec<PathBuf>,
 
     /// Additional Library paths
     #[serde(default)]
-    pub libpaths: Vec<String>,
+    pub libpaths: Vec<PathBuf>,
 
     /// Additional Libraries to link with
     #[serde(default)]
@@ -26,11 +29,11 @@ pub struct Build {
 
     /// Additional Linker scripts
     #[serde(default)]
-    pub ldscripts: Vec<String>,
+    pub ldscripts: Vec<PathBuf>,
 
     /// Additional objects to link
     #[serde(default)]
-    pub objects: Vec<String>,
+    pub objects: Vec<PathBuf>,
 
     #[serde(default)]
     pub flags: FlagConfig,
