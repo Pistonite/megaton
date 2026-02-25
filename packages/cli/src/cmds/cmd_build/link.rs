@@ -27,7 +27,7 @@ pub async fn build_elf(
 
     args.push(format!("-o{}", out_path.to_owned().into_utf8()?));
 
-    let linker = env.cc_path();
+    let linker = env.cc();
     let link_cmd = LinkCmd::new(linker, &args);
     let old_link_cmd = LinkCmd::try_load(link_cmd_path).ok();
 
@@ -90,7 +90,7 @@ impl LinkCmd {
 }
 
 pub async fn build_nso(elf_path: &Path, nso_path: &Path) -> cu::Result<()> {
-    let elf2nso = environment().elf2nso_path();
+    let elf2nso = environment().elf2nso();
     cu::debug!(
         "converting elf to nso: {} {} {}",
         elf2nso.display(),

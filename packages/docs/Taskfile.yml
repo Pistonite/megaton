@@ -1,0 +1,24 @@
+version: '3'
+
+includes:
+  mdbook:
+    taskfile: ../mono-dev/task/mdbook.yaml
+    optional: true
+    internal: true
+
+tasks:
+  install:
+    - task: mdbook:install-theme-monorepo
+
+  dev:
+    desc: Start mdbook in watch mode
+    cmds:
+      - task: build
+      - cargo-watch --watch packages/docs/src -s "mdbook build packages/docs" &
+      - live-server book -p 8081 {{.CLI_ARGS}}
+
+  build:
+    desc: (Re-)build the book
+    cmds:
+      - rm -rf book
+      - mdbook build

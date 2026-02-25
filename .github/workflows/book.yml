@@ -1,35 +1,30 @@
-name: Book
+name: deploy-docs
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
-  build-book:
-    name: Build
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: arduino/setup-task@v2
+      - uses: Pistonight/mono-dev/actions/setup@main
         with:
-          version: 3.x
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: cargo-bins/cargo-binstall@main
-      - run: cargo-binstall --no-confirm mdbook mdbook-admonish
-      - run: task docs:build
+          mono-dev: packages
+          rust: stable
+          tool-mdbook: true
+      - run: task exec -- docs:install
+      - run: task exec -- docs:build
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/book
+          path: packages/docs/book
           retention-days: 3
-
-
-  deploy-book:
-    name: Deploy
+  deploy:
     needs:
-      - build-book
+      - build
     if: github.event_name != 'pull_request'
     permissions:
       pages: write

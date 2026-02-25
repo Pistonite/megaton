@@ -16,7 +16,7 @@ mod config;
 mod link;
 mod rust;
 
-/// `megaton` project
+/// Manage the custom `megaton` Rust toolchain
 #[derive(Debug, Clone, AsRef, clap::Parser)]
 pub struct CmdBuild {
     /// Select profile to build
@@ -196,8 +196,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     }
 
     let elf_path = target_mod.join(format!("{}.elf", config.module.name));
-    // I dont care what oxford says, lunk is the past tense of link
-    let lunk = link::build_elf(
+    let linked = link::build_elf(
         need_link,
         artifacts,
         build_flags.ldflags,
@@ -207,7 +206,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     .await?;
 
     let nso_path = target_mod.join(format!("{}.nso", config.module.name));
-    if lunk && nso_path.exists() {
+    if linked && nso_path.exists() {
         // TODO: check while building nso, delete nso afterwards if check fails
         if let Some(check_config) = config.check {
             let check_config = check_config.get_profile(profile);
@@ -227,7 +226,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
         link::build_nso(&elf_path, &nso_path).await?;
     }
 
-    make_npdm_json(&target_mod, &config.module.title_id_hex())?;
+    make_npdm_json(&target_mod, &config.module.title_id_hex()).await?;
 
     Ok(())
 }
@@ -240,8 +239,24 @@ fn unpack_lib(lib_root_path: &Path) -> cu::Result<()> {
     Ok(())
 }
 
-fn make_npdm_json(path: &Path, title_id: &str) -> cu::Result<()> {
-    cu::hint!("Add make_npdm_json");
+async fn make_npdm_json(output_dir: &Path, title_id_hex: &str) -> cu::Result<()> {
+    cu::debug!("creating main.npdm");
+    let mut npdm_data: json::Value = json::parse(include_str!("../../../template.npdm.json"))?;
+    npdm_data["title_id"] = json!(format!("0x{}", title_id_hex));
+
+    let main_npdm_json = output_dir.join("main.npdm.json");
+    let main_npdm = output_dir.join("main.npdm");
+
+    cu::fs::write_json_pretty(&main_npdm_json, &npdm_data)?;
+
+    environment()
+        .npdmtool()
+        .command()
+        .add(cu::args![&main_npdm_json, &main_npdm])
+        .all_null()
+        .co_spawn().await?
+        .co_wait_nz().await?;
+
     Ok(())
 }
 

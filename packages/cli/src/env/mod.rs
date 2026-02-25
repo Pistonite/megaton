@@ -11,52 +11,62 @@ use cu::pre::*;
 #[derive(Debug)]
 pub struct Environment {
     megaton_home: PathBuf,
-    devkitpro: PathBuf,
-    dkp_version: String,
-    dkp_includes: Vec<String>,
-    npdmtool: PathBuf,
-    elf2nso: PathBuf,
+
     cc: PathBuf,  // C compiler
     cxx: PathBuf, // C++ compiler
     asm: PathBuf, // Assembler
+    ar: PathBuf,  // Archiver
     objdump: PathBuf,
+    npdmtool: PathBuf,
+    elf2nso: PathBuf,
+
     cc_version: String,
     cxx_version: String,
     asm_version: String,
+
+    devkitpro: PathBuf,
+    dkp_version: String,
+    dkp_includes: Vec<String>,
 }
 
 impl Environment {
     fn new(megaton_home: PathBuf, devkitpro: PathBuf) -> Self {
+
         let dkp_bin = devkitpro.join("devkitA64").join("bin");
         let cc = dkp_bin.join("aarch64-none-elf-gcc");
         let cxx = dkp_bin.join("aarch64-none-elf-g++");
         let asm = dkp_bin.join("aarch64-none-elf-gcc");
+        let ar = dkp_bin.join("aarch64-none-elf-ar");
         let objdump = dkp_bin.join("aarch64-none-elf-objdump");
+
         let dkp_tools_bin = devkitpro.join("tools").join("bin");
         let npdmtool = dkp_tools_bin.join("npdmtool");
         let elf2nso = dkp_tools_bin.join("elf2nso");
-        let dkp_version = get_dkp_version(&devkitpro, &cc)
-            .expect("Failed to init environment: check that DKP is installed correctly");
-        let dkp_includes = get_dkp_includes(&devkitpro, &dkp_version);
+
         let cc_version = get_cc_version(&cc)
             .expect("Failed to init environment: error when checking compiler version");
         let cxx_version = cc_version.clone(); // These should be the same, maybe merge
         let asm_version = cc_version.clone(); // these at some point in the future
 
+        let dkp_version = get_dkp_version(&devkitpro, &cc)
+            .expect("Failed to init environment: check that DKP is installed correctly");
+        let dkp_includes = get_dkp_includes(&devkitpro, &dkp_version);
+
         Self {
             megaton_home,
-            devkitpro,
-            dkp_version,
-            dkp_includes,
-            npdmtool,
-            elf2nso,
             cc,
             cxx,
             asm,
+            ar,
             objdump,
+            npdmtool,
+            elf2nso,
             cc_version,
             cxx_version,
             asm_version,
+            devkitpro,
+            dkp_version,
+            dkp_includes,
         }
     }
 
@@ -73,14 +83,17 @@ impl Environment {
     pub fn dkp_includes(&self) -> &[String] {
         &self.dkp_includes
     }
-    pub fn cc_path(&self) -> &Path {
+    pub fn cc(&self) -> &Path {
         &self.cc
     }
-    pub fn cxx_path(&self) -> &Path {
+    pub fn cxx(&self) -> &Path {
         &self.cxx
     }
-    pub fn asm_path(&self) -> &Path {
+    pub fn asm(&self) -> &Path {
         &self.asm
+    }
+    pub fn ar(&self) -> &Path {
+        &self.ar
     }
     pub fn objdump(&self) -> &Path {
         &self.objdump
@@ -88,7 +101,7 @@ impl Environment {
     pub fn npdmtool(&self) -> &Path {
         &self.npdmtool
     }
-    pub fn elf2nso_path(&self) -> &Path {
+    pub fn elf2nso(&self) -> &Path {
         &self.elf2nso
     }
     pub fn cc_version(&self) -> &str {

@@ -116,7 +116,7 @@ impl SourceFile {
                 compiler: compiler.to_owned(),
                 args,
             },
-            o_path
+            o_path,
         ))
     }
 
@@ -197,9 +197,9 @@ impl Lang {
     fn get_compiler_path(&self) -> &Path {
         let env = environment();
         match self {
-            Lang::C => env.cc_path(),
-            Lang::Cpp => env.cxx_path(),
-            Lang::S => env.cc_path(),
+            Lang::C => env.cc(),
+            Lang::Cpp => env.cxx(),
+            Lang::S => env.cc(),
         }
     }
 
