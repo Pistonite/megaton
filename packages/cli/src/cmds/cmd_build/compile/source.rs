@@ -46,16 +46,19 @@ impl SourceFile {
         })
     }
 
-    /// Compiles all sources in the context
-    /// Return values:
-    /// 0 : bool - true if anything actually compiled, false if compilation was skipped
-    /// 1 : CompileRecord - record of the most recent compilation
-    /// 1 : CompileRecord - path to generated object
+    /// Compiles the source file into a binary object
+    /// Checks `record` to see if the compilation command has changed.
+    /// Attaches a progress indicator to `parent_progress`
+    /// Returns:
+    ///     0: bool - true if compilation happened, false if skipped
+    ///     1: CompileRecord - a record of the most recent compilation
+    ///     2: PathBuf - path of the generated object
     pub async fn compile(
         self,
         flags: Arc<Flags>,
         output_path: Arc<PathBuf>,
         record: Option<CompileRecord>,
+        parent_progress: Arc<cu::ProgressBar>,
     ) -> cu::Result<(bool, CompileRecord, PathBuf)> {
         let compiler = self.lang.get_compiler_path();
         let mut args = self.lang.get_flags(&flags).clone();
@@ -74,22 +77,21 @@ impl SourceFile {
         args.push(self.path.display().to_string());
 
         if self.up_to_date(&record, &output_path, &args)? {
-            cu::debug!("{} up to date", o_path.display());
+            cu::debug!("Compile: object up to date {}", o_path.display());
             return Ok((false, record.unwrap(), o_path));
         }
 
         let start_time = cu::fs::Time::now();
 
-        cu::debug!(
-            "compiling: {} -> {}\n|\n{} {}\n\n",
-            self.path.display(),
-            o_path.display(),
-            compiler.display(),
-            args.join(" ")
-        );
+        let progress = parent_progress
+            .child(format!(
+                "{}",
+                self.path.display()
+            ))
+            .spawn();
         compiler
             .command()
-            .stdout(cu::lv::T)
+            .stdout(cu::lv::D)
             .stderr(cu::lv::E)
             .stdin_null()
             .args(&args)
@@ -97,6 +99,8 @@ impl SourceFile {
             .await?
             .co_wait_nz()
             .await?;
+        progress.done();
+        cu::debug!("Compile: compiled object {}", o_path.display(),);
 
         cu::fs::set_mtime(&self.path, start_time)?;
         cu::fs::set_mtime(&o_path, start_time)?;

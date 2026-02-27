@@ -32,16 +32,16 @@ pub async fn build_elf(
     let old_link_cmd = LinkCmd::try_load(link_cmd_path).ok();
 
     if let Some(old_link_cmd) = old_link_cmd {
-        cu::debug!("linkcmd successfully loaded");
-        if !need_link && link_cmd == old_link_cmd {
-            cu::debug!("linkcmd up to date");
+        cu::debug!("Link: loaded linkcmd {}", link_cmd_path.display());
+        if !need_link && link_cmd == old_link_cmd && out_path.exists() {
+            cu::debug!("Link: elf up to date {}", out_path.display());
             return Ok(false);
         }
     }
 
-    cu::debug!("linking: {}", link_cmd.display(),);
     link_cmd.execute().await?;
     link_cmd.save(link_cmd_path)?;
+    cu::debug!("Link: built elf {}", out_path.display());
 
     Ok(true)
 }
@@ -75,37 +75,28 @@ impl LinkCmd {
             .command()
             .args(&self.args)
             .stdin_null()
-            // TODO: fix progress indicator (elf2nso also)
-            .stdout(cu::pio::spinner("Linking to ELF").info())
+            .stdout(cu::pio::spinner("Linking").debug())
             .stderr(cu::lv::E);
-        let child = command.co_spawn().await?.0;
+        let (child, spinner) = command.co_spawn().await?;
         child.co_wait_nz().await?;
-
+        spinner.done();
         Ok(())
-    }
-
-    fn display(&self) -> String {
-        format!("{} {}", self.linker.display(), self.args.join(" "))
     }
 }
 
 pub async fn build_nso(elf_path: &Path, nso_path: &Path) -> cu::Result<()> {
     let elf2nso = environment().elf2nso();
-    cu::debug!(
-        "converting elf to nso: {} {} {}",
-        elf2nso.display(),
-        elf_path.display(),
-        nso_path.display()
-    );
     let command = elf2nso
         .command()
         .args([elf_path, nso_path])
         .stdin_null()
-        .stdout(cu::pio::spinner("Building NSO").info())
+        .stdout(cu::pio::spinner("Converting to NSO").debug())
         .stderr(cu::lv::E);
-    let child = command.co_spawn().await?.0;
-
-    child.co_wait_nz().await
+    let (child, spinner) = command.co_spawn().await?;
+    let res = child.co_wait_nz().await;
+    spinner.done();
+    cu::debug!("Link: converted to nso {}", nso_path.display());
+    res
 }
 
 // #[cfg(test)]

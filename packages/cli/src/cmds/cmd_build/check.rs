@@ -19,6 +19,7 @@ pub async fn check_all(
     disallowed_instructions: &[String],
     symbol_files: &[PathBuf],
 ) -> cu::Result<()> {
+    let progress = cu::progress("Checking ELF").spawn();
     let expected_symbols = load_known_symbols(symbol_files)?;
 
     let (missing_symbols, disallowed_instructions) = cu::co::try_join!(
@@ -33,7 +34,7 @@ pub async fn check_all(
             missing_symbols
         ));
     } else {
-        cu::debug!("no missing symbols")
+        cu::debug!("Check: no missing symbols")
     }
     if !disallowed_instructions.is_empty() {
         return Err(cu::fmterr!(
@@ -42,8 +43,9 @@ pub async fn check_all(
             disallowed_instructions
         ));
     } else {
-        cu::debug!("no disallowed instructions")
+        cu::debug!("Check: no disallowed instructions")
     }
+    progress.done();
 
     Ok(())
 }

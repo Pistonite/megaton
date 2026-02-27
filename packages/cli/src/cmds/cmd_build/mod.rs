@@ -206,7 +206,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     .await?;
 
     let nso_path = target_mod.join(format!("{}.nso", config.module.name));
-    if linked && nso_path.exists() {
+    if linked || !nso_path.exists() {
         // TODO: check while building nso, delete nso afterwards if check fails
         if let Some(check_config) = config.check {
             let check_config = check_config.get_profile(profile);

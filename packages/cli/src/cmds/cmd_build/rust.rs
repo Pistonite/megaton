@@ -83,7 +83,7 @@ impl RustCtx {
                 "--manifest-path",
                 &self.manifest,
             ])
-            .preset(cu::pio::cargo("Updating crate"));
+            .preset(cu::pio::cargo("Building crate"));
 
         command = command.args(cargoflags);
         command = command.env("RUSTFLAGS", rustflags);

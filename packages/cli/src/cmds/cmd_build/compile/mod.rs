@@ -51,22 +51,26 @@ pub async fn compile_all(
     let pool = cu::co::pool(0);
     let mut handles = vec![];
 
+    let progress = cu::progress("Compiling C/C++ objects").spawn();
     // Start compilation for all contexts
     for ctx in contexts {
         source::scan(&ctx.source_paths).for_each(|src| {
+            cu::debug!("Scan: disovered source {}", src.path.display());
             let flags = ctx.flags.clone();
             let output_path = ctx.output_path.clone();
             let record = compile_db.find_record(src.pathhash);
+            let progress = progress.clone();
             let handle = if let Some(record) = record {
                 // Previous record found
-                pool.spawn(src.compile(flags, output_path, Some(record.to_owned())))
+                pool.spawn(src.compile(flags, output_path, Some(record.to_owned()), progress))
             } else {
                 // No record of this file found
-                pool.spawn(src.compile(flags, output_path, None))
+                pool.spawn(src.compile(flags, output_path, None, progress))
             };
             handles.push(handle);
         });
     }
+    progress.done();
 
     let mut something_compiled = false;
     let mut objects = vec![];
