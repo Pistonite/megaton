@@ -29,13 +29,15 @@ Nested map properties like `build.flags` are recursively merged,
 and should be specified like `[build.profiles.foo.flags]`, **NOT** `[build.flags.profiles.foo]`
 
 ## Base Profile
-The configs without any explicit profiles is known as the "base profile", and
-has the name `"none"`. (This word is reserved you cannot name your custom profile `"none"`).
 
-```admonish todo
-"base" or "none" for the base profile?
+```admonish danger
+The base profile will be called `"none"`, as described in this documentation.
+However in the current development, it's coded as `"base"`. This will be changed
+in the stable release, and is tracked by [Issue #80](https://github.com/Pistonite/megaton/issues/80)
 ```
 
+The configs without any explicit profiles is known as the "base profile", and
+has the name `"none"`. (This word is reserved you cannot name your custom profile `"none"`).
 
 ## Inheriting the Base Profile
 Each config option specified on a custom profile inherits from the base profile.
@@ -55,10 +57,6 @@ You can customize the profile selection behavior of the CLI with the
 for example, select a profile by default if nothing is specified on the CLI, or disallow
 the `"none"` profile (i.e. the base profile) from the CLI (useful if only using the base profile)
 for inheritance.
-
-```admonish todo
-"base" or "none" for the base profile?
-```
 
 See the reference for [`Profile`](../reference/configuration/section_profile.md) section for
 more information.

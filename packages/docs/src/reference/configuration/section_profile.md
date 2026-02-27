@@ -18,21 +18,13 @@ to be built.
 
 Default: `true`
 
-```admonish todo
-"base" or "none" for the base profile?
-```
-
 ### Key: `profile.default`
 Type: `string`
 
 The profile that will be built if the `-p PROFILE` flag is omitted from the CLI.
 If set to `""` (the empty string), the profile must be set via CLI flag on every call.
 
-Default: `"base"`
-
-```admonish todo
-"base" or "none" for the base profile?
-```
+Default: `"none"`
 
 Examples:
 1. Set to empty string
@@ -62,7 +54,3 @@ Examples:
     # Run with `megaton build` -> use foo
     # Run with `megaton build -p none` -> error
     ```
-
-```admonish todo
-"base" or "none" for the base profile?
-```
