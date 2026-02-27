@@ -225,33 +225,26 @@ pub fn scan(dirs: &[PathBuf]) -> SourceIterator {
         .iter()
         .filter_map(|dir| cu::fs::walk(dir).ok())
         .collect::<Vec<_>>();
-    let num_walks = walks.len();
 
-    SourceIterator {
-        walks,
-        num_walks,
-        idx: 0,
-    }
+    SourceIterator { walks }
 }
 
-// TODO: https://github.com/Pistonite/megaton/issues/77
 pub struct SourceIterator {
     walks: Vec<cu::fs::Walk>,
-    num_walks: usize,
-    idx: usize,
 }
 
 impl Iterator for SourceIterator {
     type Item = SourceFile;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while self.idx < self.num_walks {
-            if let Some(Ok(entry)) = self.walks[self.idx].next() {
-                if let Some(source) = SourceFile::new(entry.path()) {
-                    return Some(source);
+        while let Some(mut walk) = self.walks.pop() {
+            while let Some(Ok(entry)) = walk.next() {
+                let source = SourceFile::new(entry.path());
+                if source.is_some() {
+                    self.walks.push(walk);
+                    return source;
                 }
             }
-            self.idx += 1;
         }
         None
     }
