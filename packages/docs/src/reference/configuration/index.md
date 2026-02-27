@@ -2,7 +2,7 @@
 
 This config allows the user to set several options which change how the mod is built by the build tool.
 
-This root of a particular project is the directory that contains the config (Megaton.toml).
+The root of a particular project is the directory that contains the config (Megaton.toml).
 For all values that determine a path, unless otherwise specified,
 the path is relative to the project root.
 
