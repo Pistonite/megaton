@@ -206,7 +206,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     .await?;
 
     let nso_path = target_mod.join(format!("{}.nso", config.module.name));
-    if linked || !nso_path.exists() {
+    if linked && nso_path.exists() {
         // TODO: check while building nso, delete nso afterwards if check fails
         if let Some(check_config) = config.check {
             let check_config = check_config.get_profile(profile);
@@ -240,7 +240,7 @@ fn unpack_lib(lib_root_path: &Path) -> cu::Result<()> {
 }
 
 async fn make_npdm_json(output_dir: &Path, title_id_hex: &str) -> cu::Result<()> {
-    cu::debug!("creating main.npdm");
+    cu::debug!("cmd_build: creating main.npdm");
     let mut npdm_data: json::Value = json::parse(include_str!("../../../template.npdm.json"))?;
     npdm_data["title_id"] = json!(format!("0x{}", title_id_hex));
 

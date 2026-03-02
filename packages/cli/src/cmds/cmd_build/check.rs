@@ -29,7 +29,7 @@ pub async fn check_all(
 
     if !missing_symbols.is_empty() {
         return Err(cu::fmterr!(
-            "Found missing symbols in {}:\n{:#?}",
+            "Missing symbols in {}:\n{:#?}",
             elf.display(),
             missing_symbols
         ));
@@ -66,6 +66,42 @@ fn load_known_symbols(symbol_files: &[PathBuf]) -> cu::Result<Symbols> {
     Ok(symbols)
 }
 
+async fn check_symbols(
+    elf: &Path,
+    expected_symbols: Symbols,
+    ignored_symbols: &[String],
+) -> cu::Result<Vec<String>> {
+    let (child, stdout_handle) = environment()
+        .objdump()
+        .command()
+        .arg("-T")
+        .arg(elf)
+        .stdout(cu::pio::string())
+        .stdie_null()
+        .co_spawn()
+        .await?;
+
+    child.co_wait_nz().await?;
+    let stdout = stdout_handle.co_join().await??;
+    let mut symbols = parse_objdump_syms(stdout);
+
+    cu::debug!("symbols: {:#?}", symbols);
+
+    for ignored_symbol in ignored_symbols {
+        symbols.remove(ignored_symbol);
+    }
+
+    let missing_symbols = symbols
+        .into_iter()
+        .filter(|symbol| {
+            // dot is not a valid character in a C identifier, most likely a false positive (.data, .text)
+            !symbol.starts_with(".") && !expected_symbols.contains(symbol)
+        })
+        .collect::<Vec<_>>();
+
+    Ok(missing_symbols)
+}
+
 fn parse_objdump_syms(content: String) -> Symbols {
     let mut lines = content.lines();
 
@@ -87,40 +123,6 @@ fn parse_objdump_syms(content: String) -> Symbols {
             }
         })
         .collect()
-}
-
-async fn check_symbols(
-    elf: &Path,
-    expected_symbols: Symbols,
-    ignored_symbols: &[String],
-) -> cu::Result<Vec<String>> {
-    let (child, stdout_handle) = environment()
-        .objdump()
-        .command()
-        .arg("-T")
-        .arg(elf)
-        .stdout(cu::pio::string())
-        .stdie_null()
-        .co_spawn()
-        .await?;
-
-    child.co_wait_nz().await?;
-    let stdout = stdout_handle.co_join().await??;
-    let mut symbols = parse_objdump_syms(stdout);
-
-    for ignored_symbol in ignored_symbols {
-        symbols.remove(ignored_symbol);
-    }
-
-    let missing_symbols = symbols
-        .into_iter()
-        .filter(|symbol| {
-            // dot is not a valid character in a C identifier, most likely a false positive (.data, .text)
-            !symbol.starts_with(".") && !expected_symbols.contains(symbol)
-        })
-        .collect::<Vec<_>>();
-
-    Ok(missing_symbols)
 }
 
 async fn check_instructions(
