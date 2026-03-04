@@ -3,7 +3,7 @@
 [Home Page](./index.md)
 ---
 - [Installation](./install.md)
-- [Tutorial]()
+- [Tutorial](./tutorial/index.md)
   - [Create Project]()
   - [Incremental Build]()
   - [Project Config]()
