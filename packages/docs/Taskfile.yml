@@ -9,6 +9,8 @@ includes:
 tasks:
   install:
     - task: mdbook:install-theme-monorepo
+    - cp src/icon.svg theme/favicon.svg
+    - cp src/icon.png theme/favicon.png
 
   dev:
     desc: Start mdbook in watch mode
