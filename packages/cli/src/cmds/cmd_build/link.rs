@@ -42,6 +42,7 @@ pub async fn build_elf(
     cu::debug!("linking: {}", link_cmd.display(),);
     link_cmd.execute().await?;
     link_cmd.save(link_cmd_path)?;
+    cu::fs::write(PathBuf::from("./linkcommand.txt"), link_cmd.display())?;
 
     Ok(true)
 }

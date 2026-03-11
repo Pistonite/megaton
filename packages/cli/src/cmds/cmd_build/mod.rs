@@ -132,7 +132,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
             &format!("MEGART_TITLE_ID_HEX={:016x}", &config.module.title_id),
         ]);
         if rust_enabled {
-            lib_flags.add_defines(["MEGART_RUST", "MEGART_RUST_MAIN"]);
+            lib_flags.add_defines(["MEGART_RUST"]);
         }
         let lib_ctx = compile::CompileCtx::new(
             vec![target_lib.join("src")],
