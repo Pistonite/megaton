@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025-2026 Megaton contributors
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use cu::pre::*;
 use derive_more::AsRef;
@@ -74,13 +74,12 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     cu::debug!("profile: {profile}");
 
-    let mut artifacts = vec![];
+    let mut static_libs = vec![];
     let mut need_link = false;
 
     ////////// Build rust //////////
     let rust_ctx = rust::RustCtx::from_config(config.cargo);
     let rust_enabled = rust_ctx.is_some();
-    let mut cargo_output  = None;
     if lib_enabled && let Some(rust_ctx) = rust_ctx {
         let rust_ctx = rust_ctx?;
         cu::debug!("rust support enabled");
@@ -90,9 +89,11 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
             .build(&build_flags.cargoflags, &build_flags.rustflags)
             .await?;
 
-        cargo_output = Some(rust_ctx
-            .get_output_path()
-            .ok_or_else(|| cu::fmterr!("Can't find the rust static lib"))?);
+        static_libs.push(
+            rust_ctx
+                .get_output_path()
+                .ok_or_else(|| cu::fmterr!("Can't find the rust static lib"))?,
+        );
 
         need_link |= rust_ctx
             .gen_cxxbridge(&target_mod_src, &target_mod_include)
@@ -165,7 +166,6 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     // Compile both contexts
     let (compiled, mut objects) = compile::compile_all(&contexts, &compiledb_path).await?;
     need_link |= compiled;
-    artifacts.append(&mut objects);
 
     ////////// Link & Check //////////
     let mut libpaths = vec![];
@@ -191,18 +191,14 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     build_flags.add_libraries(build_config.libraries);
 
     for obj in build_config.objects {
-        artifacts.push(obj.normalize_exists()?);
-    }
-
-    if let Some(rust_a) = cargo_output {
-        cu::info!("adding artifact: {}", rust_a.display());
-        artifacts.push(rust_a);
+        objects.push(obj.normalize_exists()?);
     }
 
     let elf_path = target_mod.join(format!("{}.elf", config.module.name));
     let linked = link::build_elf(
         need_link,
-        artifacts,
+        objects,
+        static_libs,
         build_flags.ldflags,
         &elf_path,
         &target_mod.join("linkcmd.cache"),
