@@ -11,7 +11,8 @@ use crate::env::environment;
 /// Link a list of artifacts into an elf file.
 pub async fn build_elf(
     need_link: bool,
-    mut artifacts: Vec<PathBuf>,
+    mut objects: Vec<PathBuf>,
+    static_libs: Vec<PathBuf>,
     ldflags: Vec<String>,
     out_path: &Path,
     link_cmd_path: &Path,
@@ -20,9 +21,12 @@ pub async fn build_elf(
     let mut args = ldflags;
 
     // sort so args are always comparable regardless of compilation order
-    artifacts.sort();
-    for artifact in artifacts {
-        args.push(artifact.into_utf8()?);
+    objects.sort();
+    for object in objects {
+        args.push(object.into_utf8()?);
+    }
+    for lib in static_libs {
+        args.push(lib.into_utf8()?);
     }
 
     args.push(format!("-o{}", out_path.to_owned().into_utf8()?));
@@ -33,7 +37,7 @@ pub async fn build_elf(
 
     if let Some(old_link_cmd) = old_link_cmd {
         cu::debug!("linkcmd successfully loaded");
-        if !need_link && link_cmd == old_link_cmd {
+        if !need_link && link_cmd == old_link_cmd && out_path.exists() {
             cu::debug!("linkcmd up to date");
             return Ok(false);
         }
@@ -42,6 +46,7 @@ pub async fn build_elf(
     cu::debug!("linking: {}", link_cmd.display(),);
     link_cmd.execute().await?;
     link_cmd.save(link_cmd_path)?;
+    cu::fs::write(PathBuf::from("./linkcommand.txt"), link_cmd.display())?;
 
     Ok(true)
 }
