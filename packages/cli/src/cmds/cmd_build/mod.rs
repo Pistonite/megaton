@@ -182,14 +182,14 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     for ldscript in build_config.ldscripts {
         ldscripts.push(ldscript.normalize_exists()?.into_utf8()?);
     }
-    build_flags.add_ldscripts(ldscripts);
-    build_flags.add_libraries(build_config.libraries);
 
     let verfile_path = target_mod.join("verfile");
     let entry = config.megaton.entry_point();
     make_verfile(&verfile_path, entry)?;
-    build_flags.set_version_script(verfile_path.into_utf8()?);
     build_flags.set_init(entry);
+    build_flags.set_version_script(verfile_path.into_utf8()?);
+    build_flags.add_ldscripts(ldscripts);
+    build_flags.add_libraries(build_config.libraries);
 
     for obj in build_config.objects {
         artifacts.push(obj.normalize_exists()?);
