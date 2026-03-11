@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025-2026 Megaton contributors
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use cu::pre::*;
 use derive_more::AsRef;
@@ -80,6 +80,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     ////////// Build rust //////////
     let rust_ctx = rust::RustCtx::from_config(config.cargo);
     let rust_enabled = rust_ctx.is_some();
+    let mut cargo_output  = None;
     if lib_enabled && let Some(rust_ctx) = rust_ctx {
         let rust_ctx = rust_ctx?;
         cu::debug!("rust support enabled");
@@ -89,11 +90,9 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
             .build(&build_flags.cargoflags, &build_flags.rustflags)
             .await?;
 
-        artifacts.push(
-            rust_ctx
-                .get_output_path()
-                .ok_or_else(|| cu::fmterr!("Can't find the rust static lib"))?,
-        );
+        cargo_output = Some(rust_ctx
+            .get_output_path()
+            .ok_or_else(|| cu::fmterr!("Can't find the rust static lib"))?);
 
         need_link |= rust_ctx
             .gen_cxxbridge(&target_mod_src, &target_mod_include)
@@ -193,6 +192,11 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     for obj in build_config.objects {
         artifacts.push(obj.normalize_exists()?);
+    }
+
+    if let Some(rust_a) = cargo_output {
+        cu::info!("adding artifact: {}", rust_a.display());
+        artifacts.push(rust_a);
     }
 
     let elf_path = target_mod.join(format!("{}.elf", config.module.name));
