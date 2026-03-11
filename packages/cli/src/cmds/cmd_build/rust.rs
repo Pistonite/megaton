@@ -8,6 +8,8 @@ use std::{
 
 use cu::pre::*;
 
+use crate::env::environment;
+
 use super::config::CargoConfig;
 
 pub struct RustCtx {
@@ -87,6 +89,9 @@ impl RustCtx {
 
         command = command.args(cargoflags);
         command = command.env("RUSTFLAGS", rustflags);
+        command = command.env("CC", environment().cc());
+        command = command.env("CXX", environment().cxx());
+        command = command.env("AR", environment().ar());
 
         command.co_spawn().await?.0.co_wait_nz().await?;
 
