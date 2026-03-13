@@ -8,6 +8,8 @@ use std::{
 
 use cu::pre::*;
 
+use crate::env::environment;
+
 use super::config::CargoConfig;
 
 pub struct RustCtx {
@@ -87,6 +89,9 @@ impl RustCtx {
 
         command = command.args(cargoflags);
         command = command.env("RUSTFLAGS", rustflags);
+        command = command.env("CC", environment().cc());
+        command = command.env("CXX", environment().cxx());
+        command = command.env("AR", environment().ar());
 
         command.co_spawn().await?.0.co_wait_nz().await?;
 
@@ -126,10 +131,10 @@ impl RustCtx {
     ) -> cu::Result<bool> {
         let mut something_changed =
             if cxxbridge_cmd(None, true, &include_out_path.join("rust").join("cxx.h")).await? {
-                cu::debug!("generated rust/cxx.h");
+                cu::debug!("Cxxbridge: generated rust/cxx.h");
                 true
             } else {
-                cu::debug!("up to date: rust/cxx.h");
+                cu::debug!("Cxxbridge: header up to date rust/cxx.h");
                 false
             };
 
@@ -179,7 +184,7 @@ impl RustCtx {
     }
 
     fn get_source_files(&self) -> cu::Result<Vec<PathBuf>> {
-        // TODO: try to make this return an iterator
+        // TODO: consider making this an iterator
         let mut source_files: Vec<PathBuf> = vec![];
         for dir in &self.source_paths {
             let mut walk = cu::fs::walk(dir)?;
@@ -208,7 +213,7 @@ async fn cxxbridge_process(
     let stem = stem_os.as_utf8()?;
     let path_to_rs = file.normalize()?;
 
-    // TODO: Kinda icky, maybe find a way to get relative path that doesnt require searching
+    // TODO: consider finding a cleaner solution
     let rel_source_path = source_paths
         .iter()
         .find(|p| path_to_rs.starts_with(p))
@@ -220,18 +225,18 @@ async fn cxxbridge_process(
     out_cc.set_file_name(format!("{stem}.cc"));
 
     let header_updated = if cxxbridge_cmd(Some(&file), true, &out_h).await? {
-        cu::debug!("generated header {}", &out_h.display());
+        cu::debug!("Cxxbridge: generated header {}", &out_h.display());
         true
     } else {
-        cu::debug!("header up to date: {}", &out_h.display());
+        cu::debug!("Cxxbridge: header up to date {}", &out_h.display());
         false
     };
 
     let source_updated = if cxxbridge_cmd(Some(&file), false, &out_cc).await? {
-        cu::debug!("generated source {}", &out_cc.display());
+        cu::debug!("Cxxbridge: generated source {}", &out_cc.display());
         true
     } else {
-        cu::debug!("source up to date: {}", &out_cc.display());
+        cu::debug!("Cxxbridge: source up to date {}", &out_cc.display());
         false
     };
 

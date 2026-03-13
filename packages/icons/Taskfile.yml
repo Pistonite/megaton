@@ -1,0 +1,11 @@
+version: '3'
+
+tasks:
+  build:
+    desc: Create the icons in the other packages
+    cmds:
+      - prism > prism.d.ts
+      - prism icon.ts > icon.svg
+      - prism icon.ts --png icon.png
+      - cp icon.svg ../docs/src/icon.svg
+      - cp icon.png ../docs/src/icon.png

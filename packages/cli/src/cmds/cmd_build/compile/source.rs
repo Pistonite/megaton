@@ -91,7 +91,7 @@ impl SourceFile {
             .spawn();
         compiler
             .command()
-            .stdout(cu::lv::D)
+            .stdout(cu::lv::T)
             .stderr(cu::lv::E)
             .stdin_null()
             .args(&args)

@@ -55,7 +55,7 @@ pub async fn compile_all(
     // Start compilation for all contexts
     for ctx in contexts {
         source::scan(&ctx.source_paths).for_each(|src| {
-            cu::debug!("Scan: disovered source {}", src.path.display());
+            cu::debug!("Scan: found source {}", src.path.display());
             let flags = ctx.flags.clone();
             let output_path = ctx.output_path.clone();
             let record = compile_db.find_record(src.pathhash);

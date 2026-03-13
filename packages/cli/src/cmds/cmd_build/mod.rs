@@ -74,7 +74,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     cu::debug!("profile: {profile}");
 
-    let mut artifacts = vec![];
+    let mut static_libs = vec![];
     let mut need_link = false;
 
     ////////// Build rust //////////
@@ -89,7 +89,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
             .build(&build_flags.cargoflags, &build_flags.rustflags)
             .await?;
 
-        artifacts.push(
+        static_libs.push(
             rust_ctx
                 .get_output_path()
                 .ok_or_else(|| cu::fmterr!("Can't find the rust static lib"))?,
@@ -132,7 +132,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
             &format!("MEGART_TITLE_ID_HEX={:016x}", &config.module.title_id),
         ]);
         if rust_enabled {
-            lib_flags.add_defines(["MEGART_RUST", "MEGART_RUST_MAIN"]);
+            lib_flags.add_defines(["MEGART_RUST"]);
         }
         let lib_ctx = compile::CompileCtx::new(
             vec![target_lib.join("src")],
@@ -166,7 +166,6 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     // Compile both contexts
     let (compiled, mut objects) = compile::compile_all(&contexts, &compiledb_path).await?;
     need_link |= compiled;
-    artifacts.append(&mut objects);
 
     ////////// Link & Check //////////
     let mut libpaths = vec![];
@@ -182,23 +181,24 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     for ldscript in build_config.ldscripts {
         ldscripts.push(ldscript.normalize_exists()?.into_utf8()?);
     }
-    build_flags.add_ldscripts(ldscripts);
-    build_flags.add_libraries(build_config.libraries);
 
     let verfile_path = target_mod.join("verfile");
     let entry = config.megaton.entry_point();
     make_verfile(&verfile_path, entry)?;
-    build_flags.set_version_script(verfile_path.into_utf8()?);
     build_flags.set_init(entry);
+    build_flags.set_version_script(verfile_path.into_utf8()?);
+    build_flags.add_ldscripts(ldscripts);
+    build_flags.add_libraries(build_config.libraries);
 
     for obj in build_config.objects {
-        artifacts.push(obj.normalize_exists()?);
+        objects.push(obj.normalize_exists()?);
     }
 
     let elf_path = target_mod.join(format!("{}.elf", config.module.name));
     let linked = link::build_elf(
         need_link,
-        artifacts,
+        objects,
+        static_libs,
         build_flags.ldflags,
         &elf_path,
         &target_mod.join("linkcmd.cache"),

@@ -3,12 +3,21 @@
 ## Prerequisites
 - Megaton requires `DevKitA64` from [DevKitPro](https://devkitpro.org/wiki/Getting_Started).
   (Select the `switch-dev` group)
+
+  ```admonish todo
+  TODO Add info about how megaton searches for DKP installation
+  ```
 - For Rust support (building mods written in Rust), a Rust toolchain for the host system
   (i.e. the system used to build the mod) and `git` are required to clone and build
   the Rust compiler for the `aarch64-unknown-hermit` target.
 
 ## Install Megaton
 The `megaton` CLI is a single binary, which can be installed in 3 ways:
+
+```admonish todo
+TODO These don't work yet
+```
+
 1. (Recommended) Install from prebuilt binary with `cargo-binstall`
     ```bash
     cargo binstall megaton-cmd --git https://github.com/Pistonite/megaton
@@ -22,7 +31,11 @@ The `megaton` CLI is a single binary, which can be installed in 3 ways:
 ## Install Megaton Rust Toolchain
 Megaton implements the [Hermit ABI](https://github.com/hermit-os/hermit-rs) to bind Rust
 Standard Library to NNSDK. This requires a custom Rust toolchain. Megaton will install
-this toolchain at `~/.cache/megaton/rust-toolchain`
+this toolchain at `~/.cache/megaton/rust-toolchain`.
+
+This toolchain is locked at a commit for every Megaton version. This will be bumped approximately
+in line with Rust's stable release. If you need Rust feature in a higher version of Rust than
+what is included with Megaton, please open an issue on GitHub.
 
 Run the following command to install the toolchain, or upgrade the toolchain in the future
 ```bash

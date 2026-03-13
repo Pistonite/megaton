@@ -39,16 +39,8 @@ void __megaton_module_entry() {
 #ifdef MEGART_RUST
     __megaton_librs_init();
 #endif
-
     // bootstrap done
 
     // call module main
     megaton_main();
 }
-
-// project can allow megaton to provide a main shim
-// to directly call the rust side
-#ifdef MEGART_RUST_MAIN
-void __megaton_rs_main();
-void megaton_main() { __megaton_rs_main(); }
-#endif
