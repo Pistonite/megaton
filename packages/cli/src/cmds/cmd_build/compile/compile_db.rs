@@ -49,7 +49,7 @@ impl CompileDB {
         if let Ok(file) = cu::fs::read(path) {
             json::read::<CompileDB>(file.as_slice())
         } else {
-            Err(cu::fmterr!("cannot read {}", path.display()))
+            Err(cu::fmterr!("Cannot read {}", path.display()))
         }
     }
 

@@ -137,7 +137,6 @@ fn default_sources() -> Vec<PathBuf> {
 
 impl Validate for CargoConfig {
     fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
-        cu::hint!("TODO: validate cargo config");
         self.unused.validate(ctx)
     }
 }

@@ -85,7 +85,7 @@ async fn check_symbols(
     let stdout = stdout_handle.co_join().await??;
     let mut symbols = parse_objdump_syms(stdout);
 
-    cu::debug!("symbols: {:#?}", symbols);
+    cu::trace!("objdump symbols: {:#?}", symbols);
 
     for ignored_symbol in ignored_symbols {
         symbols.remove(ignored_symbol);

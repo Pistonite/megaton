@@ -51,7 +51,7 @@ pub async fn compile_all(
     let pool = cu::co::pool(0);
     let mut handles = vec![];
 
-    let progress = cu::progress("Compiling C/C++ objects").spawn();
+    let progress = cu::progress("Compiling C/C++/S objects").spawn();
     // Start compilation for all contexts
     for ctx in contexts {
         source::scan(&ctx.source_paths).for_each(|src| {

@@ -180,10 +180,10 @@ pub fn commit() -> &'static str {
 /// # Safety
 /// Only safe to call when only one thread exists
 pub unsafe fn init_env() -> cu::Result<()> {
-    // TODO: decide if we really need megaton_home since caches just go in the target dir
+    cu::debug!("Env: Initializing environment");
     let megaton_home = cu::env_var("MEGATON_HOME").unwrap_or_default();
     let megaton_home = if megaton_home.is_empty() {
-        cu::debug!("env: MEGATON_HOME not specified, using default path ~/.cache/megaton");
+        cu::debug!("Env: MEGATON_HOME not specified, using default path ~/.cache/megaton");
         let mut home = std::env::home_dir().context("failed to get user's home directory")?;
         home.extend([".cache", "megaton"]);
         home.normalize()?
@@ -193,8 +193,6 @@ pub unsafe fn init_env() -> cu::Result<()> {
 
     let devkitpro = cu::env_var("DEVKITPRO").context("DEVKITPRO environment variable not set")?;
     let devkitpro = Path::new(&devkitpro).normalize()?;
-
-    cu::debug!("env: megaton_home={}", megaton_home.display());
 
     let env = Environment::new(megaton_home, devkitpro);
     if ENVIRONMENT.set(env).is_err() {
