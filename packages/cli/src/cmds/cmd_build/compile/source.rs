@@ -84,10 +84,7 @@ impl SourceFile {
         let start_time = cu::fs::Time::now();
 
         let progress = parent_progress
-            .child(format!(
-                "{}",
-                self.path.display()
-            ))
+            .child(format!("{}", self.path.display()))
             .spawn();
         compiler
             .command()

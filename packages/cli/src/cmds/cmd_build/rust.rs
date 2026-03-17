@@ -77,7 +77,8 @@ impl RustCtx {
             Err(_) => None,
         };
 
-        let cargo = cu::which("cargo").context("Cargo executable not found: ensure rust is properly installed")?;
+        let cargo = cu::which("cargo")
+            .context("Cargo executable not found: ensure rust is properly installed")?;
         let mut command = cargo
             .command()
             .add(cu::args![
@@ -114,7 +115,9 @@ impl RustCtx {
 
         let table = &cu::fs::read_string(&self.manifest)?.parse::<toml::Table>()?;
         let entry = &table["package"]["name"];
-        let name = entry.as_str().ok_or_else(|| cu::fmterr!("Not utf: {}", entry))?;
+        let name = entry
+            .as_str()
+            .ok_or_else(|| cu::fmterr!("Not utf: {}", entry))?;
         let name = name.replace("-", "_");
         let filename = format!("lib{name}.a");
 
