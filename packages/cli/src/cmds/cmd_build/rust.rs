@@ -206,9 +206,7 @@ async fn cxxbridge_process(
     header_suffix: Arc<String>,
     source_paths: Arc<Vec<PathBuf>>,
 ) -> cu::Result<bool> {
-    let stem_os = file
-        .file_stem()
-        .ok_or_else(|| cu::fmterr!("Invalid file name: {}", file.display()))?;
+    let stem_os = cu::check!(file.file_stem(), "Invalid file name: {}", file.display())?;
 
     let stem = stem_os.as_utf8()?;
     let path_to_rs = file.normalize()?;
@@ -247,10 +245,7 @@ async fn cxxbridge_process(
 async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::Result<bool> {
     let mut args = vec![];
     if let Some(file) = file {
-        args.push(
-            file.to_str()
-                .ok_or_else(|| cu::fmterr!("Not utf-8: {}", file.display()))?,
-        );
+        args.push(cu::check!(file.to_str(), "Not utf-8: {}", file.display())?);
     }
     if header {
         args.push("--header");

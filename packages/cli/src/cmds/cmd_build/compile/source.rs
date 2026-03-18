@@ -84,7 +84,7 @@ impl SourceFile {
         let start_time = cu::fs::Time::now();
 
         let progress = parent_progress
-            .child(format!("{}", self.path.display()))
+            .child(format!("{}", self.path.try_to_rel().display()))
             .spawn();
         compiler
             .command()
@@ -163,10 +163,10 @@ impl SourceFile {
         let depfile = match depfile::parse(&d_file_contents) {
             Ok(depfile) => depfile,
             Err(pos) => {
-                return Err(cu::Error::msg(format!(
+                cu::bail!(
                     "Error when parsing depfile {} at position {pos}",
                     d_path.display()
-                )));
+                );
             }
         };
 

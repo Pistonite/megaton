@@ -32,7 +32,7 @@ impl CompileCtx {
     }
 }
 
-/// Compiles all sources found in multiple contexts, asyncronously
+/// Compiles all sources found in multiple contexts, asynchronously
 /// Will wait until all compilation jobs finish before returning
 /// Handles loading, updating, and saving the compile db
 /// Returns true if anything actually compiled
@@ -51,7 +51,7 @@ pub async fn compile_all(
     let pool = cu::co::pool(0);
     let mut handles = vec![];
 
-    let mut num_steps = 0;
+    let mut total_tasks = 0;
     let progress = cu::progress("Compiling C/C++/S objects")
         .total(0)
         .eta(false)
@@ -64,20 +64,21 @@ pub async fn compile_all(
             cu::debug!("Scan: found source {}", src.path.display());
             let flags = ctx.flags.clone();
             let output_path = ctx.output_path.clone();
-            let record = compile_db.find_record(src.pathhash);
+            let record = compile_db.find_record(src.pathhash).cloned();
             let progress = progress.clone();
-            let handle = pool.spawn(src.compile(flags, output_path, record.cloned(), progress));
+            let handle =
+                pool.spawn(async move { src.compile(flags, output_path, record, progress).await });
             handles.push(handle);
-            num_steps += 1;
+            total_tasks += 1;
         });
     }
-    progress.set_total(num_steps);
+    progress.set_total(total_tasks);
 
     let mut something_compiled = false;
     let mut objects = vec![];
     let mut num_errors = 0;
     let mut set = cu::co::set(handles);
-    let mut completed_steps = 0;
+    let mut completed_tasks = 0;
     while let Some(joined) = set.next().await {
         let res = joined?;
         match res {
@@ -90,8 +91,8 @@ pub async fn compile_all(
                 num_errors += 1;
             }
         }
-        completed_steps += 1;
-        cu::progress!(progress = completed_steps);
+        completed_tasks += 1;
+        cu::progress!(progress = completed_tasks);
     }
 
     compile_db.save(compile_db_path)?;
@@ -99,7 +100,7 @@ pub async fn compile_all(
 
     if num_errors > 0 {
         // Just report how many errors we got. The tasks themselves will write to stderr as
-        // compilation errors are encourntered.
+        // compilation errors are encountered.
         cu::bail!("Compilation failed with {num_errors} errors");
     } else {
         Ok((something_compiled, objects))

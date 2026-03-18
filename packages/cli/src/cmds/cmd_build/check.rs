@@ -19,7 +19,6 @@ pub async fn check_all(
     disallowed_instructions: &[String],
     symbol_files: &[PathBuf],
 ) -> cu::Result<()> {
-    cu::info!("Checking ELF");
     let expected_symbols = load_known_symbols(symbol_files)?;
 
     let (missing_symbols, disallowed_instructions) = cu::co::try_join!(
@@ -46,6 +45,7 @@ pub async fn check_all(
         cu::debug!("Check: no disallowed instructions")
     }
 
+    cu::info!("Passed all checks");
     Ok(())
 }
 
@@ -151,15 +151,12 @@ async fn check_instructions(
         Regex::new(r"^hlt").unwrap(),
     ];
     disallowed_regexes.extend(disallowed_instructions.iter().filter_map(|inst| {
-        Regex::new(inst)
-            .inspect_err(|e| {
-                cu::error!(
-                    "Failed to parse disallowed instruction {}. Error: {}",
-                    inst,
-                    e
-                )
-            })
-            .ok()
+        cu::check!(
+            Regex::new(inst),
+            "Failed to parse disallowed instruction {}.",
+            inst
+        )
+        .ok()
     }));
 
     let bad_instructions: Vec<String> = instructions

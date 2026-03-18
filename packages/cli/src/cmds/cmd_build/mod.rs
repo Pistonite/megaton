@@ -225,7 +225,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
         }
         link::build_nso(&elf_path, &nso_path).await?;
     } else {
-        cu::hint!("Up to date")
+        cu::info!("Up to date")
     }
 
     Ok(())
@@ -248,7 +248,6 @@ async fn make_npdm_json(output_dir: &Path, title_id_hex: &str) -> cu::Result<()>
 
     cu::fs::write_json_pretty(&main_npdm_json, &npdm_data)?;
 
-    cu::info!("Creating main.npdm");
     environment()
         .npdmtool()
         .command()
@@ -258,6 +257,8 @@ async fn make_npdm_json(output_dir: &Path, title_id_hex: &str) -> cu::Result<()>
         .await?
         .co_wait_nz()
         .await?;
+
+    cu::info!("Created npdm: {}", main_npdm.try_to_rel().display());
     Ok(())
 }
 

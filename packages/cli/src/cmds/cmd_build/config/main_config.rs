@@ -29,7 +29,7 @@ pub fn load_config(manifest_path: impl AsRef<Path>) -> cu::Result<Config> {
             Err(_) => continue,
         }
     }
-    Err(cu::Error::msg("Failed to find Megaton config"))
+    cu::bail!("Failed to find Megaton config");
 }
 
 /// Config data read from Megaton.toml
