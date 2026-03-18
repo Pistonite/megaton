@@ -6,7 +6,7 @@ use std::{
     sync::Arc,
 };
 
-use cu::pre::*;
+// use cu::pre::*;
 
 use super::config::Flags;
 use compile_db::CompileDB;
@@ -32,7 +32,7 @@ impl CompileCtx {
     }
 }
 
-/// Compiles all sources found in multiple contexts, asyncronously
+/// Compiles all sources found in multiple contexts, asynchronously
 /// Will wait until all compilation jobs finish before returning
 /// Handles loading, updating, and saving the compile db
 /// Returns true if anything actually compiled
@@ -51,55 +51,58 @@ pub async fn compile_all(
     let pool = cu::co::pool(0);
     let mut handles = vec![];
 
+    let mut total_tasks = 0;
+    let progress = cu::progress("Compiling C/C++/S objects")
+        .total(0)
+        .eta(false)
+        .percentage(false)
+        .spawn();
+
     // Start compilation for all contexts
     for ctx in contexts {
         source::scan(&ctx.source_paths).for_each(|src| {
             cu::debug!("Scan: found source {}", src.path.display());
             let flags = ctx.flags.clone();
             let output_path = ctx.output_path.clone();
-            let record = compile_db.find_record(src.pathhash);
-            let handle = if let Some(record) = record {
-                // Previous record found
-                pool.spawn(src.compile(flags, output_path, Some(record.to_owned())))
-            } else {
-                // No record of this file found
-                pool.spawn(src.compile(flags, output_path, None))
-            };
+            let record = compile_db.find_record(src.pathhash).cloned();
+            let progress = progress.clone();
+            let handle =
+                pool.spawn(async move { src.compile(flags, output_path, record, progress).await });
             handles.push(handle);
+            total_tasks += 1;
         });
     }
+    progress.set_total(total_tasks);
 
     let mut something_compiled = false;
     let mut objects = vec![];
-    let mut errors = vec![];
+    let mut num_errors = 0;
     let mut set = cu::co::set(handles);
+    let mut completed_tasks = 0;
     while let Some(joined) = set.next().await {
-        let res = joined.context("Failed to join handle")?;
+        let res = joined?;
         match res {
             Ok((did_compile, rec, o_path)) => {
                 something_compiled |= did_compile;
                 objects.push(o_path);
                 compile_db.update(rec.source_hash, rec.clone());
             }
-            Err(e) => {
-                errors.push(e);
+            Err(_) => {
+                num_errors += 1;
             }
         }
+        completed_tasks += 1;
+        cu::progress!(progress = completed_tasks);
     }
 
     compile_db.save(compile_db_path)?;
+    drop(progress);
 
-    if errors.is_empty() {
-        Ok((something_compiled, objects))
+    if num_errors > 0 {
+        // Just report how many errors we got. The tasks themselves will write to stderr as
+        // compilation errors are encountered.
+        cu::bail!("Compilation failed with {num_errors} errors");
     } else {
-        let num = errors.len();
-        let errorstring = errors
-            .iter()
-            .map(|e| e.to_string())
-            .collect::<Vec<_>>()
-            .join("\n");
-        Err(cu::fmterr!(
-            "Compilation failed with {num} errors: \n{errorstring}"
-        ))
+        Ok((something_compiled, objects))
     }
 }

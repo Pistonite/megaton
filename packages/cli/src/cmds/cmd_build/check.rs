@@ -27,24 +27,25 @@ pub async fn check_all(
     )?;
 
     if !missing_symbols.is_empty() {
-        return Err(cu::fmterr!(
-            "Found missing symbols in {}:\n{:#?}",
+        cu::bail!(
+            "Missing symbols in {}:\n{:#?}",
             elf.display(),
             missing_symbols
-        ));
+        );
     } else {
-        cu::debug!("no missing symbols")
+        cu::debug!("Check: no missing symbols")
     }
     if !disallowed_instructions.is_empty() {
-        return Err(cu::fmterr!(
+        cu::bail!(
             "Found disallowed instructions in {}:\n{:#?}",
             elf.display(),
             disallowed_instructions
-        ));
+        );
     } else {
-        cu::debug!("no disallowed instructions")
+        cu::debug!("Check: no disallowed instructions")
     }
 
+    cu::info!("Passed all checks");
     Ok(())
 }
 
@@ -62,6 +63,42 @@ fn load_known_symbols(symbol_files: &[PathBuf]) -> cu::Result<Symbols> {
     }
 
     Ok(symbols)
+}
+
+async fn check_symbols(
+    elf: &Path,
+    expected_symbols: Symbols,
+    ignored_symbols: &[String],
+) -> cu::Result<Vec<String>> {
+    let (child, stdout_handle) = environment()
+        .objdump()
+        .command()
+        .arg("-T")
+        .arg(elf)
+        .stdout(cu::pio::string())
+        .stdie_null()
+        .co_spawn()
+        .await?;
+
+    child.co_wait_nz().await?;
+    let stdout = stdout_handle.co_join().await??;
+    let mut symbols = parse_objdump_syms(stdout);
+
+    cu::trace!("objdump symbols: {:#?}", symbols);
+
+    for ignored_symbol in ignored_symbols {
+        symbols.remove(ignored_symbol);
+    }
+
+    let missing_symbols = symbols
+        .into_iter()
+        .filter(|symbol| {
+            // dot is not a valid character in a C identifier, most likely a false positive (.data, .text)
+            !symbol.starts_with(".") && !expected_symbols.contains(symbol)
+        })
+        .collect::<Vec<_>>();
+
+    Ok(missing_symbols)
 }
 
 fn parse_objdump_syms(content: String) -> Symbols {
@@ -85,40 +122,6 @@ fn parse_objdump_syms(content: String) -> Symbols {
             }
         })
         .collect()
-}
-
-async fn check_symbols(
-    elf: &Path,
-    expected_symbols: Symbols,
-    ignored_symbols: &[String],
-) -> cu::Result<Vec<String>> {
-    let (child, stdout_handle) = environment()
-        .objdump()
-        .command()
-        .arg("-T")
-        .arg(elf)
-        .stdout(cu::pio::string())
-        .stdie_null()
-        .co_spawn()
-        .await?;
-
-    child.co_wait_nz().await?;
-    let stdout = stdout_handle.co_join().await??;
-    let mut symbols = parse_objdump_syms(stdout);
-
-    for ignored_symbol in ignored_symbols {
-        symbols.remove(ignored_symbol);
-    }
-
-    let missing_symbols = symbols
-        .into_iter()
-        .filter(|symbol| {
-            // dot is not a valid character in a C identifier, most likely a false positive (.data, .text)
-            !symbol.starts_with(".") && !expected_symbols.contains(symbol)
-        })
-        .collect::<Vec<_>>();
-
-    Ok(missing_symbols)
 }
 
 async fn check_instructions(
@@ -148,15 +151,12 @@ async fn check_instructions(
         Regex::new(r"^hlt").unwrap(),
     ];
     disallowed_regexes.extend(disallowed_instructions.iter().filter_map(|inst| {
-        Regex::new(inst)
-            .inspect_err(|e| {
-                cu::error!(
-                    "Failed to parse disallowed instruction {}. Error: {}",
-                    inst,
-                    e
-                )
-            })
-            .ok()
+        cu::check!(
+            Regex::new(inst),
+            "Failed to parse disallowed instruction {}.",
+            inst
+        )
+        .ok()
     }));
 
     let bad_instructions: Vec<String> = instructions

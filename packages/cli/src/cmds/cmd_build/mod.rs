@@ -52,7 +52,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     let env = environment();
 
     ////////// Load config //////////
-    let config = config::load_config(&args.config).context("failed to load config")?;
+    let config = config::load_config(&args.config).context("Failed to load config")?;
     let profile = config.profile.resolve(&args.profile)?;
     let build_config = config.build.get_profile(profile);
     let mut build_flags = Flags::from_config(&build_config.flags);
@@ -72,7 +72,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     cu::fs::make_dir(&target_mod_o)?;
     make_npdm_json(&target_mod, &config.module.title_id_hex()).await?;
 
-    cu::debug!("profile: {profile}");
+    cu::debug!("Cmd_build: using profile {profile}");
 
     let mut static_libs = vec![];
     let mut need_link = false;
@@ -81,9 +81,8 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     let rust_ctx = rust::RustCtx::from_config(config.cargo);
     let rust_enabled = rust_ctx.is_some();
     if lib_enabled && let Some(rust_ctx) = rust_ctx {
-        let rust_ctx = rust_ctx?;
-        cu::debug!("rust support enabled");
-        cu::debug!("cargo manifest: {}", rust_ctx.manifest.display());
+        let rust_ctx =
+            rust_ctx.context("Rust is enabled, but cargo context could not be initialized")?;
 
         need_link |= rust_ctx
             .build(&build_flags.cargoflags, &build_flags.rustflags)
@@ -91,13 +90,14 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
 
         static_libs.push(
             rust_ctx
-                .get_output_path()
-                .ok_or_else(|| cu::fmterr!("Can't find the rust static lib"))?,
+                .get_output()
+                .context("Failed to get cargo output")?,
         );
 
         need_link |= rust_ctx
             .gen_cxxbridge(&target_mod_src, &target_mod_include)
-            .await?;
+            .await
+            .context("Failed to generate CXX interop files")?;
     }
 
     ////////// Compile sources //////////
@@ -107,12 +107,12 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     // If libmegaton enabled, create library context
     if lib_enabled {
-        cu::debug!("libmegaton enabled");
+        cu::debug!("Cmd_build: libmegaton enabled");
         let target_lib = profile_target.join("lib");
 
         if args.unpack_lib {
             // TODO: Unpack automatically if libary files dont exist or are out of date
-            cu::debug!("installing libmegaton version {}", "X.X.X");
+            cu::info!("Installing libmegaton version {}", "X.X.X");
             unpack_lib(&target_lib).context("Failed to unpack library archive")?;
         }
 
@@ -129,7 +129,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
             &format!("MEGART_NX_MODULE_NAME=\"{}\"", &config.module.name),
             &format!("MEGART_NX_MODULE_NAME_LEN={}", &config.module.name.len()),
             &format!("MEGART_TITLE_ID={}", &config.module.title_id),
-            &format!("MEGART_TITLE_ID_HEX={:016x}", &config.module.title_id),
+            &format!("MEGART_TITLE_ID_HEX=\"0x{:016x}\"", &config.module.title_id),
         ]);
         if rust_enabled {
             lib_flags.add_defines(["MEGART_RUST"]);
@@ -225,7 +225,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
         }
         link::build_nso(&elf_path, &nso_path).await?;
     } else {
-        cu::hint!("Up to date")
+        cu::info!("Up to date")
     }
 
     Ok(())
@@ -240,7 +240,6 @@ fn unpack_lib(lib_root_path: &Path) -> cu::Result<()> {
 }
 
 async fn make_npdm_json(output_dir: &Path, title_id_hex: &str) -> cu::Result<()> {
-    cu::debug!("creating main.npdm");
     let mut npdm_data: json::Value = json::parse(include_str!("../../../template.npdm.json"))?;
     npdm_data["title_id"] = json!(format!("0x{}", title_id_hex));
 
@@ -259,6 +258,7 @@ async fn make_npdm_json(output_dir: &Path, title_id_hex: &str) -> cu::Result<()>
         .co_wait_nz()
         .await?;
 
+    cu::info!("Created npdm: {}", main_npdm.try_to_rel().display());
     Ok(())
 }
 
@@ -267,9 +267,9 @@ fn make_verfile(path: &Path, entry: &str) -> cu::Result<()> {
     let verfile_after = ";\n\tlocal: *;\n};";
     let verfile_data = format!("{}{}{}", verfile_before, entry, verfile_after);
     if write_if_changed(path, verfile_data.as_bytes())? {
-        cu::debug!("updated verfile");
+        cu::debug!("Cmd_build: updated verfile");
     } else {
-        cu::debug!("verfile up to date");
+        cu::debug!("Cmd_build: verfile up to date");
     }
     Ok(())
 }

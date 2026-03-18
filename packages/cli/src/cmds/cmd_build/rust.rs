@@ -21,19 +21,20 @@ pub struct RustCtx {
 
 impl RustCtx {
     /// Gets the crate based on the cargo config. Returns `None` if rust is
-    /// disabled or can't be automattically enabled. Returns Some(Err()) if
+    /// disabled or can't be automatically enabled. Returns Some(Err()) if
     /// cargo is explicitly enabled, but couldn't be be found for some reason.
     pub fn from_config(cargo: CargoConfig) -> Option<cu::Result<Self>> {
         let manifest = cargo
             .manifest
             .unwrap_or(CargoConfig::default_manifest_path());
 
-        // Nested enums is not ideal. Maybe try and find a better way to do this while maintaing
+        // Nested enums is not ideal. Maybe try and find a better way to do this while maintain
         // a return type that makes sense for the caller.
         match cargo.enabled {
             None | Some(true) => {
                 let ctx = RustCtx::new(&manifest, cargo.sources, cargo.header_suffix);
                 if ctx.is_err() && cargo.enabled.is_none() {
+                    cu::hint!("Cargo is disabled");
                     None
                 } else {
                     Some(ctx)
@@ -57,7 +58,7 @@ impl RustCtx {
             .map(|rel_path| crate_root.join(rel_path))
             .collect::<Vec<_>>();
 
-        // This should always be target, even if the megaton target dir is differnt
+        // This should always be target, even if the megaton target dir is different
         let target_path = crate_root.join("target");
 
         Ok(Self {
@@ -70,13 +71,14 @@ impl RustCtx {
 
     /// Build the rust crate with `cargo build +megaton`
     pub async fn build(&self, cargoflags: &[String], rustflags: &str) -> cu::Result<bool> {
-        let old_output = self.get_output_path();
+        let old_output = self.get_output();
         let old_mtime = match old_output {
-            Some(file) => cu::fs::get_mtime(file).unwrap_or(None),
-            None => None,
+            Ok(file) => cu::fs::get_mtime(file).unwrap_or(None),
+            Err(_) => None,
         };
 
-        let cargo = cu::which("cargo").context("Cargo executable not found")?;
+        let cargo = cu::which("cargo")
+            .context("Cargo executable not found: ensure rust is properly installed")?;
         let mut command = cargo
             .command()
             .add(cu::args![
@@ -85,7 +87,7 @@ impl RustCtx {
                 "--manifest-path",
                 &self.manifest,
             ])
-            .preset(cu::pio::cargo("Updating crate"));
+            .preset(cu::pio::cargo("Building crate"));
 
         command = command.args(cargoflags);
         command = command.env("RUSTFLAGS", rustflags);
@@ -95,7 +97,7 @@ impl RustCtx {
 
         command.co_spawn().await?.0.co_wait_nz().await?;
 
-        let new_output = self.get_output_path().unwrap();
+        let new_output = self.get_output().unwrap();
         let new_mtime = cu::fs::get_mtime(new_output).unwrap();
 
         // Return true if artifact changed
@@ -103,23 +105,25 @@ impl RustCtx {
     }
 
     /// Gets the path to the static lib compiled by cargo
-    /// This should always be using the hermit target on release mode
-    /// Will panic if it fails to read the package name from Cargo.toml
-    pub fn get_output_path(&self) -> Option<PathBuf> {
+    /// Error if the Cargo manifest can't be parsed, filename
+    /// can't be parsed, or if file doesn't exist
+    pub fn get_output(&self) -> cu::Result<PathBuf> {
         let rel_path = self
             .target_path
             .join("aarch64-unknown-hermit")
             .join("release");
-        let name = &cu::fs::read_string(&self.manifest)
-            .unwrap()
-            .parse::<toml::Table>()
-            .unwrap();
 
-        let name = &name["package"]["name"].as_str().unwrap();
+        let table = &cu::fs::read_string(&self.manifest)?.parse::<toml::Table>()?;
+
+        let package = &table.get("package");
+        let package = cu::check!(package, "cargo manifest missing entry package")?;
+        let name = &package.get("name");
+        let name = cu::check!(name, "cargo manifest missing entry package.name")?;
+        let name = cu::check!(name.as_str(), "package name is not a string")?;
         let name = name.replace("-", "_");
-        let filename = format!("lib{name}.a");
 
-        rel_path.join(&filename).normalize_exists().ok()
+        let filename = format!("lib{name}.a");
+        rel_path.join(&filename).normalize_exists()
     }
 
     /// Scan rust sources and generate cxxbridge sources and headers
@@ -131,10 +135,10 @@ impl RustCtx {
     ) -> cu::Result<bool> {
         let mut something_changed =
             if cxxbridge_cmd(None, true, &include_out_path.join("rust").join("cxx.h")).await? {
-                cu::debug!("generated rust/cxx.h");
+                cu::debug!("Cxxbridge: generated rust/cxx.h");
                 true
             } else {
-                cu::debug!("up to date: rust/cxx.h");
+                cu::debug!("Cxxbridge: header up to date rust/cxx.h");
                 false
             };
 
@@ -168,23 +172,19 @@ impl RustCtx {
             }
         }
 
-        if errors.is_empty() {
-            Ok(something_changed)
-        } else {
+        if !errors.is_empty() {
             let num = errors.len();
             let errorstring = errors
                 .iter()
                 .map(|e| e.to_string())
                 .collect::<Vec<_>>()
                 .join("\n");
-            Err(cu::fmterr!(
-                "Cxxbridge failed due to {num} errors: \n{errorstring}"
-            ))
+            cu::bail!("Failed due to {num} error(s): \n{errorstring}");
         }
+        Ok(something_changed)
     }
 
     fn get_source_files(&self) -> cu::Result<Vec<PathBuf>> {
-        // TODO: try to make this return an iterator
         let mut source_files: Vec<PathBuf> = vec![];
         for dir in &self.source_paths {
             let mut walk = cu::fs::walk(dir)?;
@@ -206,14 +206,11 @@ async fn cxxbridge_process(
     header_suffix: Arc<String>,
     source_paths: Arc<Vec<PathBuf>>,
 ) -> cu::Result<bool> {
-    let stem_os = file
-        .file_stem()
-        .ok_or_else(|| cu::fmterr!("invalid file name: {}", file.display()))?;
+    let stem_os = cu::check!(file.file_stem(), "Invalid file name: {}", file.display())?;
 
     let stem = stem_os.as_utf8()?;
     let path_to_rs = file.normalize()?;
 
-    // TODO: Kinda icky, maybe find a way to get relative path that doesnt require searching
     let rel_source_path = source_paths
         .iter()
         .find(|p| path_to_rs.starts_with(p))
@@ -225,18 +222,18 @@ async fn cxxbridge_process(
     out_cc.set_file_name(format!("{stem}.cc"));
 
     let header_updated = if cxxbridge_cmd(Some(&file), true, &out_h).await? {
-        cu::debug!("generated header {}", &out_h.display());
+        cu::debug!("Cxxbridge: generated header {}", &out_h.display());
         true
     } else {
-        cu::debug!("header up to date: {}", &out_h.display());
+        cu::debug!("Cxxbridge: header up to date {}", &out_h.display());
         false
     };
 
     let source_updated = if cxxbridge_cmd(Some(&file), false, &out_cc).await? {
-        cu::debug!("generated source {}", &out_cc.display());
+        cu::debug!("Cxxbridge: generated source {}", &out_cc.display());
         true
     } else {
-        cu::debug!("source up to date: {}", &out_cc.display());
+        cu::debug!("Cxxbridge: source up to date {}", &out_cc.display());
         false
     };
 
@@ -248,17 +245,14 @@ async fn cxxbridge_process(
 async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::Result<bool> {
     let mut args = vec![];
     if let Some(file) = file {
-        args.push(
-            file.to_str()
-                .ok_or_else(|| cu::fmterr!("Not utf-8: {}", file.display()))?,
-        );
+        args.push(cu::check!(file.to_str(), "Not utf-8: {}", file.display())?);
     }
     if header {
         args.push("--header");
     }
 
-    let exe =
-        cu::which("cxxbridge").context("cxxbridge not found; `cargo install cxxbridge-cmd`")?;
+    let exe = cu::which("cxxbridge")
+        .context("cxxbridge executable not found; `cargo install cxxbridge-cmd`")?;
     let command = exe
         .command()
         .stdout(cu::pio::buffer())
@@ -280,13 +274,9 @@ async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::
         Some(1) => Ok(false),
         Some(other) => {
             let stderr = stderr.co_join().await??;
-            Err(cu::Error::msg(format!(
-                "cxxbridge exited with unexpected status ({other})\n{stderr}"
-            )))
+            cu::bail!("cxxbridge exited with unexpected status ({other})\n{stderr}");
         }
-        None => Err(cu::Error::msg(
-            "cxxbridge exited with no status code for some reason",
-        )),
+        None => cu::bail!("cxxbridge terminated early"),
     }
 }
 
