@@ -94,11 +94,11 @@ pub async fn build_nso(elf_path: &Path, nso_path: &Path) -> cu::Result<()> {
         .command()
         .args([elf_path, nso_path])
         .stdin_null()
-        .stdout(cu::pio::spinner("Converting to NSO").debug())
+        .stdout(cu::lv::D)
         .stderr(cu::lv::E);
-    let (child, spinner) = command.co_spawn().await?;
+    cu::info!("Converting to NSO");
+    let child = command.co_spawn().await?;
     let res = child.co_wait_nz().await;
-    spinner.done();
     cu::debug!("Link: converted to nso {}", nso_path.display());
     res
 }

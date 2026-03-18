@@ -6,7 +6,7 @@ use std::{
     sync::Arc,
 };
 
-use cu::pre::*;
+// use cu::pre::*;
 
 use super::config::Flags;
 use compile_db::CompileDB;
@@ -51,7 +51,13 @@ pub async fn compile_all(
     let pool = cu::co::pool(0);
     let mut handles = vec![];
 
-    let progress = cu::progress("Compiling C/C++/S objects").spawn();
+    let mut num_steps = 0;
+    let progress = cu::progress("Compiling C/C++/S objects")
+        .total(0)
+        .eta(false)
+        .percentage(false)
+        .spawn();
+
     // Start compilation for all contexts
     for ctx in contexts {
         source::scan(&ctx.source_paths).for_each(|src| {
@@ -60,49 +66,42 @@ pub async fn compile_all(
             let output_path = ctx.output_path.clone();
             let record = compile_db.find_record(src.pathhash);
             let progress = progress.clone();
-            let handle = if let Some(record) = record {
-                // Previous record found
-                pool.spawn(src.compile(flags, output_path, Some(record.to_owned()), progress))
-            } else {
-                // No record of this file found
-                pool.spawn(src.compile(flags, output_path, None, progress))
-            };
+            let handle = pool.spawn(src.compile(flags, output_path, record.cloned(), progress));
             handles.push(handle);
+            num_steps += 1;
         });
     }
-    progress.done();
+    progress.set_total(num_steps);
 
     let mut something_compiled = false;
     let mut objects = vec![];
-    let mut errors = vec![];
+    let mut num_errors = 0;
     let mut set = cu::co::set(handles);
+    let mut completed_steps = 0;
     while let Some(joined) = set.next().await {
-        let res = joined.context("Failed to join handle")?;
+        let res = joined?;
         match res {
             Ok((did_compile, rec, o_path)) => {
                 something_compiled |= did_compile;
                 objects.push(o_path);
                 compile_db.update(rec.source_hash, rec.clone());
             }
-            Err(e) => {
-                errors.push(e);
+            Err(_) => {
+                num_errors += 1;
             }
         }
+        completed_steps += 1;
+        cu::progress!(progress = completed_steps);
     }
 
     compile_db.save(compile_db_path)?;
+    drop(progress);
 
-    if errors.is_empty() {
-        Ok((something_compiled, objects))
+    if num_errors > 0 {
+        // Just report how many errors we got. The tasks themselves will write to stderr as
+        // compilation errors are encourntered.
+        cu::bail!("Compilation failed with {num_errors} errors");
     } else {
-        let num = errors.len();
-        let errorstring = errors
-            .iter()
-            .map(|e| e.to_string())
-            .collect::<Vec<_>>()
-            .join("\n");
-        Err(cu::fmterr!(
-            "Compilation failed with {num} errors: \n{errorstring}"
-        ))
+        Ok((something_compiled, objects))
     }
 }

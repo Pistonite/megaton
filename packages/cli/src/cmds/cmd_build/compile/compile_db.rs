@@ -36,8 +36,8 @@ impl CompileDB {
                 cu::debug!("Compile: loaded compiledb");
                 db
             }
-            Err(_) => {
-                cu::debug!("Compile: creating new compiledb");
+            Err(e) => {
+                cu::debug!("Compile: compiledb failed to load: {e:?}, creating a new one");
                 Self::new()
             }
         }
@@ -46,11 +46,8 @@ impl CompileDB {
     /// Attempt to load the compiledb from the given path
     /// Errors if it can't be read, or if json parsing fails
     pub fn try_load(path: &Path) -> cu::Result<Self> {
-        if let Ok(file) = cu::fs::read(path) {
-            json::read::<CompileDB>(file.as_slice())
-        } else {
-            Err(cu::fmterr!("Cannot read {}", path.display()))
-        }
+        let file = cu::fs::read(path)?;
+        json::read::<CompileDB>(file.as_slice())
     }
 
     /// Generate a new compiledb with empty record table

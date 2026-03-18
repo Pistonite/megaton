@@ -114,13 +114,15 @@ impl RustCtx {
             .join("release");
 
         let table = &cu::fs::read_string(&self.manifest)?.parse::<toml::Table>()?;
-        let entry = &table["package"]["name"];
-        let name = entry
-            .as_str()
-            .ok_or_else(|| cu::fmterr!("Not utf: {}", entry))?;
-        let name = name.replace("-", "_");
-        let filename = format!("lib{name}.a");
 
+        let package = &table.get("package");
+        let package = cu::check!(package, "cargo manifest missing entry package")?;
+        let name = &package.get("name");
+        let name = cu::check!(name, "cargo manifest missing entry package.name")?;
+        let name = cu::check!(name.as_str(), "package name is not a string")?;
+        let name = name.replace("-", "_");
+
+        let filename = format!("lib{name}.a");
         rel_path.join(&filename).normalize_exists()
     }
 
@@ -170,17 +172,16 @@ impl RustCtx {
             }
         }
 
-        if errors.is_empty() {
-            Ok(something_changed)
-        } else {
+        if !errors.is_empty() {
             let num = errors.len();
             let errorstring = errors
                 .iter()
                 .map(|e| e.to_string())
                 .collect::<Vec<_>>()
                 .join("\n");
-            Err(cu::fmterr!("Failed due to {num} error(s): \n{errorstring}"))
+            cu::bail!("Failed due to {num} error(s): \n{errorstring}");
         }
+        Ok(something_changed)
     }
 
     fn get_source_files(&self) -> cu::Result<Vec<PathBuf>> {
@@ -278,11 +279,9 @@ async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::
         Some(1) => Ok(false),
         Some(other) => {
             let stderr = stderr.co_join().await??;
-            Err(cu::Error::msg(format!(
-                "cxxbridge exited with unexpected status ({other})\n{stderr}"
-            )))
+            cu::bail!("cxxbridge exited with unexpected status ({other})\n{stderr}");
         }
-        None => Err(cu::Error::msg("cxxbridge terminated early")),
+        None => cu::bail!("cxxbridge terminated early"),
     }
 }
 
