@@ -6,9 +6,12 @@ use std::{
     sync::Arc,
 };
 
-// use cu::pre::*;
+use cu::pre::*;
 
 use super::config::Flags;
+use crate::cmds::cmd_build::compile::{
+    compile_db::try_load_or_new_compile_commands, source::SourceStatus,
+};
 use compile_db::CompileDB;
 
 mod compile_db;
@@ -39,70 +42,91 @@ impl CompileCtx {
 pub async fn compile_all(
     contexts: &[CompileCtx],
     compile_db_path: &Path,
+    compile_commands_path: &Path,
+    configure_only: bool,
 ) -> cu::Result<(bool, Vec<PathBuf>)> {
     // Get compile_db
     let mut compile_db = CompileDB::try_load_or_new(compile_db_path);
+
+    let mut compile_commands = try_load_or_new_compile_commands(compile_commands_path);
 
     if !compile_db.is_version_correct() {
         cu::info!("Compiler version has changed, recompiling");
         compile_db = CompileDB::new();
     }
 
-    let pool = cu::co::pool(0);
+    // Even if an object doesn't need compiled, we still need to pass back its path since this is
+    // how the linker knows what objects need linked
+    let mut objects = vec![];
     let mut handles = vec![];
+    let pool = cu::co::pool(0);
 
     let mut total_tasks = 0;
-    let progress = cu::progress("Compiling C/C++/S objects")
-        .total(0)
+    let progress = cu::progress("C/C++/S")
+        .total(handles.len())
         .eta(false)
         .percentage(false)
         .spawn();
-
-    // Start compilation for all contexts
-    for ctx in contexts {
-        source::scan(&ctx.source_paths).for_each(|src| {
-            cu::debug!("Scan: found source {}", src.path.display());
-            let flags = ctx.flags.clone();
-            let output_path = ctx.output_path.clone();
-            let record = compile_db.find_record(src.pathhash).cloned();
-            let progress = progress.clone();
-            let handle =
-                pool.spawn(async move { src.compile(flags, output_path, record, progress).await });
-            handles.push(handle);
-            total_tasks += 1;
-        });
+    if configure_only {
+        cu::progress!(progress, "configuring compile_commands.json");
+    } else {
+        cu::progress!(progress, "compiling sources");
     }
+
+    // Configure all sources and start compile tasks
+    for ctx in contexts {
+        for src in source::scan(&ctx.source_paths) {
+            let record = compile_db.find_record(src.pathhash);
+            match src.configure_compilation(&ctx.flags, &ctx.output_path, record)? {
+                SourceStatus::UpToDate(object) => {
+                    if !configure_only {
+                        cu::debug!("Compile: object up to date {}", &object.display());
+                    }
+                    objects.push(object);
+                }
+                SourceStatus::CompileNeeded(compile_record) => {
+                    objects.push(compile_record.o_path.clone());
+                    if !configure_only {
+                        let parent_progress = progress.clone();
+                        compile_db.update(compile_record.source_hash, compile_record.clone());
+                        let handle = pool
+                            .spawn(async move { compile_record.compile(parent_progress).await });
+                        handles.push(handle);
+                        total_tasks += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    if configure_only || handles.is_empty() {
+        progress.done();
+        cu::fs::write_json_pretty(compile_commands_path, &compile_commands)?;
+        return Ok((false, objects));
+    }
+
     progress.set_total(total_tasks);
 
-    let mut something_compiled = false;
-    let mut objects = vec![];
+    let mut completed_tasks = 0;
     let mut num_errors = 0;
     let mut set = cu::co::set(handles);
-    let mut completed_tasks = 0;
     while let Some(joined) = set.next().await {
-        let res = joined?;
-        match res {
-            Ok((did_compile, rec, o_path)) => {
-                something_compiled |= did_compile;
-                objects.push(o_path);
-                compile_db.update(rec.source_hash, rec.clone());
-            }
-            Err(_) => {
-                num_errors += 1;
-            }
+        if joined?.is_err() {
+            num_errors += 1;
         }
         completed_tasks += 1;
         cu::progress!(progress = completed_tasks);
     }
 
+    progress.done();
+    cu::fs::write_json_pretty(compile_commands_path, &compile_commands)?;
     compile_db.save(compile_db_path)?;
-    drop(progress);
 
     if num_errors > 0 {
         // Just report how many errors we got. The tasks themselves will write to stderr as
         // compilation errors are encountered.
         cu::bail!("Compilation failed with {num_errors} errors");
     } else {
-        Ok((something_compiled, objects))
+        Ok((true, objects))
     }
 }

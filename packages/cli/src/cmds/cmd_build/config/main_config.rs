@@ -201,7 +201,7 @@ pub struct Module {
     /// The compile_commands.json file to put/update compile commands
     /// for other tools like clangd
     #[serde(default = "default_comp_commands")]
-    pub compdb: String,
+    pub compdb: PathBuf,
 
     #[serde(flatten, default)]
     unused: CaptureUnused,
@@ -240,8 +240,8 @@ fn default_target() -> PathBuf {
     PathBuf::from("target")
 }
 
-fn default_comp_commands() -> String {
-    "compile_commands.json".to_string()
+fn default_comp_commands() -> PathBuf {
+    PathBuf::from("compile_commands.json")
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -66,7 +66,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     let target_mod_src = target_mod.join("src");
     let target_mod_include = target_mod.join("include");
     let target_mod_o = target_mod.join("o");
-    let compiledb_path = target_mod.join("compiledb.cache");
+    let compile_db_path = target_mod.join("compiledb.cache");
     cu::fs::make_dir(&target_mod_src)?;
     cu::fs::make_dir(&target_mod_include)?;
     cu::fs::make_dir(&target_mod_o)?;
@@ -164,7 +164,9 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     contexts.push(mod_ctx);
 
     // Compile both contexts
-    let (compiled, mut objects) = compile::compile_all(&contexts, &compiledb_path).await?;
+    let compile_commands_path = config.module.compdb.normalize()?;
+    let (compiled, mut objects) =
+        compile::compile_all(&contexts, &compile_db_path, &compile_commands_path, args.configure).await?;
     need_link |= compiled;
 
     ////////// Link & Check //////////
