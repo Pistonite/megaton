@@ -2,13 +2,12 @@
 // Copyright (c) 2026 Megaton contributors
 
 use std::{
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     path::{Path, PathBuf},
     sync::Arc,
 };
 
 use cu::pre::*;
-use regex::Regex;
 
 use crate::env::environment;
 
@@ -120,14 +119,16 @@ impl CompileRecord {
     }
 }
 
+// Ordered so the vec order also stays the same
+type CompileCommandsContainer = BTreeSet<CompileCommandsEntry>;
+
 pub struct CompileCommands {
-    entries: Vec<CompileCommandsEntry>,
+    entries: CompileCommandsContainer,
 }
 
-// TODO: this is basically the same as CompileDB, maybe use a trait or generics to reduce the
-// duplication
+// TODO: this is similar to CompileDB, maybe generics/traits could make these share some implementation?
 impl CompileCommands {
-    pub fn try_load_or_new_compile_commands(path: &Path) -> Self {
+    pub fn try_load_or_new(path: &Path) -> Self {
         match Self::try_load(path) {
             Ok(db) => {
                 cu::debug!("Compile: loaded compile_commands.json");
@@ -138,7 +139,7 @@ impl CompileCommands {
                     "Compile: compile_commands.json failed to load: {e:?}, creating a new one"
                 );
                 Self {
-                    entries: Vec::<CompileCommandsEntry>::new(),
+                    entries: CompileCommandsContainer::new(),
                 }
             }
         }
@@ -147,18 +148,21 @@ impl CompileCommands {
     fn try_load(path: &Path) -> cu::Result<Self> {
         let file = cu::fs::read(path)?;
         let vec = json::read::<Vec<CompileCommandsEntry>>(file.as_slice())?;
-        Ok(Self { entries: vec })
+        let container = CompileCommandsContainer::from_iter(vec);
+        Ok(Self { entries: container })
     }
 
-    pub fn save(&self, path: &Path) -> cu::Result<()> {
-        cu::fs::write_json_pretty(path, &self.entries)
+    pub fn save(self, path: &Path) -> cu::Result<()> {
+        let vec: Vec<CompileCommandsEntry> = self.entries.into_iter().collect();
+        cu::fs::write_json_pretty(path, &vec)
     }
 
-    pub fn update(&mut self, path_hash: usize, record: CompileRecord) {
+    pub fn update(&mut self, entry: CompileCommandsEntry) {
+        self.entries.insert(entry);
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CompileCommandsEntry {
     arguments: Vec<String>,
     directory: String,
@@ -167,20 +171,30 @@ pub struct CompileCommandsEntry {
 
 impl From<&CompileRecord> for CompileCommandsEntry {
     fn from(value: &CompileRecord) -> Self {
+        let env = environment().dkp_includes();
         let arguments = value
             .clone()
             .args
             .into_iter()
-            .filter(|x| {
-                let re = Regex::new(r"-mtune=.+|-march=.+|-mtp=.+").unwrap();
-                !re.is_match(x)
+            .filter_map(|arg| {
+                if arg.starts_with("-I") {
+                    let path = &String::from(&arg[2..]);
+                    if env.contains(path) {
+                        let thing = format!("-isystem{}", path);
+                        Some(thing)
+                    } else {
+                        Some(arg)
+                    }
+                } else if arg.contains("-mtune=")
+                    || arg.contains("-march=")
+                    || arg.contains("-mtp=")
+                {
+                    None
+                } else {
+                    Some(arg)
+                }
             })
             .collect::<Vec<_>>();
-
-        // devkitpro_includes()
-        //     .into_iter()
-        //     .map(|i| format!("-isystem {i}"))
-        //     .collect::<Vec<_>>(),
 
         // This should never be able to panic
         let directory = PathBuf::from(".")

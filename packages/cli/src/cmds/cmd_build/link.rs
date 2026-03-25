@@ -79,7 +79,7 @@ impl LinkCmd {
             .command()
             .args(&self.args)
             .stdin_null()
-            .stdout(cu::pio::spinner("Linking").debug())
+            .stdout(cu::pio::spinner("Link").debug())
             .stderr(cu::lv::E);
         let (child, spinner) = command.co_spawn().await?;
         child.co_wait_nz().await?;

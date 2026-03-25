@@ -70,7 +70,10 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     cu::fs::make_dir(&target_mod_src)?;
     cu::fs::make_dir(&target_mod_include)?;
     cu::fs::make_dir(&target_mod_o)?;
-    make_npdm_json(&target_mod, &config.module.title_id_hex()).await?;
+
+    if !args.configure {
+        make_npdm_json(&target_mod, &config.module.title_id_hex()).await?;
+    }
 
     cu::debug!("Cmd_build: using profile {profile}");
 
@@ -84,15 +87,16 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
         let rust_ctx =
             rust_ctx.context("Rust is enabled, but cargo context could not be initialized")?;
 
-        need_link |= rust_ctx
-            .build(&build_flags.cargoflags, &build_flags.rustflags)
-            .await?;
-
-        static_libs.push(
-            rust_ctx
-                .get_output()
-                .context("Failed to get cargo output")?,
-        );
+        if !args.configure {
+            need_link |= rust_ctx
+                .build(&build_flags.cargoflags, &build_flags.rustflags)
+                .await?;
+            static_libs.push(
+                rust_ctx
+                    .get_output()
+                    .context("Failed to get cargo output")?,
+            );
+        }
 
         need_link |= rust_ctx
             .gen_cxxbridge(&target_mod_src, &target_mod_include)
@@ -165,11 +169,21 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     // Compile both contexts
     let compile_commands_path = config.module.compdb.normalize()?;
-    let (compiled, mut objects) =
-        compile::compile_all(&contexts, &compile_db_path, &compile_commands_path, args.configure).await?;
+    let (compiled, mut objects) = compile::compile_all(
+        &contexts,
+        &compile_db_path,
+        &compile_commands_path,
+        args.configure,
+    )
+    .await?;
     need_link |= compiled;
 
     ////////// Link & Check //////////
+    if args.configure {
+        cu::info!("Configured build");
+        return Ok(());
+    }
+
     let mut libpaths = vec![];
     for libpath in build_config.libpaths {
         libpaths.push(libpath.normalize_exists()?.into_utf8()?);

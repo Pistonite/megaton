@@ -6,13 +6,9 @@ use std::{
     sync::Arc,
 };
 
-use cu::pre::*;
-
 use super::config::Flags;
-use crate::cmds::cmd_build::compile::{
-    compile_db::try_load_or_new_compile_commands, source::SourceStatus,
-};
-use compile_db::CompileDB;
+use compile_db::{CompileCommands, CompileCommandsEntry, CompileDB};
+use source::SourceStatus;
 
 mod compile_db;
 mod source;
@@ -47,31 +43,21 @@ pub async fn compile_all(
 ) -> cu::Result<(bool, Vec<PathBuf>)> {
     // Get compile_db
     let mut compile_db = CompileDB::try_load_or_new(compile_db_path);
-
-    let mut compile_commands = try_load_or_new_compile_commands(compile_commands_path);
-
     if !compile_db.is_version_correct() {
         cu::info!("Compiler version has changed, recompiling");
         compile_db = CompileDB::new();
     }
+
+    let mut compile_commands = CompileCommands::try_load_or_new(compile_commands_path);
 
     // Even if an object doesn't need compiled, we still need to pass back its path since this is
     // how the linker knows what objects need linked
     let mut objects = vec![];
     let mut handles = vec![];
     let pool = cu::co::pool(0);
-
     let mut total_tasks = 0;
-    let progress = cu::progress("C/C++/S")
-        .total(handles.len())
-        .eta(false)
-        .percentage(false)
-        .spawn();
-    if configure_only {
-        cu::progress!(progress, "configuring compile_commands.json");
-    } else {
-        cu::progress!(progress, "compiling sources");
-    }
+
+    let mut progress_bar = None;
 
     // Configure all sources and start compile tasks
     for ctx in contexts {
@@ -82,12 +68,28 @@ pub async fn compile_all(
                     if !configure_only {
                         cu::debug!("Compile: object up to date {}", &object.display());
                     }
+                    // Record must exist if object is up to date
+                    let old_rec = record.unwrap();
+                    let entry = CompileCommandsEntry::from(old_rec);
+                    compile_commands.update(entry);
                     objects.push(object);
                 }
                 SourceStatus::CompileNeeded(compile_record) => {
                     objects.push(compile_record.o_path.clone());
+                    let entry = CompileCommandsEntry::from(&compile_record);
+                    compile_commands.update(entry);
+
                     if !configure_only {
-                        let parent_progress = progress.clone();
+                        if progress_bar.is_none() {
+                            progress_bar = Some(
+                                cu::progress("Compile")
+                                    .total(0)
+                                    .eta(false)
+                                    .percentage(false)
+                                    .spawn(),
+                            );
+                        }
+                        let parent_progress = progress_bar.clone().unwrap().clone();
                         compile_db.update(compile_record.source_hash, compile_record.clone());
                         let handle = pool
                             .spawn(async move { compile_record.compile(parent_progress).await });
@@ -99,13 +101,15 @@ pub async fn compile_all(
         }
     }
 
-    if configure_only || handles.is_empty() {
-        progress.done();
-        cu::fs::write_json_pretty(compile_commands_path, &compile_commands)?;
+    if handles.is_empty() {
+        compile_commands.save(compile_commands_path)?;
+        cu::debug!("Compile: updated compile_commands.json");
         return Ok((false, objects));
     }
 
-    progress.set_total(total_tasks);
+    let progress_bar = progress_bar.unwrap();
+
+    progress_bar.set_total(total_tasks);
 
     let mut completed_tasks = 0;
     let mut num_errors = 0;
@@ -115,11 +119,11 @@ pub async fn compile_all(
             num_errors += 1;
         }
         completed_tasks += 1;
-        cu::progress!(progress = completed_tasks);
+        cu::progress!(progress_bar = completed_tasks);
     }
 
-    progress.done();
-    cu::fs::write_json_pretty(compile_commands_path, &compile_commands)?;
+    progress_bar.done();
+    compile_commands.save(compile_commands_path)?;
     compile_db.save(compile_db_path)?;
 
     if num_errors > 0 {

@@ -45,7 +45,7 @@ pub async fn check_all(
         cu::debug!("Check: no disallowed instructions")
     }
 
-    cu::info!("Passed all checks");
+    cu::hint!("Check: looks good to me");
     Ok(())
 }
 
