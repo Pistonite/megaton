@@ -177,8 +177,8 @@ impl From<&CompileRecord> for CompileCommandsEntry {
             .args
             .into_iter()
             .filter_map(|arg| {
-                if arg.starts_with("-I") {
-                    let path = &String::from(&arg[2..]);
+                if let Some(path) = arg.strip_prefix("-I") {
+                    let path = &String::from(path);
                     if env.contains(path) {
                         let thing = format!("-isystem{}", path);
                         Some(thing)
