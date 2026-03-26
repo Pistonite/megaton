@@ -90,14 +90,14 @@ impl LinkCmd {
 
 pub async fn build_nso(elf_path: &Path, nso_path: &Path) -> cu::Result<()> {
     let elf2nso = environment().elf2nso();
-    let command = elf2nso
+    let res = elf2nso
         .command()
         .args([elf_path, nso_path])
         .stdin_null()
         .stdout(cu::lv::D)
-        .stderr(cu::lv::E);
-    let child = command.co_spawn().await?;
-    let res = child.co_wait_nz().await;
+        .stderr(cu::lv::E)
+        .co_wait_nz()
+        .await;
     cu::debug!("Link: converted to nso {}", nso_path.display());
     cu::info!("Created NSO: {}", nso_path.try_to_rel().display());
     res

@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Megaton contributors
 
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -11,7 +11,7 @@ use cu::pre::*;
 
 use crate::env::environment;
 
-type Records = HashMap<usize, CompileRecord>;
+type Records = BTreeMap<usize, CompileRecord>;
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct CompileDB {
@@ -24,7 +24,6 @@ pub struct CompileDB {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CompileRecord {
     pub source_path: PathBuf,
-    pub source_hash: usize,
     pub compiler: PathBuf,
     pub args: Vec<String>,
     pub o_path: PathBuf, // -o argument already in args
@@ -101,8 +100,6 @@ impl CompileRecord {
             .stderr(cu::lv::E)
             .stdin_null()
             .args(&self.args)
-            .co_spawn()
-            .await?
             .co_wait_nz()
             .await?;
 

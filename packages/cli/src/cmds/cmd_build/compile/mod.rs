@@ -63,6 +63,7 @@ pub async fn compile_all(
     for ctx in contexts {
         for src in source::scan(&ctx.source_paths) {
             let record = compile_db.find_record(src.pathhash);
+            let source_hash = src.pathhash;
             match src.configure_compilation(&ctx.flags, &ctx.output_path, record)? {
                 SourceStatus::UpToDate(object) => {
                     if !configure_only {
@@ -90,7 +91,7 @@ pub async fn compile_all(
                             );
                         }
                         let parent_progress = progress_bar.clone().unwrap().clone();
-                        compile_db.update(compile_record.source_hash, compile_record.clone());
+                        compile_db.update(source_hash, compile_record.clone());
                         let handle = pool
                             .spawn(async move { compile_record.compile(parent_progress).await });
                         handles.push(handle);

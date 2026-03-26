@@ -88,7 +88,6 @@ impl SourceFile {
         } else {
             Ok(SourceStatus::CompileNeeded(CompileRecord {
                 source_path: self.path,
-                source_hash: self.pathhash,
                 compiler: compiler.to_owned(),
                 args,
                 o_path,

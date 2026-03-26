@@ -89,13 +89,18 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
 
         if !args.configure {
             need_link |= rust_ctx
-                .build(&build_flags.cargoflags, &build_flags.rustflags)
+                .build(&build_flags.cargoflags, &build_flags.rustflags, false)
                 .await?;
             static_libs.push(
                 rust_ctx
                     .get_output()
                     .context("Failed to get cargo output")?,
             );
+        } else if rust_ctx.has_build_script() {
+            // run cargo check which calls build script before configuring
+            rust_ctx
+                .build(&build_flags.cargoflags, &build_flags.rustflags, true)
+                .await?;
         }
 
         need_link |= rust_ctx
@@ -269,8 +274,6 @@ async fn make_npdm_json(output_dir: &Path, title_id_hex: &str) -> cu::Result<()>
         .command()
         .add(cu::args![&main_npdm_json, &main_npdm])
         .all_null()
-        .co_spawn()
-        .await?
         .co_wait_nz()
         .await?;
 
