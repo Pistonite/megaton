@@ -66,11 +66,14 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     let target_mod_src = target_mod.join("src");
     let target_mod_include = target_mod.join("include");
     let target_mod_o = target_mod.join("o");
-    let compiledb_path = target_mod.join("compiledb.cache");
+    let compile_db_path = target_mod.join("compiledb.cache");
     cu::fs::make_dir(&target_mod_src)?;
     cu::fs::make_dir(&target_mod_include)?;
     cu::fs::make_dir(&target_mod_o)?;
-    make_npdm_json(&target_mod, &config.module.title_id_hex()).await?;
+
+    if !args.configure {
+        make_npdm_json(&target_mod, &config.module.title_id_hex()).await?;
+    }
 
     cu::debug!("Cmd_build: using profile {profile}");
 
@@ -84,15 +87,21 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
         let rust_ctx =
             rust_ctx.context("Rust is enabled, but cargo context could not be initialized")?;
 
-        need_link |= rust_ctx
-            .build(&build_flags.cargoflags, &build_flags.rustflags)
-            .await?;
-
-        static_libs.push(
+        if !args.configure {
+            need_link |= rust_ctx
+                .build(&build_flags.cargoflags, &build_flags.rustflags, false)
+                .await?;
+            static_libs.push(
+                rust_ctx
+                    .get_output()
+                    .context("Failed to get cargo output")?,
+            );
+        } else if rust_ctx.has_build_script() {
+            // run cargo check which calls build script before configuring
             rust_ctx
-                .get_output()
-                .context("Failed to get cargo output")?,
-        );
+                .build(&build_flags.cargoflags, &build_flags.rustflags, true)
+                .await?;
+        }
 
         need_link |= rust_ctx
             .gen_cxxbridge(&target_mod_src, &target_mod_include)
@@ -164,10 +173,22 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     contexts.push(mod_ctx);
 
     // Compile both contexts
-    let (compiled, mut objects) = compile::compile_all(&contexts, &compiledb_path).await?;
+    let compile_commands_path = config.module.compdb.normalize()?;
+    let (compiled, mut objects) = compile::compile_all(
+        &contexts,
+        &compile_db_path,
+        &compile_commands_path,
+        args.configure,
+    )
+    .await?;
     need_link |= compiled;
 
     ////////// Link & Check //////////
+    if args.configure {
+        cu::info!("Configured build");
+        return Ok(());
+    }
+
     let mut libpaths = vec![];
     for libpath in build_config.libpaths {
         libpaths.push(libpath.normalize_exists()?.into_utf8()?);
@@ -253,8 +274,6 @@ async fn make_npdm_json(output_dir: &Path, title_id_hex: &str) -> cu::Result<()>
         .command()
         .add(cu::args![&main_npdm_json, &main_npdm])
         .all_null()
-        .co_spawn()
-        .await?
         .co_wait_nz()
         .await?;
 

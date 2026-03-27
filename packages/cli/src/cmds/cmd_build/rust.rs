@@ -69,8 +69,18 @@ impl RustCtx {
         })
     }
 
+    pub fn has_build_script(&self) -> bool {
+        let script = self.manifest.parent().unwrap().join("build.rs");
+        script.exists()
+    }
+
     /// Build the rust crate with `cargo build +megaton`
-    pub async fn build(&self, cargoflags: &[String], rustflags: &str) -> cu::Result<bool> {
+    pub async fn build(
+        &self,
+        cargoflags: &[String],
+        rustflags: &str,
+        check: bool,
+    ) -> cu::Result<bool> {
         let old_output = self.get_output();
         let old_mtime = match old_output {
             Ok(file) => cu::fs::get_mtime(file).unwrap_or(None),
@@ -79,15 +89,20 @@ impl RustCtx {
 
         let cargo = cu::which("cargo")
             .context("Cargo executable not found: ensure rust is properly installed")?;
+        let command = if check { "check" } else { "build" };
         let mut command = cargo
             .command()
             .add(cu::args![
                 "+megaton",
-                "build",
+                command,
                 "--manifest-path",
                 &self.manifest,
             ])
-            .preset(cu::pio::cargo("Building crate"));
+            .preset(cu::pio::cargo(if check {
+                "Check rust crate"
+            } else {
+                "Build rust crate"
+            }));
 
         command = command.args(cargoflags);
         command = command.env("RUSTFLAGS", rustflags);
@@ -96,6 +111,9 @@ impl RustCtx {
         command = command.env("AR", environment().ar());
 
         command.co_spawn().await?.0.co_wait_nz().await?;
+        if check {
+            return Ok(false);
+        }
 
         let new_output = self.get_output().unwrap();
         let new_mtime = cu::fs::get_mtime(new_output).unwrap();
