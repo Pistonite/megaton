@@ -43,7 +43,7 @@ Megaton allows multiple different config profiles to coexist. This allows the us
 
 ### Key: `profile.allow-base` (boolean)
 Determines if the 'base' profile is allowed to be built.
-If this is set to false, the -p flag is omitted, and `profile-default = "base"`, the build will fail
+If this is set to false, the -p flag is omitted, and `profile-default = "none"`, the build will fail
 
 Default: true
 
@@ -51,12 +51,12 @@ Default: true
 The profile that will be built if the -p <PROFILE> flag is omitted from the CLI.
 Restrictions: If set to "", the profile must be set via CLI flag on every call.
 
-Default: "base"
+Default: "none"
 
 ### Key: `megaton.version` (string)
-Version of Megaton the project is supposed to use. Megaton will abort if it's major and minor version do not match this value.
+Version of Megaton the project is supposed to use. Megaton will abort if it's major and minor version do not match this value. The major version should always be 0.
 
-Restrictions: Must be in the form "{major}.{minor}".
+Restrictions: Must be in the form "0.{minor}.{patch}".
 
 ### Key: `megaton.custom-entry` (string)
 The entry point passed to the linker. If specified, the Megaton library will be disabled, including Rust support. This allows the user to use the Megaton build tool with another runtime library. If set to the empty string, Megaton will use the Megaton library as the entry point.
