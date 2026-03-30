@@ -2,9 +2,6 @@
 #include <string.h>
 
 
-using usize = std::uint32_t;
-using u64 = std::uint64_t;
-using FileDescriptor = std::uint32_t;
 
 namespace megaton {
 
@@ -61,36 +58,26 @@ enum FDType {
     UNUSEDFDT,
 };
 
-union FDU {
-    u64 FILEFDU;
-    u64 TCPFDU;
-    u64 DIRFDU;
-    bool STDINFDU;
-    bool STDOUTFDU;
-    bool STDERRFDU;
-    bool UNUSEDFDU;
-};
-
 struct FD {
     private:
         FDType type;
-        FDU val;
+        u64 val;
         
     public:
-        FD(FDType t, FDU v): type(t), val(v) { }
-        FD(): type(FDType::UNUSEDFDT), val(FDU{ .UNUSEDFDU = true }) {  };
+        FD(FDType t, u64 v): type(t), val(v) { }
+        FD(): type(FDType::UNUSEDFDT), val(0) { };
 
         FDType getType() {
             return type;
         }
 
-        FDU getInner() {
+        u64 getInner() {
             return val;
         }
 };
 
 static FD create_fd_file(u64 inner) {
-    return FD { FDType::FILEFDT, FDU{ .FILEFDU = inner } };
+    return FD { FDType::FILEFDT, inner };
 }
 
 // static FD create_fd_tcp(u64 inner) {
@@ -102,15 +89,15 @@ static FD create_fd_file(u64 inner) {
 // }
 
 static FD create_fd_stdin() {
-    return FD { FDType::STDINFDT, FDU{ .STDINFDU = true } };
+    return FD { FDType::STDINFDT, 69 };
 }
 
 static FD create_fd_stdout() {
-    return FD { FDType::STDOUTFDT, FDU{ .STDOUTFDU = true } };
+    return FD { FDType::STDOUTFDT, 70 };
 }
 
 static FD create_fd_stderr() {
-    return FD { FDType::STDERRFDT, FDU{ .STDERRFDU = true } };
+    return FD { FDType::STDERRFDT, 71 };
 }
 
 // static FD create_fd_unused(){
@@ -126,6 +113,7 @@ void init_stdio() {
     FD fd_stdin = create_fd_stdin();
     FD fd_stdout = create_fd_stdout();
     FD fd_stderr = create_fd_stderr();
+
     FDList[0] = fd_stdin;
     FDList[1] = fd_stdout;
     FDList[2] = fd_stderr;
@@ -154,7 +142,12 @@ extern "C" FileDescriptor sys_open(const char* name, int32_t flags, uint32_t mod
     nn::fs::FileHandle inner;
     botw::tcp::sendf("Library: sys_open called by %s! name=%s flags=%d mode=%u", __builtin_FUNCTION(), name, flags, mode);
     
-    nn::Result result = nn::fs::OpenFile(&inner, name, nn::fs::OpenMode_ReadWrite | nn::fs::OpenMode_Append); // todo: What to do if failure occurs?
+    nn::Result result;
+    if(mode & 0100) {
+        result = nn::fs::CreateFile(name, 0);
+    }
+
+    result = nn::fs::OpenFile(&inner, name, nn::fs::OpenMode_ReadWrite | nn::fs::OpenMode_Append); // todo: What to do if failure occurs?
     if(result.IsFailure()) {
         botw::tcp::sendf("Library: nn::fs::OpenFile failed! Exit code=%d", result.GetInnerValueForDebug());
     }
@@ -162,7 +155,6 @@ extern "C" FileDescriptor sys_open(const char* name, int32_t flags, uint32_t mod
     FileDescriptor outerFD = insertIntoFDList(fd);
     return outerFD;
 }
-
 
 
 extern "C" void sys_write(FileDescriptor fd, const char* buf, usize len) {
@@ -176,10 +168,31 @@ extern "C" void sys_write(FileDescriptor fd, const char* buf, usize len) {
     // }
 }
 
-extern "C" int32_t sys_close(FileDescriptor fd) {
-    botw::tcp::sendf("Library: sys_close called by %s! fd=%d", __builtin_FUNCTION(), fd);
+extern "C" isize sys_writev(FileDescriptor fd, const iovec* iov, usize iovcnt) {
+    botw::tcp::sendf("Library: sys_writev called by %s! fd=%d", __builtin_FUNCTION(), fd);
     return 0;
 }
+
+extern "C" int32_t sys_close(FileDescriptor fd) {
+    botw::tcp::sendf("Library: sys_close called by %s! fd=%d", __builtin_FUNCTION(), fd);
+
+    FD outerFD = FDList[fd];
+    switch(outerFD.getType()) {
+        case FDType::FILEFDT: {
+            nn::fs::FileHandle fh = nn::fs::FileHandle { };
+            fh._internal = outerFD.getInner();
+            nn::fs::CloseFile(fh);
+            return 0;
+        }
+    }
+}
+
+
+extern "C" isize sys_read(FileDescriptor fd, u8* buf, usize len) {
+    
+}
+
+
 
 namespace impl {
     #include <string.h>
