@@ -1,20 +1,6 @@
 #include <megaton/fs.h>
 #include <string.h>
 
-#ifdef BOTWTOOLKIT_TCP_SEND
-    namespace botw {
-        namespace tcp {
-            void sendf(const char* args...);
-        }
-        
-    }
-#else
-    namespace botw{
-        namespace tcp {
-            void sendf(const char* args...) {}
-        }
-    }
-#endif
 
 using usize = std::uint32_t;
 using u64 = std::uint64_t;
@@ -65,99 +51,97 @@ namespace megaton {
 }
 
 
-// enum FDType {
-//     FILE,
-//     TCP,
-//     DIR,
-//     STDIN,
-//     STDOUT,
-//     STDERR,
-//     UNUSED,
-// };
+enum FDType {
+    FILEFDT,
+    TCPFDT,
+    DIRFDT,
+    STDINFDT,
+    STDOUTFDT,
+    STDERRFDT,
+    UNUSEDFDT,
+};
 
-// union FDU {
-//     u64 FILE;
-//     u64 TCP;
-//     u64 DIR;
-//     bool STDIN;
-//     bool STDOUT;
-//     bool STDERR;
-//     bool UNUSED;
-// };
+union FDU {
+    u64 FILEFDU;
+    u64 TCPFDU;
+    u64 DIRFDU;
+    bool STDINFDU;
+    bool STDOUTFDU;
+    bool STDERRFDU;
+    bool UNUSEDFDU;
+};
 
-// struct FD {
-//     private:
-//         FDType type;
-//         FDU val;
-//         FD(FDType t, FDU v): type(t), val(v) { }
-
-//     public:
-//         FD(): type(FDType::UNUSED), val(FDU{ .UNUSED = true }) {  };
-
-//         FDType getType() {
-//             return type;
-//         }
-
-//         FDU getInner() {
-//             return val;
-//         }
-
-//         static FD file(u64 inner) {
-//             return FD { FDType::FILE, FDU{ .FILE = inner } };
-//         }
-
-//         static FD tcp(u64 inner) {
-//             return FD { FDType::TCP, FDU{ .TCP = inner } };
-//         }
-
-//         static FD dir(u64 inner) {
-//             return FD { FDType::DIR, FDU{ .DIR = inner } };
-//         }
-
-//         static FD stdin() {
-//             return FD { FDType::STDIN, FDU{ .STDIN = true } };
-//         }
-
-//         static FD stdout() {
-//             return FD { FDType::STDOUT, FDU{ .STDOUT = true } };
-//         }
-
-//         static FD stderr() {
-//             return FD { FDType::STDERR, FDU{ .STDERR = true } };
-//         }
+struct FD {
+    private:
+        FDType type;
+        FDU val;
         
-//         static FD unused(){
-//             return FD { FDType::UNUSED, FDU{ .UNUSED = true } };
-//         }
-// };
+    public:
+        FD(FDType t, FDU v): type(t), val(v) { }
+        FD(): type(FDType::UNUSEDFDT), val(FDU{ .UNUSEDFDU = true }) {  };
 
+        FDType getType() {
+            return type;
+        }
 
-// void init_stdio() {
-//     FD stdin = FD::stdin();
-//     FD stdout = FD::stdout();
-//     FD stderr = FD::stderr();
-//     FDList[0] = stdin;
-//     FDList[1] = stdout;
-//     FDList[2] = stderr;
-    
+        FDU getInner() {
+            return val;
+        }
+};
+
+static FD create_fd_file(u64 inner) {
+    return FD { FDType::FILEFDT, FDU{ .FILEFDU = inner } };
+}
+
+// static FD create_fd_tcp(u64 inner) {
+//     return FD { FDType::TCPFDT, FDU{ .TCPFDU = inner } };
 // }
 
-// const int NUM_FDS = 1000;
-// static FD FDList[NUM_FDS] = { FD() };
+// static FD create_fd_dir(u64 inner) {
+//     return FD { FDType::DIRFDT, FDU{ .DIRFDU = inner } };
+// }
+
+static FD create_fd_stdin() {
+    return FD { FDType::STDINFDT, FDU{ .STDINFDU = true } };
+}
+
+static FD create_fd_stdout() {
+    return FD { FDType::STDOUTFDT, FDU{ .STDOUTFDU = true } };
+}
+
+static FD create_fd_stderr() {
+    return FD { FDType::STDERRFDT, FDU{ .STDERRFDU = true } };
+}
+
+// static FD create_fd_unused(){
+//     return FD { FDType::UNUSEDFDT, FDU{ .UNUSEDFDU = true } };
+// }
+
+
+const int NUM_FDS = 1000;
+static FD FDList[NUM_FDS] = { FD() };
 // static char log_buffer[1000] = {};
 
+void init_stdio() {
+    FD fd_stdin = create_fd_stdin();
+    FD fd_stdout = create_fd_stdout();
+    FD fd_stderr = create_fd_stderr();
+    FDList[0] = fd_stdin;
+    FDList[1] = fd_stdout;
+    FDList[2] = fd_stderr;
+}
 
 
-// FileDescriptor insertIntoFDList(FD fd) {
-//     for(FileDescriptor i = 3; i < NUM_FDS; i++) {
-//         if(FDList[i].getType() == FDType::UNUSED) {
-//             FDList[i] = fd;
-//             return i;
-//         }
-//     }
-//     throw std::logic_error("Unable to allocate FD - FDList is full!");
-//     return 0;
-// }
+FileDescriptor insertIntoFDList(FD fd) {
+    for(FileDescriptor i = 3; i < NUM_FDS; i++) {
+        if(FDList[i].getType() == FDType::UNUSEDFDT) {
+            FDList[i] = fd;
+            return i;
+        }
+    }
+    botw::tcp::sendf("Unable to allocate FD - FDList is full!");
+    return 0;
+}
 
 
 uint32_t hermit_to_nn_flags(uint32_t hermit_open_option_flags) {
@@ -167,21 +151,23 @@ uint32_t hermit_to_nn_flags(uint32_t hermit_open_option_flags) {
 }
 
 extern "C" FileDescriptor sys_open(const char* name, int32_t flags, uint32_t mode) {
-    // nn::fs::FileHandle inner;
-    botw::tcp::sendf("Library: sys_open called! name=%s flags=%d mode=%u", name, flags, mode);
+    nn::fs::FileHandle inner;
+    botw::tcp::sendf("Library: sys_open called by %s! name=%s flags=%d mode=%u", __builtin_FUNCTION(), name, flags, mode);
     
-    // nn::Result result = nn::fs::OpenFile(&inner, name, nn::fs::OpenMode_ReadWrite | nn::fs::OpenMode_Append); // todo: What to do if failure occurs?
-    // if(result.IsFailure()) {
-    //     botw::tcp::sendf("Library: nn::fs::OpenFile failed! Exit code=%d", result.GetInnerValueForDebug());
-    // }
-    // FD fd = FD::file(inner);
-    // FileDescriptor outerFD = insertIntoFDList(fd);
-    return 4;
+    nn::Result result = nn::fs::OpenFile(&inner, name, nn::fs::OpenMode_ReadWrite | nn::fs::OpenMode_Append); // todo: What to do if failure occurs?
+    if(result.IsFailure()) {
+        botw::tcp::sendf("Library: nn::fs::OpenFile failed! Exit code=%d", result.GetInnerValueForDebug());
+    }
+    FD fd = create_fd_file(inner._internal);
+    FileDescriptor outerFD = insertIntoFDList(fd);
+    return outerFD;
 }
+
+
 
 extern "C" void sys_write(FileDescriptor fd, const char* buf, usize len) {
     // u64 innerFd = FDList[fd].getInner().FILE;
-    botw::tcp::sendf("Library: sys_write called! fd=%d buf=%s len=%u", fd, buf, len);
+    botw::tcp::sendf("Library: sys_write called by %s! fd=%d buf=%s len=%u", __builtin_FUNCTION(), fd, buf, len);
     // struct nn::fs::FileHandle inner = { innerFd };
     
     // nn::Result result = nn::fs::WriteFile(inner, 0, msg, strlen(msg), nn::fs::WriteOption::CreateOption(nn::fs::WriteOptionFlag_Flush));
@@ -190,9 +176,10 @@ extern "C" void sys_write(FileDescriptor fd, const char* buf, usize len) {
     // }
 }
 
-
-
-
+extern "C" int32_t sys_close(FileDescriptor fd) {
+    botw::tcp::sendf("Library: sys_close called by %s! fd=%d", __builtin_FUNCTION(), fd);
+    return 0;
+}
 
 namespace impl {
     #include <string.h>
