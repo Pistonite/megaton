@@ -20,7 +20,7 @@ mod rust;
 #[derive(Debug, Clone, AsRef, clap::Parser)]
 pub struct CmdBuild {
     /// Select profile to build
-    #[clap(short, long, default_value = "base")]
+    #[clap(short, long, default_value = "none")]
     pub profile: String,
 
     /// Emit configuration files only (such as compile_commands.json),
