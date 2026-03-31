@@ -281,7 +281,6 @@ fn unpack_lib(lib_path: &Path) -> cu::Result<()> {
     Ok(())
 }
 
-
 async fn make_npdm_json(output_dir: &Path, title_id_hex: &str) -> cu::Result<()> {
     let mut npdm_data: json::Value = json::parse(include_str!("../../../template.npdm.json"))?;
     npdm_data["title_id"] = json!(format!("0x{}", title_id_hex));

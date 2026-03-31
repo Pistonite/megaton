@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025-2026 Megaton contributors
-use std::{fs::File, path::Path};
 use std::io::Write;
 use std::path::PathBuf;
+use std::{fs::File, path::Path};
 
 use cu::pre::*;
 use flate2::{Compression, write::GzEncoder};
@@ -73,7 +73,8 @@ fn make_lib_targz() -> cu::Result<PathBuf> {
 fn gen_lib_hash(lib: &Path) -> cu::Result<()> {
     let lib_bytes = cu::fs::read(lib)?;
     let hash = Sha256::digest(lib_bytes);
-    let hashfile_path = PathBuf::from(cu::env_var("CARGO_MANIFEST_DIR")?).join("libmegaton_sha256sum");
+    let hashfile_path =
+        PathBuf::from(cu::env_var("CARGO_MANIFEST_DIR")?).join("libmegaton_sha256sum");
     cu::fs::write(hashfile_path, hash)?;
     Ok(())
 }
