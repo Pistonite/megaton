@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use cu::{fs::remove_contents, pre::*};
+use cu::pre::*;
 use derive_more::AsRef;
 use flate2::bufread::GzDecoder;
 
@@ -252,19 +252,19 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
 }
 
 static LIBRARY_TARGZ: &[u8] = include_bytes!("../../../libmegaton.tar.gz");
+static LIBRARY_HASH: &[u8] = include_bytes!("../../../libmegaton_sha256sum");
 
 /// True if version hash doesn't exist or doesn't match the stored tarball
 fn lib_needs_unpacked(lib_path: &Path) -> bool {
-    let lib_hash_file = lib_path.join("libhash");
+    let lib_hash_file = lib_path.join("libmegaton_sha256sum");
     if !&lib_hash_file.exists() {
         return true;
     }
-    let lib_hash = fxhash::hash(LIBRARY_TARGZ).to_string();
-    let Ok(existing_lib_hash) = cu::fs::read_string(lib_hash_file) else {
+    let Ok(existing_lib_hash) = cu::fs::read(lib_hash_file) else {
         return true;
     };
 
-    lib_hash != existing_lib_hash
+    LIBRARY_HASH != existing_lib_hash
 }
 
 /// Deletes contents of dir and unpacks the library from the stored tarball
@@ -272,16 +272,15 @@ fn unpack_lib(lib_path: &Path) -> cu::Result<()> {
     let library_tar = GzDecoder::new(LIBRARY_TARGZ);
     let mut library_archive = tar::Archive::new(library_tar);
     if lib_path.exists() {
-        remove_contents(lib_path)?;
+        cu::fs::remove_contents(lib_path)?;
     }
     library_archive.unpack(lib_path)?;
-
-    let lib_hash_file = lib_path.join("libhash");
-    let lib_hash = fxhash::hash(LIBRARY_TARGZ).to_string();
-    cu::fs::write(lib_hash_file, lib_hash)?;
+    let lib_hash_file = lib_path.join("libmegaton_sha256sum");
+    cu::fs::write(lib_hash_file, LIBRARY_HASH)?;
 
     Ok(())
 }
+
 
 async fn make_npdm_json(output_dir: &Path, title_id_hex: &str) -> cu::Result<()> {
     let mut npdm_data: json::Value = json::parse(include_str!("../../../template.npdm.json"))?;
