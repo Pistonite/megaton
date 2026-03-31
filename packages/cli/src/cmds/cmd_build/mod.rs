@@ -119,9 +119,8 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
         cu::debug!("Cmd_build: libmegaton enabled");
         let target_lib = profile_target.join("lib");
 
-        if args.unpack_lib {
-            // TODO: Unpack automatically if libary files dont exist or are out of date
-            cu::info!("Installing libmegaton version {}", "X.X.X");
+        if args.unpack_lib || lib_needs_unpacked(&target_lib) {
+            cu::hint!("Installing libmegaton");
             unpack_lib(&target_lib).context("Failed to unpack library archive")?;
         }
 
@@ -253,10 +252,32 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
 }
 
 static LIBRARY_TARGZ: &[u8] = include_bytes!("../../../libmegaton.tar.gz");
-fn unpack_lib(lib_root_path: &Path) -> cu::Result<()> {
+static LIBRARY_HASH: &[u8] = include_bytes!("../../../libmegaton_sha256sum");
+
+/// True if version hash doesn't exist or doesn't match the stored tarball
+fn lib_needs_unpacked(lib_path: &Path) -> bool {
+    let lib_hash_file = lib_path.join("libmegaton_sha256sum");
+    if !&lib_hash_file.exists() {
+        return true;
+    }
+    let Ok(existing_lib_hash) = cu::fs::read(lib_hash_file) else {
+        return true;
+    };
+
+    LIBRARY_HASH != existing_lib_hash
+}
+
+/// Deletes contents of dir and unpacks the library from the stored tarball
+fn unpack_lib(lib_path: &Path) -> cu::Result<()> {
     let library_tar = GzDecoder::new(LIBRARY_TARGZ);
     let mut library_archive = tar::Archive::new(library_tar);
-    library_archive.unpack(lib_root_path)?;
+    if lib_path.exists() {
+        cu::fs::remove_contents(lib_path)?;
+    }
+    library_archive.unpack(lib_path)?;
+    let lib_hash_file = lib_path.join("libmegaton_sha256sum");
+    cu::fs::write(lib_hash_file, LIBRARY_HASH)?;
+
     Ok(())
 }
 
