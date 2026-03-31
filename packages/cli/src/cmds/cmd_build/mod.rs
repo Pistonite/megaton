@@ -32,11 +32,6 @@ pub struct CmdBuild {
     #[clap(short = 'c', long, default_value = "Megaton.toml")]
     pub config: String,
 
-    /// Unpack the library archive before building, even if it already
-    /// exists and is up to date
-    #[clap(short = 'l', long)]
-    pub unpack_lib: bool,
-
     #[clap(flatten)]
     #[as_ref]
     common: cu::cli::Flags,
@@ -119,7 +114,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
         cu::debug!("Cmd_build: libmegaton enabled");
         let target_lib = profile_target.join("lib");
 
-        if args.unpack_lib || lib_needs_unpacked(&target_lib) {
+        if lib_needs_unpacked(&target_lib) {
             cu::hint!("Installing libmegaton");
             unpack_lib(&target_lib).context("Failed to unpack library archive")?;
         }
