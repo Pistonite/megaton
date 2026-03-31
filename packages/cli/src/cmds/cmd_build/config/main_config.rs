@@ -4,8 +4,10 @@
 //! Config structures
 use std::path::{Path, PathBuf};
 
-use super::{BASE_PROFILE, Build, CaptureUnused, ExtendProfile, Profile, Validate, ValidateCtx};
 use cu::pre::*;
+
+use super::{BASE_PROFILE, Build, CaptureUnused, ExtendProfile, Profile, Validate, ValidateCtx};
+use crate::MEGATON_VERSION;
 
 /// Load a Megaton.toml config file
 pub fn load_config(manifest_path: impl AsRef<Path>) -> cu::Result<Config> {
@@ -147,7 +149,7 @@ pub struct MegatonConfig {
     /// If specified, megaton will run version check
     ///
     /// `N` means the build tool must be version `0.N.x` (x can be anything)
-    pub version: Option<u32>,
+    pub version: Option<String>,
 
     /// Custom entry point symbol for the module. This should only be set if libmegaton is disabled.
     /// Using this disables the libmegaton runtime, which also means rust support will be disabled.
@@ -159,9 +161,37 @@ pub struct MegatonConfig {
 
 impl Validate for MegatonConfig {
     fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
-        cu::hint!("TODO: implement version check");
+        if let Some(v) = &self.version {
+            check_version(v, MEGATON_VERSION)?
+        }
         self.unused.validate(ctx)
     }
+}
+
+fn check_version(checked_version: &str, real_version: &str) -> cu::Result<()> {
+    let mut version = checked_version.splitn(3, '.');
+    let ver_major = cu::check!(version.next(), "invalid format: {}", checked_version)?;
+    let ver_minor = cu::check!(version.next(), "invalid format: {}", checked_version)?;
+    let ver_patch = cu::check!(version.next(), "invalid format: {}", checked_version)?;
+    let mut real = real_version.splitn(3, '.');
+    let real_major = real.next().unwrap();
+    let real_minor = real.next().unwrap();
+    let real_patch = real.next().unwrap();
+    if ver_major != real_major || ver_minor != real_minor {
+        cu::bail!(
+            "megaton.version: major and minor version must match {}.{}.X",
+            real_major,
+            real_minor
+        );
+    }
+    if ver_patch != real_patch {
+        cu::hint!(
+            "Megaton patch number has changed - config: {}, megaton: {}",
+            checked_version,
+            real_version
+        );
+    }
+    Ok(())
 }
 
 impl MegatonConfig {
@@ -251,7 +281,7 @@ pub struct ProfileConfig {
     /// If `Some("")`, a profile must be specified in command line or megaton will error
     pub default: Option<String>,
 
-    /// Allow the base (`base`) profile to be used
+    /// Allow the base (`none`) profile to be used
     #[serde(default = "default_true")]
     pub allow_base: bool,
 
@@ -284,17 +314,17 @@ impl ProfileConfig {
         'b: 'a, // lifetime: cli should live longer since that's parsed before config
     {
         let profile = match (cli_profile, &self.default) {
-            ("base", Some(p)) if p.is_empty() => {
+            ("none", Some(p)) if p.is_empty() => {
                 cu::error!("no profile specified!");
                 cu::hint!("- please specify a profile with -p PROFILE");
                 cu::bail!("failed to selected a profile");
             }
-            ("base", Some(p)) => p,
-            ("base", None) => BASE_PROFILE,
+            ("none", Some(p)) => p,
+            ("none", None) => BASE_PROFILE,
             (profile, _) => profile,
         };
 
-        if !self.allow_base && profile == "base" {
+        if !self.allow_base && profile == "none" {
             cu::error!("base profile is not allowed!");
             cu::hint!("- please specify a profile with -p PROFILE");
             cu::bail!("failed to selected a profile");
