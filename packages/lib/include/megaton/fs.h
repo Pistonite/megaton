@@ -4,12 +4,6 @@
 #include <megaton/__priv/nn/fs.h>
 
 
-
-using isize = std::int32_t;
-using usize = std::uint32_t;
-using u64 = std::uint64_t;
-using FileDescriptor = std::uint32_t;
-
 #define FOO2 // todo: replace with BOTWTOOLKIT_TCP_SEND (double check this)
 #ifdef FOO2
     namespace botw::tcp {
@@ -21,6 +15,13 @@ using FileDescriptor = std::uint32_t;
     }
 #endif
 
+
+
+using isize = std::int32_t;
+using usize = std::uint32_t;
+using u64 = std::uint64_t;
+using FileDescriptor = std::uint32_t;
+
 namespace megaton {
     using usize = std::uint32_t;
     using u64 = std::uint64_t;
@@ -28,9 +29,39 @@ namespace megaton {
     nn::fs::FileHandle open_file(const char* path);
     bool write_file(nn::fs::FileHandle fd, const char* content);
     void close_file(nn::fs::FileHandle fd);
+    void debugShowFDList();
 }
 
 struct iovec {
     char   *iov_base;  /* Base address. */
     size_t iov_len;    /* Length. */
+};
+
+
+enum FDType {
+    FILEFDT,
+    TCPFDT,
+    DIRFDT,
+    STDINFDT,
+    STDOUTFDT,
+    STDERRFDT,
+    UNUSEDFDT,
+};
+
+struct FD {
+    private:
+        FDType type;
+        u64 val;
+        
+    public:
+        FD(FDType t, u64 v): type(t), val(v) { }
+        FD(): type(FDType::UNUSEDFDT), val(420) { };
+
+        FDType getType() {
+            return type;
+        }
+
+        u64 getInner() {
+            return val;
+        }
 };
