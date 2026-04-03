@@ -189,7 +189,23 @@ extern "C" int32_t sys_close(FileDescriptor fd) {
 
 
 extern "C" isize sys_read(FileDescriptor fd, u8* buf, usize len) {
-    
+    botw::tcp::sendf("Library: sys_read called by %s! fd=%d len=%u", __builtin_FUNCTION(), fd, len);
+
+    FD outerFD = FDList[fd];
+    switch(outerFD.getType()) {
+        case FDType::FILEFDT: {
+            nn::fs::FileHandle fh = nn::fs::FileHandle { };
+            fh._internal = outerFD.getInner();
+            size_t bytes_read = 0;
+            nn::Result result = nn::fs::ReadFile(&bytes_read, fh, 0, buf, len);
+            if(result.IsFailure()) {
+                botw::tcp::sendf("Library: nn::fs::ReadFile failed! Exit code=%d", result.GetInnerValueForDebug());
+                return -1;
+            }
+            botw::tcp::sendf("Library: sys_read success! bytes_read=%d", bytes_read);
+            return (isize)bytes_read;
+        }
+    }
 }
 
 
