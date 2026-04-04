@@ -27,6 +27,7 @@ namespace megaton {
     using u64 = std::uint64_t;
     using FileDescriptor = std::uint32_t;
     nn::fs::FileHandle open_file(const char* path);
+    bool file_exists(const char* path);
     bool write_file(nn::fs::FileHandle fd, const char* content);
     void close_file(nn::fs::FileHandle fd);
     void debugShowFDList();
