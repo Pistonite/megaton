@@ -11,15 +11,8 @@ using u64 = std::uint64_t;
 using FileDescriptor = std::uint32_t;
 
 
-// static FD create_fd_tcp(u64 inner) {
-//     return FD { FDType::TCPFDT, inner };
-// }
-
-
-
 const int NUM_FDS = 1000;
 static FD FDList[NUM_FDS] = { FD() };
-// static char log_buffer[1000] = {};
 
 void init_stdio() {
     FD fd_stdin = create_fd_stdin();
@@ -181,6 +174,8 @@ namespace impl {
 }
 
 
+// Syscall Definitions
+
 extern "C" FileDescriptor sys_open(const char* name, int32_t flags, uint32_t mode) {
     botw::tcp::sendf("Library: sys_open called! name=%s flags=%d mode=%u\n", name, flags, mode);
     // e.g. sys_open called name=sd:/testfile3.txt flags=577 mode=511
@@ -270,7 +265,6 @@ extern "C" int32_t sys_close(FileDescriptor fd) {
     }
 }
 
-
 extern "C" isize sys_read(FileDescriptor fd, u8* buf, usize len) {
     botw::tcp::sendf("Library: sys_read called! fd=%d len=%d\n", fd, len);
     FD outerFD = FDList[fd];
@@ -296,10 +290,6 @@ extern "C" isize sys_read(FileDescriptor fd, u8* buf, usize len) {
 }
 
 namespace megaton {
-    // If debugShowFDList doesn't work, try this first!
-    // void debugShowFDListSafe(){
-    
-    //}
 
     void debugShowFDList() {
         char msg[NUM_FDS*12] = {0};
