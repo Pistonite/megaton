@@ -4,8 +4,8 @@
 #include <megaton/__priv/nn/fs.h>
 
 
-#define FOO2 // todo: replace with BOTWTOOLKIT_TCP_SEND (double check this)
-#ifdef FOO2
+#define BOTWTOOLKIT_TCP_SEND2 // todo: replace with BOTWTOOLKIT_TCP_SEND (double check this)
+#ifdef BOTWTOOLKIT_TCP_SEND2
     namespace botw::tcp {
         void sendf(const char* args, ...);
     }

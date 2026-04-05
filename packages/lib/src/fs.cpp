@@ -11,13 +11,9 @@ static FD create_fd_file(u64 inner) {
     return FD { FDType::FILEFDT, inner };
 }
 
-// static FD create_fd_tcp(u64 inner) {
-//     return FD { FDType::TCPFDT, FDU{ .TCPFDU = inner } };
-// }
-
-// static FD create_fd_dir(u64 inner) {
-//     return FD { FDType::DIRFDT, FDU{ .DIRFDU = inner } };
-// }
+static FD create_fd_dir(u64 inner) {
+    return FD { FDType::DIRFDT, inner };
+}
 
 static FD create_fd_stdin() {
     return FD { FDType::STDINFDT, 69 };
@@ -31,9 +27,10 @@ static FD create_fd_stderr() {
     return FD { FDType::STDERRFDT, 71 };
 }
 
-// static FD create_fd_unused(){
-//     return FD { FDType::UNUSEDFDT, FDU{ .UNUSEDFDU = true } };
+// static FD create_fd_tcp(u64 inner) {
+//     return FD { FDType::TCPFDT, inner };
 // }
+
 
 
 const int NUM_FDS = 1000;
@@ -73,7 +70,6 @@ uint32_t hermit_to_nn_flags(uint32_t hermit_open_option_flags) {
 }
 
 extern "C" FileDescriptor sys_open(const char* name, int32_t flags, uint32_t mode) {
-    nn::fs::FileHandle inner;
     botw::tcp::sendf("Library: sys_open called! name=%s flags=%d mode=%u\n", name, flags, mode);
     // e.g. sys_open called name=sd:/testfile3.txt flags=577 mode=511
     // create=true
@@ -81,26 +77,42 @@ extern "C" FileDescriptor sys_open(const char* name, int32_t flags, uint32_t mod
     // todo:check if file exists before calling create
     // i think nn::fs::CreateFile will error if the file exists
     
-    
-    
     nn::Result result;
-    if(mode & 0100) {
-        if(!megaton::file_exists(name)) {
+    
+    nn::fs::DirectoryEntryType type;
+    result = nn::fs::GetEntryType(&type, name);
+    if(result.IsFailure()) {
+        if(mode & 0100) { 
             result = nn::fs::CreateFile(name, 0);
             if(result.IsFailure()) {
                 botw::tcp::sendf("Library sys_open: nn::fs::CreateFile failed! Exit code=%d\n", result.GetInnerValueForDebug());
             }
+            type = nn::fs::DirectoryEntryType_File;
         }
     }
 
-    result = nn::fs::OpenFile(&inner, name, nn::fs::OpenMode_ReadWrite | nn::fs::OpenMode_Append); // todo: What to do if failure occurs?
-    if(result.IsFailure()) {
-        botw::tcp::sendf("Library sys_open: nn::fs::OpenFile failed! Exit code=%d\n", result.GetInnerValueForDebug());
-        return -1;
+    // could probably be condensed via polymorphism
+    FileDescriptor outerFD = 999;
+    if(type == nn::fs::DirectoryEntryType_File) {
+        nn::fs::FileHandle inner;
+        result = nn::fs::OpenFile(&inner, name, nn::fs::OpenMode_ReadWrite | nn::fs::OpenMode_Append); // todo: What to do if failure occurs?
+        if(result.IsFailure()) {
+            botw::tcp::sendf("Library sys_open: nn::fs::OpenFile failed! Exit code=%d\n", result.GetInnerValueForDebug());
+            return -1;
+        }
+        FD fd = create_fd_file(inner._internal);
+        outerFD = insertIntoFDList(fd);
+        botw::tcp::sendf("\tsys_open: successfully returning file fd=%d\n", outerFD);
     }
-    FD fd = create_fd_file(inner._internal);
-    FileDescriptor outerFD = insertIntoFDList(fd);
-    botw::tcp::sendf("\tsys_open: successfully returning fd=%d\n", outerFD);
+    else { // type == nn::fs::DirectoryEntryType_Directory
+        nn::fs::DirectoryHandle inner;
+        result = nn::fs::OpenDirectory(&inner, name, nn::fs::OpenDirectoryMode_All);
+        FD fd = create_fd_dir(inner._internal);
+        
+        outerFD = insertIntoFDList(fd);
+        botw::tcp::sendf("\tsys_open: successfully returning directory fd=%d\n", outerFD);
+    }
+    
     return outerFD;
 }
 
@@ -109,7 +121,7 @@ extern "C" void sys_write(FileDescriptor fd, const char* buf, usize len) {
     u64 innerFd = FDList[fd].getInner();
     botw::tcp::sendf("Library: sys_write called! fd=%d buf=%s len=%u inner=%ld\n", fd, buf, len, innerFd);
     struct nn::fs::FileHandle inner = { innerFd };
-    nn::fs::WriteOption options = nn::fs::WriteOption::CreateOption(nn::fs::WriteOptionFlag_Flush);
+    nn::fs::WriteOption options = nn::fs::WriteOption::CreateOption(0);
     
     nn::Result result = nn::fs::WriteFile(inner, 0, buf, strlen(buf), options);
     if(result.IsFailure()) {
@@ -130,7 +142,15 @@ extern "C" int32_t sys_close(FileDescriptor fd) {
         case FDType::FILEFDT: {
             nn::fs::FileHandle fh = nn::fs::FileHandle { };
             fh._internal = outerFD.getInner();
+            nn::fs::FlushFile(fh);
             nn::fs::CloseFile(fh);
+            removeFromFDList(fd);
+            return 0;
+        }
+        case FDType::DIRFDT: {
+            nn::fs::DirectoryHandle dh = nn::fs::DirectoryHandle { };
+            dh._internal = outerFD.getInner();
+            nn::fs::CloseDirectory(dh);
             removeFromFDList(fd);
             return 0;
         }
@@ -156,11 +176,9 @@ extern "C" isize sys_read(FileDescriptor fd, u8* buf, usize len) {
             }
             botw::tcp::sendf("Library: sys_read success! bytes_read=%d", bytes_read);
             return (isize)bytes_read;
-                
-            
         }
         default: {
-            botw::tcp::sendf("sys_read called for unsupported FDType: %d! fd=%d", outerFD.getType(), fd);
+            botw::tcp::sendf("Library: sys_read called for unsupported FDType: %d! fd=%d", outerFD.getType(), fd);
             return -1;
         }
     }
@@ -187,63 +205,6 @@ namespace megaton {
             }
         }
         botw::tcp::sendf("%s", msg);
-    }
-
-    
-    nn::fs::FileHandle open_file(const char* path) {
-        nn::fs::FileHandle f;
-        nn::fs::DirectoryEntryType type;
-        nn::Result result = nn::fs::GetEntryType(&type, path);
-
-        if (result.IsFailure()) {
-            botw::tcp::sendf("File %s does not exist: creating!\n", path);
-            result = nn::fs::CreateFile(path, 0);
-            if(result.IsFailure()) {
-                botw::tcp::sendf("ERROR! Failed to create file %s!\n", path);
-            } else {
-                botw::tcp::sendf("Created file %s successfully!", path);
-            }
-        }
-
-        
-        result = nn::fs::OpenFile(&f, path, nn::fs::OpenMode_ReadWrite);
-        if(result.IsFailure()) {
-            botw::tcp::sendf("Failed to open file %s. Returned fd is %d\n", path, f._internal);
-        } else {
-            botw::tcp::sendf("Opened file %s successfully! Returned fd is %d\n", path, f._internal);
-        }
-
-        return f;
-    }
-
-    
-    bool write_file(nn::fs::FileHandle fd, const char* content) {
-        nn::Result result = nn::fs::WriteFile(fd, 0, content, strlen(content), nn::fs::WriteOption::CreateOption(nn::fs::WriteOptionFlag_Flush));
-        if(result.IsFailure()) {
-            botw::tcp::sendf("Failed to write to file %d\n", fd._internal);
-        } else {
-            botw::tcp::sendf("Wrote to file %d successfully!\n", fd._internal);
-        }
-        return result.IsSuccess();
-    }
-
-    void close_file(nn::fs::FileHandle fd) {
-        nn::fs::CloseFile(fd);
-    }
-
-    bool file_exists(const char* path) {
-        
-        nn::fs::DirectoryEntryType type;
-        nn::Result result = nn::fs::GetEntryType(&type, path);
-
-        if (result.IsFailure()) {
-            // botw::tcp::sendf("file_exists nn::fs::GetEntryType failed! path=%s error_code=%d\n", path, result.GetInnerValueForDebug());
-            return false;
-        }
-        bool exists = type != nn::fs::DirectoryEntryType_Directory;
-        botw::tcp::sendf("file %s exists=%d \n", path, exists);
-
-        return exists;
     }
 }
 
@@ -280,55 +241,103 @@ struct FileAttr {
 };
 
 
-// It is used here: https://github.com/hermit-os/rust/blob/042a556d8d0247361ed97e5d9217bb477c487be3/library/std/src/sys/fs/hermit.rs#L585
+// Used here: https://github.com/hermit-os/rust/blob/042a556d8d0247361ed97e5d9217bb477c487be3/library/std/src/sys/fs/hermit.rs#L585
 extern "C" int32_t sys_stat(const char* name, FileAttr* stat) {
     botw::tcp::sendf("sys_stat called! filename: %s\n",name);
-    if(!megaton::file_exists(name)) {
-        return -1;
+
+    nn::fs::DirectoryEntryType type;
+    nn::Result result = nn::fs::GetEntryType(&type, name);
+    if (result.IsFailure()) return -1;
+    
+    if(type == nn::fs::DirectoryEntryType_File) {
+        nn::fs::FileHandle handle;
+        nn::Result result = nn::fs::OpenFile(&handle, name, nn::fs::OpenMode_Read);
+        if(result.IsFailure()) return -1;
+        int32_t stat_result = impl::stat_file(handle, name, stat);
+        nn::fs::CloseFile(handle);
+        return stat_result;
+    } else if(type == nn::fs::DirectoryEntryType_Directory) {
+        nn::fs::DirectoryHandle handle;
+        nn::Result result = nn::fs::OpenDirectory(&handle, name, nn::fs::OpenMode_Read);
+        if(result.IsFailure()) return -1;
+        int32_t stat_result = impl::stat_dir(handle, name, stat);
+        nn::fs::CloseDirectory(handle);
+        return stat_result;
     }
-    nn::fs::FileHandle handle;
-    nn::Result result = nn::fs::OpenFile(&handle, name, nn::fs::OpenMode_Read);
-    if(result.IsFailure()) return -1;
-
-    // TODO: What values should these have?
-    stat->st_gid = 0;
-    stat->st_dev = 0;
-    stat->st_ino = 0;
-    stat->st_nlink = 0;
-
-    u32 S_IRUSR = 0400;
-    u32 S_IWUSR = 0200;
-    stat->st_mode = S_IRUSR | S_IWUSR;
-
-
-    long file_size = 0;
-    result = nn::fs::GetFileSize(&file_size, handle);
-    if(result.IsFailure()) return -1;
-
-    stat->st_size = file_size;
-    int block_size = 1024;
-    stat->st_blksize = block_size;
-    if(file_size % block_size == 0) stat->st_blocks = file_size / block_size;
-    else stat->st_blocks = (file_size / block_size) + 1;
-
-
-    nn::fs::FileTimeStamp mtime;
-    result = nn::fs::GetFileTimeStampForDebug(&mtime, name);
-    if(result.IsFailure()) return -1;
-
-    timespec timestamp;
-    timestamp.tv_sec = mtime.mTime1;
-    timestamp.tv_nsec = 0;
-
-    stat->st_atim = timestamp;
-    stat->st_mtim = timestamp;
-    stat->st_ctim = timestamp;
-
-    return 0;
+    return -1;
 }
 
 
 
 namespace impl {
     // internal helper functions go here
+
+    int32_t stat_file(nn::fs::FileHandle handle, const char* name, FileAttr* stat) {
+        nn::Result result;
+        // TODO: What values should these have?
+        stat->st_gid = 0;
+        stat->st_dev = 0;
+        stat->st_ino = 0;
+        stat->st_nlink = 0;
+
+        u32 S_IRUSR = 0400;
+        u32 S_IWUSR = 0200;
+        stat->st_mode = S_IRUSR | S_IWUSR;
+
+
+        long file_size = 0;
+        result = nn::fs::GetFileSize(&file_size, handle);
+        if(result.IsFailure()) return -1;
+
+        stat->st_size = file_size;
+        int block_size = 1024;
+        stat->st_blksize = block_size;
+        if(file_size % block_size == 0) stat->st_blocks = file_size / block_size;
+        else stat->st_blocks = (file_size / block_size) + 1;
+
+
+        nn::fs::FileTimeStamp mtime;
+        result = nn::fs::GetFileTimeStampForDebug(&mtime, name);
+        if(result.IsFailure()) return -1;
+
+        timespec timestamp;
+        timestamp.tv_sec = mtime.mTime1;
+        timestamp.tv_nsec = 0;
+
+        stat->st_atim = timestamp;
+        stat->st_mtim = timestamp;
+        stat->st_ctim = timestamp;
+
+        return 0;
+    }
+
+    int32_t stat_dir(nn::fs::DirectoryHandle handle, const char* name, FileAttr* stat) {
+         nn::Result result;
+        // TODO: What values should these have?
+        stat->st_gid = 0;
+        stat->st_dev = 0;
+        stat->st_ino = 0;
+        stat->st_nlink = 0;
+
+        u32 S_IRUSR = 0400;
+        u32 S_IWUSR = 0200;
+        stat->st_mode = S_IRUSR | S_IWUSR;
+
+        long file_size = 0;
+        stat->st_size = file_size;
+        int block_size = 1024;
+        stat->st_blksize = block_size;
+        if(file_size % block_size == 0) stat->st_blocks = file_size / block_size;
+        else stat->st_blocks = (file_size / block_size) + 1;
+
+        timespec timestamp;
+        timestamp.tv_sec = 0;
+        timestamp.tv_nsec = 0;
+
+        stat->st_atim = timestamp;
+        stat->st_mtim = timestamp;
+        stat->st_ctim = timestamp;
+
+        return 0;
+    } 
 }
