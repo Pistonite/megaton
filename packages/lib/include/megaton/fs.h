@@ -49,20 +49,58 @@ enum FDType {
     UNUSEDFDT,
 };
 
+struct FileFDU {
+    u64 internalFD;
+    u64 seek_pos;
+};
+
+union FDU {
+    FileFDU FILE;
+    u64 TCP;
+    u64 DIR;
+    bool STDIN;  // could collapse these last 4 into 1 union member. Not sure what it would be called.
+    bool STDOUT;
+    bool STDERR;
+    bool UNUSED;
+};
+
 struct FD {
     private:
-        FDType type;
-        u64 val;
+        FDType type; 
+        FDU val;  // data related to internal state or internal switch identifiers,
+        // or is otherwise useful for dealing with the type of FD 
         
     public:
-        FD(FDType t, u64 v): type(t), val(v) { }
-        FD(): type(FDType::UNUSEDFDT), val(420) { };
+        FD(FDType t, FDU v): type(t), val(v) { }
+        FD(): type(FDType::UNUSEDFDT), val(FDU{ .UNUSED = true }) {  };
 
         FDType getType() {
             return type;
         }
 
-        u64 getInner() {
+        FDU& getVal() {
             return val;
         }
 };
+
+
+static FD create_fd_file(u64 inner) {
+    FileFDU fdu = { .internalFD=inner, .seek_pos=0 };
+    return FD { FDType::FILEFDT, FDU{ .FILE=fdu} };
+}
+
+static FD create_fd_dir(u64 inner) {
+    return FD { FDType::DIRFDT, FDU{ .DIR=inner} };
+}
+
+static FD create_fd_stdin() {
+    return FD { FDType::STDINFDT, FDU{ .STDIN=true} };
+}
+
+static FD create_fd_stdout() {
+    return FD { FDType::STDOUTFDT,  FDU{ .STDOUT=true}  };
+}
+
+static FD create_fd_stderr() {
+    return FD { FDType::STDERRFDT,  FDU{ .STDERR=true}  };
+}
