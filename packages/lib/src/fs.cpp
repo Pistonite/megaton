@@ -11,8 +11,11 @@ using u64 = std::uint64_t;
 using FileDescriptor = std::uint32_t;
 
 
+
 const int NUM_FDS = 1000;
 static FD FDList[NUM_FDS] = { FD() };
+static uint32_t current_umask = 0022;
+
 
 void init_stdio() {
     FD fd_stdin = create_fd_stdin();
@@ -357,5 +360,30 @@ extern "C" int32_t sys_stat(const char* name, FileAttr* stat) {
         return stat_result;
     }
     return -1;
+}
+
+extern "C" int32_t sys_mkdir(const char* name, uint32_t mode) {
+    botw::tcp::sendf("Library: sys_mkdir called! name=%s mode=%u\n", name, mode);
+    nn::Result result = nn::fs::CreateDirectory(name);
+    if(result.IsFailure()) {
+        botw::tcp::sendf("Library: sys_mkdir failed! Exit code=%d\n", result.GetInnerValueForDebug());
+        return -1;
+    }
+    botw::tcp::sendf("Library: sys_mkdir success!\n");
+    return 0;
+}
+
+extern "C" FileDescriptor sys_opendir(const char* name) {
+    botw::tcp::sendf("Library: sys_opendir called! name=%s\n", name);
+    nn::fs::DirectoryHandle inner;
+    nn::Result result = nn::fs::OpenDirectory(&inner, name, nn::fs::OpenDirectoryMode_All);
+    if(result.IsFailure()) {
+        botw::tcp::sendf("Library: sys_opendir failed! Exit code=%d\n", result.GetInnerValueForDebug());
+        return -1;
+    }
+    FD fd = create_fd_dir(inner._internal);
+    FileDescriptor outerFD = insertIntoFDList(fd);
+    botw::tcp::sendf("Library: sys_opendir success! fd=%d\n", outerFD);
+    return outerFD;
 }
 
