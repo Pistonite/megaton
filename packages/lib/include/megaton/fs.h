@@ -18,22 +18,10 @@
     }
 #endif
 
-
-
-using isize = std::int32_t;
-using usize = std::uint32_t;
-using u64 = std::uint64_t;
-using FileDescriptor = std::uint32_t;
+using FD = std::uint32_t;
 
 namespace megaton {
-    using usize = std::uint32_t;
-    using u64 = std::uint64_t;
-    using FileDescriptor = std::uint32_t;
-    nn::fs::FileHandle open_file(const char* path);
-    bool file_exists(const char* path);
-    bool write_file(nn::fs::FileHandle fd, const char* content);
-    void close_file(nn::fs::FileHandle fd);
-    void debugShowFDList();
+    void debug_show_fd_list();
 }
 
 struct iovec {
@@ -42,42 +30,44 @@ struct iovec {
 };
 
 
-enum FDType {
+enum FileDescriptorType {
+    UNUSEDFDT,
     FILEFDT,
     TCPFDT,
     DIRFDT,
     STDINFDT,
     STDOUTFDT,
     STDERRFDT,
-    UNUSEDFDT,
 };
 
 struct FileFDU {
-    u64 internalFD;
-    u64 seek_pos;
+    uint64_t internalFD;
+    uint64_t seek_pos;
 };
 
+/* Contains data related to internal state or internal switch identifiers, 
+or is otherwise useful for dealing with the type of FD  */ 
 union FDU {
     FileFDU FILE;
-    u64 TCP;
-    u64 DIR;
-    bool STDIN;  // could collapse these last 4 into 1 union member. Not sure what it would be called.
+    uint64_t TCP;
+    uint64_t DIR;
+    // could collapse these last 4 into 1 union member, since they store the same kind of data. Not sure what it would be called.
+    bool STDIN;  
     bool STDOUT;
     bool STDERR;
     bool UNUSED;
 };
 
-struct FD {
+struct FileDescriptor {
     private:
-        FDType type; 
-        FDU val;  // data related to internal state or internal switch identifiers,
-        // or is otherwise useful for dealing with the type of FD 
+        FileDescriptorType type; 
+        FDU val;  
         
     public:
-        FD(FDType t, FDU v): type(t), val(v) { }
-        FD(): type(FDType::UNUSEDFDT), val(FDU{ .UNUSED = true }) {  };
+        FileDescriptor(FileDescriptorType t, FDU v): type(t), val(v) { }
+        FileDescriptor(): type(FileDescriptorType::UNUSEDFDT), val(FDU{ .UNUSED = true }) {  };
 
-        FDType getType() {
+        FileDescriptorType getType() {
             return type;
         }
 
@@ -87,23 +77,23 @@ struct FD {
 };
 
 
-static FD create_fd_file(u64 inner) {
+inline FileDescriptor create_fd_file(uint64_t inner) {
     FileFDU fdu = { .internalFD=inner, .seek_pos=0 };
-    return FD { FDType::FILEFDT, FDU{ .FILE=fdu} };
+    return FileDescriptor { FileDescriptorType::FILEFDT, FDU{ .FILE=fdu} };
 }
 
-static FD create_fd_dir(u64 inner) {
-    return FD { FDType::DIRFDT, FDU{ .DIR=inner} };
+inline FileDescriptor create_fd_dir(uint64_t inner) {
+    return FileDescriptor { FileDescriptorType::DIRFDT, FDU{ .DIR=inner} };
 }
 
-static FD create_fd_stdin() {
-    return FD { FDType::STDINFDT, FDU{ .STDIN=true} };
+inline FileDescriptor create_fd_stdin() {
+    return FileDescriptor { FileDescriptorType::STDINFDT, FDU{ .STDIN=true} };
 }
 
-static FD create_fd_stdout() {
-    return FD { FDType::STDOUTFDT,  FDU{ .STDOUT=true}  };
+inline FileDescriptor create_fd_stdout() {
+    return FileDescriptor { FileDescriptorType::STDOUTFDT,  FDU{ .STDOUT=true}  };
 }
 
-static FD create_fd_stderr() {
-    return FD { FDType::STDERRFDT,  FDU{ .STDERR=true}  };
+inline FileDescriptor create_fd_stderr() {
+    return FileDescriptor { FileDescriptorType::STDERRFDT,  FDU{ .STDERR=true}  };
 }

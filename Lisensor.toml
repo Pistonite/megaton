@@ -14,3 +14,5 @@
 # Unmodified files
 # ["libnx Authors"]
 # "packages/lib/src/external/libnx/*.s" = "ISC"
+# "packages/lib/include/megaton/__priv/nn/**/*.h" = "ISC"
+"packages/lib/include/megaton/__priv/vapours/**/*.h" = "GPL-2.0-only"
