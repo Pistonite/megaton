@@ -6,6 +6,7 @@ use std::{
     sync::Arc,
 };
 
+use cargo_metadata::{MetadataCommand, semver::Version};
 use cu::pre::*;
 
 use crate::env::environment;
@@ -19,7 +20,7 @@ pub struct RustCtx {
     header_suffix: String,
 }
 
-static BLESSED_CXX_VERSION: &'static str = "1.0.194";
+static BLESSED_CXX_VERSION: &str = "1.0.194";
 
 impl RustCtx {
     /// Gets the crate based on the cargo config. Returns `None` if rust is
@@ -55,6 +56,8 @@ impl RustCtx {
 
         let crate_root = manifest.parent().unwrap();
 
+        cu::debug!("checking cxx version");
+
         let source_paths = sources
             .iter()
             .map(|rel_path| crate_root.join(rel_path))
@@ -69,6 +72,38 @@ impl RustCtx {
             source_paths,
             header_suffix,
         })
+    }
+
+    pub fn check_cxx_version(&self) -> cu::Result<()> {
+        let metadata = MetadataCommand::new()
+            .manifest_path(&self.manifest)
+            .exec()?;
+
+        let root_deps = &metadata.root_package().unwrap().dependencies;
+        let cxx_req= &cu::check!(
+            root_deps.iter().find(|dep| dep.name == "cxx"),
+            "Failed to find cxx in package dependencies: make sure to add `cxx = \"{}\"` to the root cargo package",
+            BLESSED_CXX_VERSION
+        )?.req;
+
+        let blessed_version = Version::parse(BLESSED_CXX_VERSION)?;
+
+        let mut older = blessed_version.clone();
+        older.patch -= 1;
+        if cxx_req.matches(&older) {
+            cu::error!("please use exact cxx version `={}`", BLESSED_CXX_VERSION);
+            cu::bail!("bad cxx version: allows version older than what megaton supports");
+        }
+
+        let mut newer = blessed_version.clone();
+        newer.patch += 1;
+        if cxx_req.matches(&newer) {
+            cu::warn!("please use exact cxx version `={}`", BLESSED_CXX_VERSION);
+            cu::warn!("cxx version might be newer than megaton currently supports");
+        } else {
+            cu::debug!("cxx version check passed with no issues");
+        }
+        Ok(())
     }
 
     pub fn has_build_script(&self) -> bool {
