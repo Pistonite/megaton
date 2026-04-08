@@ -278,30 +278,8 @@ extern "C" int64_t sys_read(FD fd, u8* buf, uint64_t len) {
     }    
 }
 
-extern "C" int32_t sys_mkdir(const char* name, uint32_t mode) {
-    botw::tcp::sendf("Library: sys_mkdir called! name=%s mode=%u\n", name, mode);
-    nn::Result result = nn::fs::CreateDirectory(name);
-    if(result.IsFailure()) {
-        botw::tcp::sendf("Library: sys_mkdir failed! Exit code=%d\n", result.GetInnerValueForDebug());
-        return -1;
-    }
-    botw::tcp::sendf("Library: sys_mkdir success!\n");
-    return 0;
-}
 
-extern "C" FD sys_opendir(const char* name) {
-    botw::tcp::sendf("Library: sys_opendir called! name=%s\n", name);
-    nn::fs::DirectoryHandle inner;
-    nn::Result result = nn::fs::OpenDirectory(&inner, name, nn::fs::OpenDirectoryMode_All);
-    if(result.IsFailure()) {
-        botw::tcp::sendf("Library: sys_opendir failed! Exit code=%d\n", result.GetInnerValueForDebug());
-        return -1;
-    }
-    FileDescriptor fd = create_fd_dir(inner._internal);
-    FD outerFD = impl::insert_into_fd_list(fd);
-    botw::tcp::sendf("Library: sys_opendir success! fd=%d\n", outerFD);
-    return outerFD;
-}
+
 
 
 extern "C" int sys_truncate(const char* path, int64_t length) {
@@ -382,48 +360,6 @@ extern "C" int32_t sys_unlink(const char* name) {
     else return 0;
 } 
 
-namespace megaton {
-
-    void debug_show_fd_list(){
-        botw::tcp::sendf("Library: Printing FDList!\n");
-
-        for (int i = 0; i < NUM_FDS; i++)
-        {
-            FileDescriptor fd = FDList[i];
-
-            switch(fd.get_type()) {
-                case FileDescriptorType::FILE: { 
-                    botw::tcp::sendf("%d=>file (%ld) (seek=%ld) ", i, fd.get_internal_fd(), fd.seek_pos);
-                    break;
-                }
-                case FileDescriptorType::DIR: {
-                    botw::tcp::sendf("%d=>dir (%ld) ", i, fd.get_internal_fd());
-                    break;
-                }
-                case FileDescriptorType::TCP: {
-                    botw::tcp::sendf("%d=>tcp (%ld) ", i, fd.get_internal_fd());
-                    break;
-                }
-                case FileDescriptorType::STDIN: {
-                    botw::tcp::sendf("%d=>stdin ", i);
-                    break;
-                }
-                case FileDescriptorType::STDOUT: {
-                    botw::tcp::sendf("%d=>stdout ", i);
-                    break;
-                }
-                case FileDescriptorType::STDERR: {
-                    botw::tcp::sendf("%d=>stderr ", i);
-                    break;
-                }
-                default: {
-                    break;
-                }
-            }
-        }
-        botw::tcp::sendf("\nLibrary: Printing FDList Done!\n");
-    }
-}
 
 // Used here: https://github.com/hermit-os/rust/blob/042a556d8d0247361ed97e5d9217bb477c487be3/library/std/src/sys/fs/hermit.rs#L585
 extern "C" int32_t sys_stat(const char* name, FileAttr* stat) {
@@ -484,4 +420,48 @@ extern "C" FD sys_opendir(const char* name) {
     FD outer_fd = impl::insert_into_fd_list(fd);
     botw::tcp::sendf("Library: sys_opendir success! fd=%d\n", outer_fd);
     return outer_fd;
+}
+
+
+namespace megaton {
+
+    void debug_show_fd_list(){
+        botw::tcp::sendf("Library: Printing FDList!\n");
+
+        for (int i = 0; i < NUM_FDS; i++)
+        {
+            FileDescriptor fd = FDList[i];
+
+            switch(fd.get_type()) {
+                case FileDescriptorType::FILE: { 
+                    botw::tcp::sendf("%d=>file (%ld) (seek=%ld) ", i, fd.get_internal_fd(), fd.seek_pos);
+                    break;
+                }
+                case FileDescriptorType::DIR: {
+                    botw::tcp::sendf("%d=>dir (%ld) ", i, fd.get_internal_fd());
+                    break;
+                }
+                case FileDescriptorType::TCP: {
+                    botw::tcp::sendf("%d=>tcp (%ld) ", i, fd.get_internal_fd());
+                    break;
+                }
+                case FileDescriptorType::STDIN: {
+                    botw::tcp::sendf("%d=>stdin ", i);
+                    break;
+                }
+                case FileDescriptorType::STDOUT: {
+                    botw::tcp::sendf("%d=>stdout ", i);
+                    break;
+                }
+                case FileDescriptorType::STDERR: {
+                    botw::tcp::sendf("%d=>stderr ", i);
+                    break;
+                }
+                default: {
+                    break;
+                }
+            }
+        }
+        botw::tcp::sendf("\nLibrary: Printing FDList Done!\n");
+    }
 }

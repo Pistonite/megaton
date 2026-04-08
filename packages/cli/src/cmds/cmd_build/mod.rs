@@ -127,6 +127,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
 
         // Add public library includes
         build_flags.add_includes([target_lib.join("include").into_utf8()?]);
+        build_flags.add_includes([target_lib.join("nnheaders").join("include").into_utf8()?]);
 
         let mut lib_flags = build_flags.clone();
 

@@ -4,7 +4,7 @@
 #pragma once
 #include <cstdint>
 #include <stdexcept>
-#include <megaton/__priv/nn/fs.h>
+#include <nn/fs.h>
 
 
 #define BOTWTOOLKIT_TCP_SEND2 // todo: replace with BOTWTOOLKIT_TCP_SEND (double check this)
