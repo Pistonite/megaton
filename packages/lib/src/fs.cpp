@@ -280,44 +280,6 @@ extern "C" int64_t sys_read(FD fd, u8* buf, uint64_t len) {
     }    
 }
 
-extern "C" int sys_truncate(const char* path, int64_t length) {
-    nn::fs::FileHandle handle;
-    nn::Result result = nn::fs::OpenFile(&handle, path, nn::fs::OpenMode_Write | nn::fs::OpenMode_Append);
-    if (result.IsFailure()) {
-        return -ENOENT;
-    }
-    result = nn::fs::SetFileSize(handle, length);
-    nn::fs::CloseFile(handle);
-    if (result.IsFailure()) {
-        return -EIO;
-    }
-    return 0;
-}
-
-extern "C" int sys_umask(uint32_t mask) {
-    int old = current_umask;
-    current_umask = mask & 0777;
-    return old;
-}
-
-extern "C" int sys_chmod(const char* path, uint32_t mode) {
-    nn::fs::DirectoryEntryType type;
-    nn::Result result = nn::fs::GetEntryType(&type, path);
-    if (result.IsFailure()) {
-        return -ENOENT;
-    }
-    return 0;
-}
-
-extern "C" int sys_access(const char* path) {
-    nn::fs::DirectoryEntryType type;
-    nn::Result result = nn::fs::GetEntryType(&type, path);
-    if (result.IsFailure()) {
-        return -ENOENT;
-    }
-    return 0;
-}
-
 extern "C" int32_t sys_unlink(const char* name) {
     nn::fs::DirectoryEntryType type;
     botw::tcp::sendf("Library: sys_unlink called for %s\n", name);
