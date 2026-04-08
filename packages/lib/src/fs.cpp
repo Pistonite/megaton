@@ -6,6 +6,7 @@
 
 const int NUM_FDS = 1000;
 static FileDescriptor FDList[NUM_FDS];
+static uint32_t current_umask = 0022;
 
 
 void init_stdio() {
