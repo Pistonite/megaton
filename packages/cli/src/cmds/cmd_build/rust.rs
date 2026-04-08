@@ -78,31 +78,27 @@ impl RustCtx {
         let metadata = MetadataCommand::new()
             .manifest_path(&self.manifest)
             .exec()?;
-
-        let root_deps = &metadata.root_package().unwrap().dependencies;
-        let cxx_req= &cu::check!(
-            root_deps.iter().find(|dep| dep.name == "cxx"),
-            "Failed to find cxx in package dependencies: make sure to add `cxx = \"{}\"` to the root cargo package",
+        let cxx = cu::check!(
+            metadata.packages.iter().find(|pack| pack.name == "cxx"),
+            "failed to find cxx package\ntry adding this line to your cargo dependencies: `cxx = \"={}\"`",
             BLESSED_CXX_VERSION
-        )?.req;
-
-        let blessed_version = Version::parse(BLESSED_CXX_VERSION)?;
-
-        let mut older = blessed_version.clone();
-        older.patch -= 1;
-        if cxx_req.matches(&older) {
-            cu::error!("please use exact cxx version `={}`", BLESSED_CXX_VERSION);
-            cu::bail!("bad cxx version: allows version older than what megaton supports");
+        )?;
+        let blessed_version = Version::parse(BLESSED_CXX_VERSION).unwrap();
+        if cxx.version < blessed_version {
+            cu::bail!(
+                "cxx version is older than the supported version; supported: {}, found: {} ",
+                blessed_version,
+                cxx.version
+            );
+        }
+        if cxx.version > blessed_version {
+            cu::warn!(
+                "cxx version is newer than the supported version; supported: {}, found: {}",
+                blessed_version,
+                cxx.version
+            );
         }
 
-        let mut newer = blessed_version.clone();
-        newer.patch += 1;
-        if cxx_req.matches(&newer) {
-            cu::warn!("please use exact cxx version `={}`", BLESSED_CXX_VERSION);
-            cu::warn!("cxx version might be newer than megaton currently supports");
-        } else {
-            cu::debug!("cxx version check passed with no issues");
-        }
         Ok(())
     }
 
