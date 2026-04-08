@@ -5,7 +5,7 @@
 #include <string.h>
 
 const int NUM_FDS = 1000;
-static FileDescriptor FDList[NUM_FDS];
+static FileDescriptor FileDescriptorList[NUM_FDS];
 static uint32_t current_umask = 0022;
 
 
@@ -14,19 +14,10 @@ void init_stdio() {
     FileDescriptor fd_stdout = create_fd_stdout();
     FileDescriptor fd_stderr = create_fd_stderr();
 
-    FDList[0] = fd_stdin;
-    FDList[1] = fd_stdout;
-    FDList[2] = fd_stderr;
+    FileDescriptorList[0] = fd_stdin;
+    FileDescriptorList[1] = fd_stdout;
+    FileDescriptorList[2] = fd_stderr;
 }
-
-
-
-uint32_t hermit_to_nn_flags(uint32_t hermit_open_option_flags) {
-    // hermit OpenOption defintion: https://github.com/hermit-os/kernel/blob/ec0fc3572c9d8deba725df8b7eb000980034a9f6/src/fd/mod.rs#L53
-    // nnheaders OpenOption definition: https://github.com/open-ead/nnheaders/blob/0547381a6166ea54fb306a53a02683a8527475fd/include/nn/fs/fs_types.h#L51
-    return hermit_open_option_flags;
-}
-
 
 struct timespec {
     long tv_sec;
@@ -63,6 +54,12 @@ struct FileAttr {
 
 
 namespace impl {
+    uint32_t hermit_to_nn_flags(uint32_t hermit_open_option_flags) {
+        // hermit OpenOption defintion: https://github.com/hermit-os/kernel/blob/ec0fc3572c9d8deba725df8b7eb000980034a9f6/src/fd/mod.rs#L53
+        // nnheaders OpenOption definition: https://github.com/open-ead/nnheaders/blob/0547381a6166ea54fb306a53a02683a8527475fd/include/nn/fs/fs_types.h#L51
+        return hermit_open_option_flags;
+    }
+
     // internal helper functions go here
     nn::fs::FileHandle get_file_handle(FileDescriptor fd) {
         return { fd.get_internal_fd() };
@@ -70,17 +67,17 @@ namespace impl {
     
     FD insert_into_fd_list(FileDescriptor fd) {
         for(FD i = 3; i < NUM_FDS; i++) {
-            if(FDList[i].get_type() == FileDescriptorType::UNUSED) {
-                FDList[i] = fd;
+            if(FileDescriptorList[i].get_type() == FileDescriptorType::UNUSED) {
+                FileDescriptorList[i] = fd;
                 return i;
             }
         }
-        botw::tcp::sendf("Unable to allocate FD - FDList is full!\n");
+        botw::tcp::sendf("Unable to allocate FD - FileDescriptorList is full!\n");
         return 0;
     }
 
     void remove_from_fd_list(FD fd) {
-        FDList[fd] = FileDescriptor();
+        FileDescriptorList[fd] = FileDescriptor();
     }
 
     void write_file(FileDescriptor fd, const char* buf, uint64_t len){
@@ -212,7 +209,7 @@ extern "C" FD sys_open(const char* name, int32_t flags, uint32_t mode) {
 
 
 extern "C" void sys_write(FD fd, const char* buf, uint64_t len) {
-    FileDescriptor inner_fd = FDList[fd];
+    FileDescriptor inner_fd = FileDescriptorList[fd];
     botw::tcp::sendf("Library: sys_write called! fd=%d buf=%s len=%u\n", fd, buf, len);
     switch(inner_fd.get_type()) {
         case FileDescriptorType::FILE: {
@@ -234,7 +231,7 @@ extern "C" int64_t sys_writev(FD fd, const iovec* iov, uint64_t iovcnt) {
 extern "C" int32_t sys_close(FD fd) {
     botw::tcp::sendf("Library: sys_close called! fd=%d\n", fd);
 
-    FileDescriptor outer_fd = FDList[fd];
+    FileDescriptor outer_fd = FileDescriptorList[fd];
     switch(outer_fd.get_type()) {
         case FileDescriptorType::FILE: {
             nn::fs::FileHandle fh = impl::get_file_handle(outer_fd);
@@ -257,7 +254,12 @@ extern "C" int32_t sys_close(FD fd) {
 
 extern "C" int64_t sys_read(FD fd, u8* buf, uint64_t len) {
     botw::tcp::sendf("Library: sys_read called! fd=%d len=%d\n", fd, len);
-    FileDescriptor outer_fd = FDList[fd];
+    if(fd < 0 || fd >= NUM_FDS) {
+        botw::tcp::sendf("Library: Error in sys_read: FD %d is out of bounds!\n", fd);
+        return -ENOENT;
+    }
+
+    FileDescriptor outer_fd = FileDescriptorList[fd];
     switch(outer_fd.get_type()) {
         case FileDescriptorType::FILE: {
             nn::fs::FileHandle fh = impl::get_file_handle(outer_fd);
@@ -265,7 +267,7 @@ extern "C" int64_t sys_read(FD fd, u8* buf, uint64_t len) {
             nn::Result result = nn::fs::ReadFile(&bytes_read, fh, outer_fd.seek_pos, buf, len);
             if(result.IsFailure()) {
                 botw::tcp::sendf("sys_read: nn::fs::ReadFile failed! Exit code=%d\n", result.GetInnerValueForDebug());
-                return -1;
+                return -EIO;
             }
             botw::tcp::sendf("Library: sys_read success! bytes_read=%d\n", bytes_read);
             outer_fd.seek_pos += bytes_read;
@@ -273,14 +275,10 @@ extern "C" int64_t sys_read(FD fd, u8* buf, uint64_t len) {
         }
         default: {
             botw::tcp::sendf("Library: sys_read called for unsupported FDType: %d! fd=%d\n", outer_fd.get_type(), fd);
-            return -1;
+            return -ENOENT;
         }
     }    
 }
-
-
-
-
 
 extern "C" int sys_truncate(const char* path, int64_t length) {
     nn::fs::FileHandle handle;
@@ -295,7 +293,6 @@ extern "C" int sys_truncate(const char* path, int64_t length) {
     }
     return 0;
 }
-
 
 extern "C" int sys_umask(uint32_t mask) {
     int old = current_umask;
@@ -321,7 +318,6 @@ extern "C" int sys_access(const char* path) {
     return 0;
 }
 
-
 extern "C" int32_t sys_unlink(const char* name) {
     nn::fs::DirectoryEntryType type;
     botw::tcp::sendf("Library: sys_unlink called for %s\n", name);
@@ -329,7 +325,7 @@ extern "C" int32_t sys_unlink(const char* name) {
     nn::Result result = nn::fs::GetEntryType(&type, name);
     if(result.IsFailure()){
         botw::tcp::sendf("Library: sys_unlink: nn::fs::GetEntryType failed with %d!\n", result.GetInnerValueForDebug());
-        return -1; // todo : investigate if there are proper/more meaningful error codes
+        return -ENOENT; // todo : investigate if there are proper/more meaningful error codes
     } 
     switch(type) {
         case nn::fs::DirectoryEntryType_File: {
@@ -426,11 +422,11 @@ extern "C" FD sys_opendir(const char* name) {
 namespace megaton {
 
     void debug_show_fd_list(){
-        botw::tcp::sendf("Library: Printing FDList!\n");
+        botw::tcp::sendf("Library: Printing FileDescriptorList!\n");
 
         for (int i = 0; i < NUM_FDS; i++)
         {
-            FileDescriptor fd = FDList[i];
+            FileDescriptor fd = FileDescriptorList[i];
 
             switch(fd.get_type()) {
                 case FileDescriptorType::FILE: { 
@@ -462,6 +458,6 @@ namespace megaton {
                 }
             }
         }
-        botw::tcp::sendf("\nLibrary: Printing FDList Done!\n");
+        botw::tcp::sendf("\nLibrary: Printing FileDescriptorList Done!\n");
     }
 }
