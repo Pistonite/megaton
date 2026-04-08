@@ -276,10 +276,74 @@ extern "C" int64_t sys_read(FD fd, u8* buf, uint64_t len) {
             botw::tcp::sendf("Library: sys_read called for unsupported FDType: %d! fd=%d\n", outerFD.getType(), fd);
             return -1;
         }
-    }
-
-    
+    }    
 }
+
+extern "C" int32_t sys_mkdir(const char* name, uint32_t mode) {
+    botw::tcp::sendf("Library: sys_mkdir called! name=%s mode=%u\n", name, mode);
+    nn::Result result = nn::fs::CreateDirectory(name);
+    if(result.IsFailure()) {
+        botw::tcp::sendf("Library: sys_mkdir failed! Exit code=%d\n", result.GetInnerValueForDebug());
+        return -1;
+    }
+    botw::tcp::sendf("Library: sys_mkdir success!\n");
+    return 0;
+}
+
+extern "C" FD sys_opendir(const char* name) {
+    botw::tcp::sendf("Library: sys_opendir called! name=%s\n", name);
+    nn::fs::DirectoryHandle inner;
+    nn::Result result = nn::fs::OpenDirectory(&inner, name, nn::fs::OpenDirectoryMode_All);
+    if(result.IsFailure()) {
+        botw::tcp::sendf("Library: sys_opendir failed! Exit code=%d\n", result.GetInnerValueForDebug());
+        return -1;
+    }
+    FileDescriptor fd = create_fd_dir(inner._internal);
+    FD outerFD = insertIntoFDList(fd);
+    botw::tcp::sendf("Library: sys_opendir success! fd=%d\n", outerFD);
+    return outerFD;
+}
+
+
+extern "C" int sys_truncate(const char* path, int64_t length) {
+    nn::fs::FileHandle handle;
+    nn::Result result = nn::fs::OpenFile(&handle, path, nn::fs::OpenMode_Write | nn::fs::OpenMode_Append);
+    if (result.IsFailure()) {
+        return -ENOENT;
+    }
+    result = nn::fs::SetFileSize(handle, length);
+    nn::fs::CloseFile(handle);
+    if (result.IsFailure()) {
+        return -EIO;
+    }
+    return 0;
+}
+
+
+extern "C" int sys_umask(uint32_t mask) {
+    int old = current_umask;
+    current_umask = mask & 0777;
+    return old;
+}
+
+extern "C" int sys_chmod(const char* path, uint32_t mode) {
+    nn::fs::DirectoryEntryType type;
+    nn::Result result = nn::fs::GetEntryType(&type, path);
+    if (result.IsFailure()) {
+        return -ENOENT;
+    }
+    return 0;
+}
+
+extern "C" int sys_access(const char* path) {
+    nn::fs::DirectoryEntryType type;
+    nn::Result result = nn::fs::GetEntryType(&type, path);
+    if (result.IsFailure()) {
+        return -ENOENT;
+    }
+    return 0;
+}
+
 
 extern "C" int32_t sys_unlink(const char* name) {
     nn::fs::DirectoryEntryType type;
@@ -401,30 +465,5 @@ extern "C" int32_t sys_stat(const char* name, FileAttr* stat) {
         return stat_result;
     }
     return -1;
-}
-
-extern "C" int32_t sys_mkdir(const char* name, uint32_t mode) {
-    botw::tcp::sendf("Library: sys_mkdir called! name=%s mode=%u\n", name, mode);
-    nn::Result result = nn::fs::CreateDirectory(name);
-    if(result.IsFailure()) {
-        botw::tcp::sendf("Library: sys_mkdir failed! Exit code=%d\n", result.GetInnerValueForDebug());
-        return -1;
-    }
-    botw::tcp::sendf("Library: sys_mkdir success!\n");
-    return 0;
-}
-
-extern "C" FD sys_opendir(const char* name) {
-    botw::tcp::sendf("Library: sys_opendir called! name=%s\n", name);
-    nn::fs::DirectoryHandle inner;
-    nn::Result result = nn::fs::OpenDirectory(&inner, name, nn::fs::OpenDirectoryMode_All);
-    if(result.IsFailure()) {
-        botw::tcp::sendf("Library: sys_opendir failed! Exit code=%d\n", result.GetInnerValueForDebug());
-        return -1;
-    }
-    FileDescriptor fd = create_fd_dir(inner._internal);
-    FD outerFD = insertIntoFDList(fd);
-    botw::tcp::sendf("Library: sys_opendir success! fd=%d\n", outerFD);
-    return outerFD;
 }
 
