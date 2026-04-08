@@ -20,7 +20,8 @@
 
 using FD = std::uint32_t;
 
-namespace megaton {
+// Functions exported to mod developers
+namespace megaton { 
     void debug_show_fd_list();
 }
 
@@ -30,70 +31,54 @@ struct iovec {
 };
 
 
-enum FileDescriptorType {
-    UNUSEDFDT,
-    FILEFDT,
-    TCPFDT,
-    DIRFDT,
-    STDINFDT,
-    STDOUTFDT,
-    STDERRFDT,
-};
-
-struct FileFDU {
-    uint64_t internalFD;
-    uint64_t seek_pos;
-};
-
-/* Contains data related to internal state or internal switch identifiers, 
-or is otherwise useful for dealing with the type of FD  */ 
-union FDU {
-    FileFDU FILE;
-    uint64_t TCP;
-    uint64_t DIR;
-    // could collapse these last 4 into 1 union member, since they store the same kind of data. Not sure what it would be called.
-    bool STDIN;  
-    bool STDOUT;
-    bool STDERR;
-    bool UNUSED;
+enum class FileDescriptorType {
+    UNUSED,
+    FILE,
+    TCP,
+    DIR,
+    STDIN,
+    STDOUT,
+    STDERR,
 };
 
 struct FileDescriptor {
     private:
         FileDescriptorType type; 
-        FDU val;  
+        uint64_t internal_fd;
         
     public:
-        FileDescriptor(FileDescriptorType t, FDU v): type(t), val(v) { }
-        FileDescriptor(): type(FileDescriptorType::UNUSEDFDT), val(FDU{ .UNUSED = true }) {  };
+        uint64_t seek_pos; // used for files
 
-        FileDescriptorType getType() {
+        FileDescriptor(FileDescriptorType t, uint64_t internal_fd): type(t), internal_fd(internal_fd), seek_pos(0) { }
+        FileDescriptor(FileDescriptorType t): type(t) { }
+        FileDescriptor(): type(FileDescriptorType::UNUSED) {  };
+
+        FileDescriptorType get_type() {
             return type;
         }
 
-        FDU& getVal() {
-            return val;
+        uint64_t get_internal_fd() {
+            return internal_fd;
         }
 };
 
 
 inline FileDescriptor create_fd_file(uint64_t inner) {
-    FileFDU fdu = { .internalFD=inner, .seek_pos=0 };
-    return FileDescriptor { FileDescriptorType::FILEFDT, FDU{ .FILE=fdu} };
+    return FileDescriptor(FileDescriptorType::FILE, inner);
 }
 
 inline FileDescriptor create_fd_dir(uint64_t inner) {
-    return FileDescriptor { FileDescriptorType::DIRFDT, FDU{ .DIR=inner} };
+    return FileDescriptor(FileDescriptorType::DIR, inner);
 }
 
 inline FileDescriptor create_fd_stdin() {
-    return FileDescriptor { FileDescriptorType::STDINFDT, FDU{ .STDIN=true} };
+    return FileDescriptor(FileDescriptorType::STDIN);
 }
 
 inline FileDescriptor create_fd_stdout() {
-    return FileDescriptor { FileDescriptorType::STDOUTFDT,  FDU{ .STDOUT=true}  };
+    return FileDescriptor(FileDescriptorType::STDOUT);
 }
 
 inline FileDescriptor create_fd_stderr() {
-    return FileDescriptor { FileDescriptorType::STDERRFDT,  FDU{ .STDERR=true}  };
+    return FileDescriptor(FileDescriptorType::STDERR);
 }

@@ -19,20 +19,6 @@ void init_stdio() {
     FDList[2] = fd_stderr;
 }
 
-FD insertIntoFDList(FileDescriptor fd) {
-    for(FD i = 3; i < NUM_FDS; i++) {
-        if(FDList[i].getType() == FileDescriptorType::UNUSEDFDT) {
-            FDList[i] = fd;
-            return i;
-        }
-    }
-    botw::tcp::sendf("Unable to allocate FD - FDList is full!\n");
-    return 0;
-}
-
-void removeFromFDList(FD fd) {
-    FDList[fd] = FileDescriptor();
-}
 
 
 uint32_t hermit_to_nn_flags(uint32_t hermit_open_option_flags) {
@@ -78,17 +64,31 @@ struct FileAttr {
 
 namespace impl {
     // internal helper functions go here
-    nn::fs::FileHandle getFileHandle(FDU fileFDU) {
-        return { fileFDU.FILE.internalFD };
+    nn::fs::FileHandle get_file_handle(FileDescriptor fd) {
+        return { fd.get_internal_fd() };
+    }
+    
+    FD insert_into_fd_list(FileDescriptor fd) {
+        for(FD i = 3; i < NUM_FDS; i++) {
+            if(FDList[i].get_type() == FileDescriptorType::UNUSED) {
+                FDList[i] = fd;
+                return i;
+            }
+        }
+        botw::tcp::sendf("Unable to allocate FD - FDList is full!\n");
+        return 0;
+    }
+
+    void remove_from_fd_list(FD fd) {
+        FDList[fd] = FileDescriptor();
     }
 
     void write_file(FileDescriptor fd, const char* buf, uint64_t len){
-        FileFDU fdu = fd.getVal().FILE;
-        nn::fs::FileHandle fh = impl::getFileHandle(fd.getVal());
+        nn::fs::FileHandle fh = impl::get_file_handle(fd);
         nn::fs::WriteOption options = nn::fs::WriteOption::CreateOption(0);
 
-        nn::Result result = nn::fs::WriteFile(fh, fdu.seek_pos, buf, len, options);
-        fdu.seek_pos += len;
+        nn::Result result = nn::fs::WriteFile(fh, fd.seek_pos, buf, len, options);
+        fd.seek_pos += len;
         if(result.IsFailure()) {
             botw::tcp::sendf("sys_write: nn::fs::WriteFile failed! Exit code=%d\n", result.GetInnerValueForDebug());
         }
@@ -186,7 +186,7 @@ extern "C" FD sys_open(const char* name, int32_t flags, uint32_t mode) {
     }
 
     // could probably be condensed via polymorphism
-    FD outerFD = 999;
+    FD outer_fd = 999;
     if(type == nn::fs::DirectoryEntryType_File) {
         nn::fs::FileHandle inner;
         result = nn::fs::OpenFile(&inner, name, nn::fs::OpenMode_ReadWrite | nn::fs::OpenMode_Append); // todo: What to do if failure occurs?
@@ -195,32 +195,32 @@ extern "C" FD sys_open(const char* name, int32_t flags, uint32_t mode) {
             return -1;
         }
         FileDescriptor fd = create_fd_file(inner._internal);
-        outerFD = insertIntoFDList(fd);
-        botw::tcp::sendf("\tsys_open: successfully returning file fd=%d\n", outerFD);
+        outer_fd = impl::insert_into_fd_list(fd);
+        botw::tcp::sendf("\tsys_open: successfully returning file fd=%d\n", outer_fd);
     }
     else { // type == nn::fs::DirectoryEntryType_Directory
         nn::fs::DirectoryHandle inner;
         result = nn::fs::OpenDirectory(&inner, name, nn::fs::OpenDirectoryMode_All);
         FileDescriptor fd = create_fd_dir(inner._internal);
         
-        outerFD = insertIntoFDList(fd);
-        botw::tcp::sendf("\tsys_open: successfully returning directory fd=%d\n", outerFD);
+        outer_fd = impl::insert_into_fd_list(fd);
+        botw::tcp::sendf("\tsys_open: successfully returning directory fd=%d\n", outer_fd);
     }
     
-    return outerFD;
+    return outer_fd;
 }
 
 
 extern "C" void sys_write(FD fd, const char* buf, uint64_t len) {
-    FileDescriptor innerFd = FDList[fd];
+    FileDescriptor inner_fd = FDList[fd];
     botw::tcp::sendf("Library: sys_write called! fd=%d buf=%s len=%u\n", fd, buf, len);
-    switch(innerFd.getType()) {
-        case FileDescriptorType::FILEFDT: {
-            impl::write_file(innerFd, buf, len);
+    switch(inner_fd.get_type()) {
+        case FileDescriptorType::FILE: {
+            impl::write_file(inner_fd, buf, len);
             break;
         }
         default: {
-            botw::tcp::sendf("Library: sys_write called for invalid type with enum val %d\n", innerFd.getType());
+            botw::tcp::sendf("Library: sys_write called for invalid type with enum val %d\n", inner_fd.get_type());
         }
     }
     
@@ -234,20 +234,19 @@ extern "C" int64_t sys_writev(FD fd, const iovec* iov, uint64_t iovcnt) {
 extern "C" int32_t sys_close(FD fd) {
     botw::tcp::sendf("Library: sys_close called! fd=%d\n", fd);
 
-    FileDescriptor outerFD = FDList[fd];
-    switch(outerFD.getType()) {
-        case FileDescriptorType::FILEFDT: {
-            nn::fs::FileHandle fh = impl::getFileHandle(outerFD.getVal());
+    FileDescriptor outer_fd = FDList[fd];
+    switch(outer_fd.get_type()) {
+        case FileDescriptorType::FILE: {
+            nn::fs::FileHandle fh = impl::get_file_handle(outer_fd);
             nn::fs::FlushFile(fh);
             nn::fs::CloseFile(fh);
-            removeFromFDList(fd);
+            impl::remove_from_fd_list(fd);
             return 0;
         }
-        case FileDescriptorType::DIRFDT: {
-            nn::fs::DirectoryHandle dh = nn::fs::DirectoryHandle { };
-            dh._internal = outerFD.getVal().DIR;
+        case FileDescriptorType::DIR: {
+            nn::fs::DirectoryHandle dh = nn::fs::DirectoryHandle { outer_fd.get_internal_fd() };
             nn::fs::CloseDirectory(dh);
-            removeFromFDList(fd);
+            impl::remove_from_fd_list(fd);
             return 0;
         }
         default: {
@@ -258,22 +257,22 @@ extern "C" int32_t sys_close(FD fd) {
 
 extern "C" int64_t sys_read(FD fd, u8* buf, uint64_t len) {
     botw::tcp::sendf("Library: sys_read called! fd=%d len=%d\n", fd, len);
-    FileDescriptor outerFD = FDList[fd];
-    switch(outerFD.getType()) {
-        case FileDescriptorType::FILEFDT: {
-            nn::fs::FileHandle fh = impl::getFileHandle(outerFD.getVal());
+    FileDescriptor outer_fd = FDList[fd];
+    switch(outer_fd.get_type()) {
+        case FileDescriptorType::FILE: {
+            nn::fs::FileHandle fh = impl::get_file_handle(outer_fd);
             size_t bytes_read = 0;
-            nn::Result result = nn::fs::ReadFile(&bytes_read, fh, outerFD.getVal().FILE.seek_pos, buf, len);
+            nn::Result result = nn::fs::ReadFile(&bytes_read, fh, outer_fd.seek_pos, buf, len);
             if(result.IsFailure()) {
                 botw::tcp::sendf("sys_read: nn::fs::ReadFile failed! Exit code=%d\n", result.GetInnerValueForDebug());
                 return -1;
             }
             botw::tcp::sendf("Library: sys_read success! bytes_read=%d\n", bytes_read);
-            outerFD.getVal().FILE.seek_pos += bytes_read;
+            outer_fd.seek_pos += bytes_read;
             return (int64_t)bytes_read;
         }
         default: {
-            botw::tcp::sendf("Library: sys_read called for unsupported FDType: %d! fd=%d\n", outerFD.getType(), fd);
+            botw::tcp::sendf("Library: sys_read called for unsupported FDType: %d! fd=%d\n", outer_fd.get_type(), fd);
             return -1;
         }
     }    
@@ -299,7 +298,7 @@ extern "C" FD sys_opendir(const char* name) {
         return -1;
     }
     FileDescriptor fd = create_fd_dir(inner._internal);
-    FD outerFD = insertIntoFDList(fd);
+    FD outerFD = impl::insert_into_fd_list(fd);
     botw::tcp::sendf("Library: sys_opendir success! fd=%d\n", outerFD);
     return outerFD;
 }
@@ -391,35 +390,30 @@ namespace megaton {
         for (int i = 0; i < NUM_FDS; i++)
         {
             FileDescriptor fd = FDList[i];
-            switch(fd.getType()) {
-                case FileDescriptorType::FILEFDT: { 
-                    botw::tcp::sendf("%d=>%ld (seek=%ld) ", i, fd.getVal().FILE.internalFD, fd.getVal().FILE.seek_pos);
-                    // msgIndex += snprintf(msg + msgIndex, 14, "%d=>%ld ", i, fd.getVal().FILE.internalFD);
+
+            switch(fd.get_type()) {
+                case FileDescriptorType::FILE: { 
+                    botw::tcp::sendf("%d=>file (%ld) (seek=%ld) ", i, fd.get_internal_fd(), fd.seek_pos);
                     break;
                 }
-                case FileDescriptorType::DIRFDT: {
-                    botw::tcp::sendf("%d=>%ld ", i, fd.getVal().DIR);
-                    // msgIndex += snprintf(msg + msgIndex, 14, "%d=>%ld ", i, fd.getVal().DIR);
+                case FileDescriptorType::DIR: {
+                    botw::tcp::sendf("%d=>dir (%ld) ", i, fd.get_internal_fd());
                     break;
                 }
-                case FileDescriptorType::TCPFDT: {
-                    botw::tcp::sendf("%d=>%ld ", i, fd.getVal().TCP);
-                    // msgIndex += snprintf(msg + msgIndex, 14, "%d=>%ld ", i, fd.getVal().TCP);
+                case FileDescriptorType::TCP: {
+                    botw::tcp::sendf("%d=>tcp (%ld) ", i, fd.get_internal_fd());
                     break;
                 }
-                case FileDescriptorType::STDINFDT: {
+                case FileDescriptorType::STDIN: {
                     botw::tcp::sendf("%d=>stdin ", i);
-                    // msgIndex += snprintf(msg + msgIndex, 14, "%d=>stdin ", i);
                     break;
                 }
-                case FileDescriptorType::STDOUTFDT: {
+                case FileDescriptorType::STDOUT: {
                     botw::tcp::sendf("%d=>stdout ", i);
-                    // msgIndex += snprintf(msg + msgIndex, 14, "%d=>stdout ", i);
                     break;
                 }
-                case FileDescriptorType::STDERRFDT: {
+                case FileDescriptorType::STDERR: {
                     botw::tcp::sendf("%d=>stderr ", i);
-                    // msgIndex += snprintf(msg + msgIndex, 14, "%d=>stderr ", i);
                     break;
                 }
                 default: {
@@ -467,3 +461,27 @@ extern "C" int32_t sys_stat(const char* name, FileAttr* stat) {
     return -1;
 }
 
+extern "C" int32_t sys_mkdir(const char* name, uint32_t mode) {
+    botw::tcp::sendf("Library: sys_mkdir called! name=%s mode=%u\n", name, mode);
+    nn::Result result = nn::fs::CreateDirectory(name);
+    if(result.IsFailure()) {
+        botw::tcp::sendf("Library: sys_mkdir failed! Exit code=%d\n", result.GetInnerValueForDebug());
+        return -1;
+    }
+    botw::tcp::sendf("Library: sys_mkdir success!\n");
+    return 0;
+}
+
+extern "C" FD sys_opendir(const char* name) {
+    botw::tcp::sendf("Library: sys_opendir called! name=%s\n", name);
+    nn::fs::DirectoryHandle inner;
+    nn::Result result = nn::fs::OpenDirectory(&inner, name, nn::fs::OpenDirectoryMode_All);
+    if(result.IsFailure()) {
+        botw::tcp::sendf("Library: sys_opendir failed! Exit code=%d\n", result.GetInnerValueForDebug());
+        return -1;
+    }
+    FileDescriptor fd = create_fd_dir(inner._internal);
+    FD outer_fd = impl::insert_into_fd_list(fd);
+    botw::tcp::sendf("Library: sys_opendir success! fd=%d\n", outer_fd);
+    return outer_fd;
+}
