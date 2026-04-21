@@ -57,7 +57,14 @@ namespace impl {
     uint32_t hermit_to_nn_flags(uint32_t hermit_open_option_flags) {
         // hermit OpenOption defintion: https://github.com/hermit-os/kernel/blob/ec0fc3572c9d8deba725df8b7eb000980034a9f6/src/fd/mod.rs#L53
         // nnheaders OpenOption definition: https://github.com/open-ead/nnheaders/blob/0547381a6166ea54fb306a53a02683a8527475fd/include/nn/fs/fs_types.h#L51
-        return hermit_open_option_flags;
+
+        uint32_t nn_flags = 0;
+        int access = hermit_open_option_flags & 0b11;
+        if (access == 0) nn_flags |= nn::fs::OpenMode_Read;
+        else if (access == 1) nn_flags |= nn::fs::OpenMode_Write;
+        else if (access == 2) nn_flags |= nn::fs::OpenMode_ReadWrite;
+        if (access != 0) nn_flags |= nn::fs::OpenMode_Append;
+        return nn_flags;
     }
 
     // internal helper functions go here
@@ -164,46 +171,77 @@ namespace impl {
 
 // Syscall Definitions
 
+
+
+
+
 extern "C" FD sys_open(const char* name, int32_t flags, uint32_t mode) {
     botw::tcp::sendf("Library: sys_open called! name=%s flags=%d mode=%u\n", name, flags, mode);
-    // e.g. sys_open called name=sd:/testfile3.txt flags=577 mode=511
+
+    const int O_CREAT  = 0100;  // create file if it doesn't exist
+    const int O_EXCL   = 0200;  // fail if file already exists
+    const int O_TRUNC  = 01000; // truncate file to zero length on open
+    const int O_APPEND = 02000; // set initial seek position to end of file
+
+    bool o_creat  = flags & O_CREAT;
+    bool o_excl   = flags & O_EXCL;
+    bool o_trunc  = flags & O_TRUNC;
+    bool o_append = flags & O_APPEND;
+
     nn::Result result;
-    
     nn::fs::DirectoryEntryType type;
     result = nn::fs::GetEntryType(&type, name);
-    if(result.IsFailure()) { 
-        if(mode & 0100) { // if file doesn't exist, and create flag given by caller, try to create the file
-            result = nn::fs::CreateFile(name, 0);
-            if(result.IsFailure()) {
-                botw::tcp::sendf("Library sys_open: nn::fs::CreateFile failed! Exit code=%d\n", result.GetInnerValueForDebug());
-                return -1;
-            }
-            type = nn::fs::DirectoryEntryType_File;
+
+    if (result.IsFailure()) {
+        if (!o_creat) { // File doesn't exist and caller didn't ask to create it
+            botw::tcp::sendf("sys_open: file doesn't exist and O_CREAT not set\n");
+            return -ENOENT;
         }
+        result = nn::fs::CreateFile(name, 0);
+        if (result.IsFailure()) {
+            botw::tcp::sendf("Library sys_open: nn::fs::CreateFile failed! Exit code=%d\n", result.GetInnerValueForDebug());
+            return -EIO;
+        }
+        type = nn::fs::DirectoryEntryType_File;
     }
 
     // could probably be condensed via polymorphism
     FD outer_fd = 999;
-    if(type == nn::fs::DirectoryEntryType_File) {
+    if (type == nn::fs::DirectoryEntryType_File) {
+
+        uint32_t open_mode = hermit_to_nn_flags(flags);
         nn::fs::FileHandle inner;
-        result = nn::fs::OpenFile(&inner, name, nn::fs::OpenMode_ReadWrite | nn::fs::OpenMode_Append); // todo: What to do if failure occurs?
-        if(result.IsFailure()) {
+        result = nn::fs::OpenFile(&inner, name, open_mode);
+        if (result.IsFailure()) {
             botw::tcp::sendf("Library sys_open: nn::fs::OpenFile failed! Exit code=%d\n", result.GetInnerValueForDebug());
-            return -1;
+            return -EIO;
         }
+
+        if (o_trunc) {
+            nn::fs::SetFileSize(inner, 0);
+        }
+
+        int64_t initial_offset = 0;
+        if (o_append) {
+            long file_size = 0;
+            nn::fs::GetFileSize(&file_size, inner);
+            initial_offset = file_size;
+        }
+
         FileDescriptor fd = create_fd_file(inner._internal);
+        fd.seek_pos = initial_offset;
         outer_fd = impl::insert_into_fd_list(fd);
         botw::tcp::sendf("\tsys_open: successfully returning file fd=%d\n", outer_fd);
-    }
-    else { // type == nn::fs::DirectoryEntryType_Directory
+
+    } else {
         nn::fs::DirectoryHandle inner;
         result = nn::fs::OpenDirectory(&inner, name, nn::fs::OpenDirectoryMode_All);
         FileDescriptor fd = create_fd_dir(inner._internal);
-        
+
         outer_fd = impl::insert_into_fd_list(fd);
         botw::tcp::sendf("\tsys_open: successfully returning directory fd=%d\n", outer_fd);
     }
-    
+
     return outer_fd;
 }
 
