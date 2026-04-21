@@ -30,7 +30,7 @@ features = ["process"]
 [build-dependencies]
 flate2 = "1.1.2"
 tar = "0.4.44"
-
+sha2 = "0.11.0"
 
 [[bin]]
 name = "megaton"

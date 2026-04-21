@@ -7,3 +7,4 @@
 .vscode/**
 
 *.tar.gz
+libmegaton_sha256sum
