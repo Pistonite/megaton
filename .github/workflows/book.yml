@@ -16,12 +16,11 @@ jobs:
     steps:
       - uses: Pistonight/mono-dev/actions/setup@main
         with:
-          mono-dev: packages
           rust: stable
           tool-mdbook: true
       - run: task exec -- docs:install
       - run: task exec -- docs:build
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: packages/docs/book
           retention-days: 3
@@ -38,4 +37,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
