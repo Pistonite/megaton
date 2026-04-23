@@ -169,9 +169,9 @@ impl Validate for MegatonConfig {
 }
 
 fn check_version(version: &Version) -> cu::Result<()> {
-    let true_version = Version::parse(MEGATON_VERSION_STRING).expect(&format!(
-        "Failed to parse megaton version string: {MEGATON_VERSION_STRING}"
-    ));
+    let true_version = Version::parse(MEGATON_VERSION_STRING).unwrap_or_else(|_| {
+        panic!("Failed to parse megaton version string: {MEGATON_VERSION_STRING}")
+    });
     let needed_version_req =
         VersionReq::parse(&format!("={}.{}", true_version.major, true_version.minor)).unwrap();
     let exact_version_req = VersionReq::parse(&format!(
