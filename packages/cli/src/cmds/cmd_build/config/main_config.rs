@@ -5,9 +5,10 @@
 use std::path::{Path, PathBuf};
 
 use cu::pre::*;
+use semver::{Version, VersionReq};
 
 use super::{BASE_PROFILE, Build, CaptureUnused, ExtendProfile, Profile, Validate, ValidateCtx};
-use crate::MEGATON_VERSION;
+use crate::MEGATON_VERSION_STRING;
 
 /// Load a Megaton.toml config file
 pub fn load_config(manifest_path: impl AsRef<Path>) -> cu::Result<Config> {
@@ -147,9 +148,8 @@ impl Validate for CargoConfig {
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MegatonConfig {
     /// If specified, megaton will run version check
-    ///
-    /// `N` means the build tool must be version `0.N.x` (x can be anything)
-    pub version: Option<String>,
+    /// Will error if
+    pub version: Option<Version>,
 
     /// Custom entry point symbol for the module. This should only be set if libmegaton is disabled.
     /// Using this disables the libmegaton runtime, which also means rust support will be disabled.
@@ -162,33 +162,37 @@ pub struct MegatonConfig {
 impl Validate for MegatonConfig {
     fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
         if let Some(v) = &self.version {
-            check_version(v, MEGATON_VERSION)?
+            check_version(v)?
         }
         self.unused.validate(ctx)
     }
 }
 
-fn check_version(checked_version: &str, real_version: &str) -> cu::Result<()> {
-    let mut version = checked_version.splitn(3, '.');
-    let ver_major = cu::check!(version.next(), "invalid format: {}", checked_version)?;
-    let ver_minor = cu::check!(version.next(), "invalid format: {}", checked_version)?;
-    let ver_patch = cu::check!(version.next(), "invalid format: {}", checked_version)?;
-    let mut real = real_version.splitn(3, '.');
-    let real_major = real.next().unwrap();
-    let real_minor = real.next().unwrap();
-    let real_patch = real.next().unwrap();
-    if ver_major != real_major || ver_minor != real_minor {
-        cu::bail!(
-            "megaton.version: major and minor version must match {}.{}.X",
-            real_major,
-            real_minor
+fn check_version(version: &Version) -> cu::Result<()> {
+    let true_version = Version::parse(MEGATON_VERSION_STRING).expect(&format!(
+        "Failed to parse megaton version string: {MEGATON_VERSION_STRING}"
+    ));
+    let needed_version_req =
+        VersionReq::parse(&format!("={}.{}", true_version.major, true_version.minor)).unwrap();
+    let exact_version_req = VersionReq::parse(&format!(
+        "={}.{}.{}",
+        true_version.major, true_version.minor, true_version.patch
+    ))
+    .unwrap();
+
+    if !needed_version_req.matches(version) {
+        cu::error!(
+            "Version check: major/minor version do not match\n\tConfig: {} | Megaton version: {}",
+            version,
+            true_version
         );
+        cu::bail!("Version check failed");
     }
-    if ver_patch != real_patch {
-        cu::hint!(
-            "Megaton patch number has changed - config: {}, megaton: {}",
-            checked_version,
-            real_version
+    if !exact_version_req.matches(version) {
+        cu::warn!(
+            "Version check: patch number does not match\n\tConfig: {} | Megaton version: {}",
+            version,
+            true_version
         );
     }
     Ok(())
