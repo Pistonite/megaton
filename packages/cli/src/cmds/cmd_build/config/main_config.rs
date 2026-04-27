@@ -8,7 +8,6 @@ use cu::pre::*;
 use semver::{Version, VersionReq};
 
 use super::{BASE_PROFILE, Build, CaptureUnused, ExtendProfile, Profile, Validate, ValidateCtx};
-use crate::MEGATON_VERSION_STRING;
 
 /// Load a Megaton.toml config file
 pub fn load_config(manifest_path: impl AsRef<Path>) -> cu::Result<Config> {
@@ -147,9 +146,10 @@ impl Validate for CargoConfig {
 /// The `[megaton]` section
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MegatonConfig {
-    /// If specified, megaton will run version check
-    /// Will error if
-    pub version: Option<Version>,
+    /// If specified, megaton will run version check and error if the current
+    /// version doesn't match the given requirement. To only check minor version,
+    /// pass a version of the form `0.{minor}.*`
+    pub version: Option<VersionReq>,
 
     /// Custom entry point symbol for the module. This should only be set if libmegaton is disabled.
     /// Using this disables the libmegaton runtime, which also means rust support will be disabled.
@@ -168,32 +168,15 @@ impl Validate for MegatonConfig {
     }
 }
 
-fn check_version(version: &Version) -> cu::Result<()> {
-    let true_version = Version::parse(MEGATON_VERSION_STRING).unwrap_or_else(|_| {
-        panic!("Failed to parse megaton version string: {MEGATON_VERSION_STRING}")
-    });
-    let needed_version_req =
-        VersionReq::parse(&format!("={}.{}", true_version.major, true_version.minor)).unwrap();
-    let exact_version_req = VersionReq::parse(&format!(
-        "={}.{}.{}",
-        true_version.major, true_version.minor, true_version.patch
-    ))
-    .unwrap();
-
-    if !needed_version_req.matches(version) {
+fn check_version(version_req: &VersionReq) -> cu::Result<()> {
+    let true_version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
+    if !version_req.matches(&true_version) {
         cu::error!(
-            "Version check: major/minor version do not match\n\tConfig: {} | Megaton version: {}",
-            version,
-            true_version
+            "Version check: version {} does not match requirement {}",
+            true_version,
+            version_req
         );
         cu::bail!("Version check failed");
-    }
-    if !exact_version_req.matches(version) {
-        cu::warn!(
-            "Version check: patch number does not match\n\tConfig: {} | Megaton version: {}",
-            version,
-            true_version
-        );
     }
     Ok(())
 }
