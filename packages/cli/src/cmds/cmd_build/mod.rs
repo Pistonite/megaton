@@ -16,7 +16,7 @@ mod config;
 mod link;
 mod rust;
 
-/// Manage the custom `megaton` Rust toolchain
+/// Compile and link the megaton project
 #[derive(Debug, Clone, AsRef, clap::Parser)]
 pub struct CmdBuild {
     /// Select profile to build
@@ -62,6 +62,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     let target_mod_include = target_mod.join("include");
     let target_mod_o = target_mod.join("o");
     let compile_db_path = target_mod.join("compiledb.cache");
+    let target_lib = profile_target.join("lib");
     cu::fs::make_dir(&target_mod_src)?;
     cu::fs::make_dir(&target_mod_include)?;
     cu::fs::make_dir(&target_mod_o)?;
@@ -75,12 +76,21 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     let mut static_libs = vec![];
     let mut need_link = false;
 
+    if lib_enabled {
+        cu::debug!("Cmd_build: libmegaton enabled");
+        install_lib_if_needed(&target_lib)?;
+    }
+
     ////////// Build rust //////////
     let rust_ctx = rust::RustCtx::from_config(config.cargo);
     let rust_enabled = rust_ctx.is_some();
     if lib_enabled && let Some(rust_ctx) = rust_ctx {
         let rust_ctx =
             rust_ctx.context("Rust is enabled, but cargo context could not be initialized")?;
+
+        rust_ctx.add_megaton_rust_lib(&target_lib).await.context(
+            "Failed to add megaton rust library, ensure libmegaton was properly installed",
+        )?;
 
         if !args.configure {
             need_link |= rust_ctx
@@ -111,14 +121,6 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
 
     // If libmegaton enabled, create library context
     if lib_enabled {
-        cu::debug!("Cmd_build: libmegaton enabled");
-        let target_lib = profile_target.join("lib");
-
-        if lib_needs_unpacked(&target_lib) {
-            cu::hint!("Installing libmegaton");
-            unpack_lib(&target_lib).context("Failed to unpack library archive")?;
-        }
-
         // Add public library includes
         build_flags.add_includes([target_lib.join("include").into_utf8()?]);
         build_flags.add_includes([target_lib.join("nnheaders").join("include").into_utf8()?]);
@@ -249,6 +251,14 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
 
 static LIBRARY_TARGZ: &[u8] = include_bytes!("../../../libmegaton.tar.gz");
 static LIBRARY_HASH: &[u8] = include_bytes!("../../../libmegaton_sha256sum");
+
+fn install_lib_if_needed(lib_path: &Path) -> cu::Result<()> {
+    if lib_needs_unpacked(lib_path) {
+        cu::hint!("Installing libmegaton");
+        unpack_lib(lib_path).context("Failed to unpack library archive")?;
+    }
+    Ok(())
+}
 
 /// True if version hash doesn't exist or doesn't match the stored tarball
 fn lib_needs_unpacked(lib_path: &Path) -> bool {

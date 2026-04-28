@@ -12,6 +12,7 @@ use crate::env::environment;
 
 use super::config::CargoConfig;
 
+#[derive(Debug, Clone)]
 pub struct RustCtx {
     pub manifest: PathBuf,
     target_path: PathBuf,
@@ -72,6 +73,26 @@ impl RustCtx {
     pub fn has_build_script(&self) -> bool {
         let script = self.manifest.parent().unwrap().join("build.rs");
         script.exists()
+    }
+
+    /// Add the megaton rust library to the crate
+    /// libmegaton must be installed when this is called
+    pub async fn add_megaton_rust_lib(&self, lib_path: &Path) -> cu::Result<()> {
+        let cargo = cu::which("cargo")
+            .context("Cargo executable not found: ensure rust is properly installed")?;
+        let command = cargo
+            .command()
+            .add(cu::args![
+                "add",
+                "--manifest-path",
+                &self.manifest,
+                "--path",
+                lib_path,
+            ])
+            .stdio_null()
+            .stderr(cu::lv::I);
+
+        command.co_wait_nz().await
     }
 
     /// Build the rust crate with `cargo build +megaton`
