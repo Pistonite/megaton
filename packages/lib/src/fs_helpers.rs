@@ -28,14 +28,39 @@ pub struct FileDescriptor {
 
 #[repr(C)]
 pub struct OpenResult {
-    pub result: NNResult,   // denotes error, or 0 on success
+    pub result: NNResult,
     pub fd: FileDescriptor
 }
 
 #[repr(C)]
+pub struct ReadResult {
+    pub result: NNResult,
+    pub bytes_read: usize,
+}
+
+#[repr(C)]
 pub struct GetEntryTypeResult {
-    pub result: NNResult,   // denotes error, or 0 on success
+    pub result: NNResult,
     pub entry_type: DirectoryEntryType
+}
+
+#[repr(C)]
+pub struct WriteResult {
+    pub result: NNResult,
+    pub bytes_written: u64
+}
+
+#[repr(C)]
+pub struct GetSizeResult {
+    pub result: NNResult,
+    pub size: i64
+}
+
+
+#[repr(C)]
+pub struct StatResult {
+    pub result: NNResult,
+    pub stat_val: stat
 }
 
 
@@ -43,13 +68,22 @@ unsafe extern "C" {
     // include!("toolkit/tcp.hpp");
     // #[namespace = "botw::tcp"]
     #[link_name = "foobar"]
-    pub unsafe fn write_file(nn_fd: u64, seek_offset: u64, buf: *const u8, len: usize) -> isize;
+    pub unsafe fn write_file(nn_fd: u64, seek_offset: u64, buf: *const u8, len: usize) -> WriteResult;
 
     #[link_name = "foobar"]
     pub unsafe fn open(name: *const i8,  flags: i32, mode: i32) -> OpenResult;
 
     #[link_name = "foobar"]
     pub unsafe fn get_entry_type(name: *const i8) -> GetEntryTypeResult;
+
+    #[link_name = "foobar"]
+    pub unsafe fn get_file_size(file_handle: u64) -> GetSizeResult;
+
+    #[link_name = "foobar"]
+    pub unsafe fn do_stat(file_handle: u64, stat_struct: *mut stat) -> GetSizeResult;
+
+    #[link_name = "foobar"]
+    pub unsafe fn read_file(file_handle: u64, seek_pos: u64, buf: *mut u8, len: u64) -> ReadResult;
 }
 
 
