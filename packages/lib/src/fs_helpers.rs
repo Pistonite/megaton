@@ -1,5 +1,13 @@
 use std::ffi::c_int;
 
+
+#[repr(C)]
+pub struct NNResult {
+    pub success: bool,
+    pub module: i32,
+    pub description: i32,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum FileDescriptorType {
     FILE,
@@ -20,9 +28,16 @@ pub struct FileDescriptor {
 
 #[repr(C)]
 pub struct OpenResult {
-    pub error_code: i32,   // denotes error, or 0 on success
+    pub result: NNResult,   // denotes error, or 0 on success
     pub fd: FileDescriptor
 }
+
+#[repr(C)]
+pub struct GetEntryTypeResult {
+    pub result: NNResult,   // denotes error, or 0 on success
+    pub entry_type: DirectoryEntryType
+}
+
 
 unsafe extern "C" {
     // include!("toolkit/tcp.hpp");
@@ -32,6 +47,9 @@ unsafe extern "C" {
 
     #[link_name = "foobar"]
     pub unsafe fn open(name: *const i8,  flags: i32, mode: i32) -> OpenResult;
+
+    #[link_name = "foobar"]
+    pub unsafe fn get_entry_type(name: *const i8) -> GetEntryTypeResult;
 }
 
 
@@ -50,13 +68,19 @@ pub const O_APPEND: i32 = 0o2000;
 pub const O_NONBLOCK: i32 = 0o4000;
 pub const O_DIRECTORY: i32 = 0o200000;
 
+pub const FS_ERR_MODULE: i32 = 2; // all fs errors will have module = 2
+pub const PATH_NOT_FOUND: i32      = 1;
+pub const PATH_ALREADY_EXISTS: i32 = 2;
+pub const TARGET_LOCKED: i32       = 7;
+pub const DIRECTORY_NOT_EMPTY: i32 = 8;
+
 // https://github.com/hermit-os/hermit-rs/blob/82146cf059bf3894eea1e96beed9da72b99b9d5a/hermit-abi/src/lib.rs#L169
 type time_t = i64;
 
-// https://github.com/hermit-os/kernel/blob/884cdccf6a5ca532b5aad102a530e2d6e7cf5b25/src/fs/mod.rs#L288
+// https://github.com/hermit-os/hermit-rs/blob/82146cf059bf3894eea1e96beed9da72b99b9d5a/hermit-abi/src/lib.rs#L284
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
-pub struct FileAttr {
+pub struct stat {
 	pub st_dev: u64,
 	pub st_ino: u64,
 	pub st_nlink: u64,
