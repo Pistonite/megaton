@@ -16,7 +16,7 @@ mod config;
 mod link;
 mod rust;
 
-/// Manage the custom `megaton` Rust toolchain
+/// Compile and link the megaton project
 #[derive(Debug, Clone, AsRef, clap::Parser)]
 pub struct CmdBuild {
     /// Select profile to build
