@@ -4,8 +4,6 @@ const NUM_FDS: usize = 1000;
 
 use crate::fs_helpers::{self, FileDescriptor, FileDescriptorType};
 
-
-
 static LIST: Mutex<[Option<FileDescriptor>; NUM_FDS]> = Mutex::new([None; NUM_FDS]);
 
 
@@ -22,6 +20,7 @@ fn insert_into_fd_list(fd: FileDescriptor) -> Option<usize> {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn sys_open(name: *const i8, flags: i32, mode: i32) -> i32 {
+    // TODO: map flags and mode to nnheaders flags and mode
     let result = unsafe { fs_helpers::open(name, flags, mode) };
     if result.error_code != 0 {
         result.error_code
