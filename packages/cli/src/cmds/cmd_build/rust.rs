@@ -79,11 +79,12 @@ impl RustCtx {
         let metadata = MetadataCommand::new()
             .manifest_path(&self.manifest)
             .exec()?;
-        let cxx = cu::check!(
-            metadata.packages.iter().find(|pack| pack.name == "cxx"),
-            "failed to find cxx package\ntry adding this line to your cargo dependencies: `cxx = \"={}\"`",
-            BLESSED_CXX_VERSION
-        )?;
+
+        let cxx = match metadata.packages.iter().find(|pack| pack.name == "cxx"){
+            Some(package) => package,
+            None => return Ok(()),
+        };
+
         let blessed_version = Version::parse(BLESSED_CXX_VERSION).unwrap();
         if cxx.version < blessed_version {
             cu::bail!(
