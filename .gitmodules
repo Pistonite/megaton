@@ -1,4 +1,3 @@
-[submodule "nnheaders"]
+[submodule "packages/lib/nnheaders"]
 	path = packages/lib/nnheaders
-	url = https://github.com/open-ead/nnheaders
-	branch = master
+	url = https://github.com/open-ead/nnheaders.git
