@@ -5,6 +5,9 @@ members = [
     "packages/lib",
     "packages/lib/macros",
 ]
+exclude = [
+    "packages/test-mod"
+]
 
 [workspace.dependencies]
 
