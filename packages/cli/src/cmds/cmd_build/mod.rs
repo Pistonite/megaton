@@ -87,6 +87,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     if lib_enabled && let Some(rust_ctx) = rust_ctx {
         let rust_ctx =
             rust_ctx.context("Rust is enabled, but cargo context could not be initialized")?;
+        rust_ctx.check_cxx_version()?;
 
         rust_ctx.add_megaton_rust_lib(&target_lib).await.context(
             "Failed to add megaton rust library, ensure libmegaton was properly installed",

@@ -6,6 +6,7 @@ use std::{
     sync::Arc,
 };
 
+use cargo_metadata::{MetadataCommand, semver::Version};
 use cu::pre::*;
 
 use crate::env::environment;
@@ -19,6 +20,8 @@ pub struct RustCtx {
     source_paths: Vec<PathBuf>,
     header_suffix: String,
 }
+
+static BLESSED_CXX_VERSION: &str = "1.0.194";
 
 impl RustCtx {
     /// Gets the crate based on the cargo config. Returns `None` if rust is
@@ -54,6 +57,8 @@ impl RustCtx {
 
         let crate_root = manifest.parent().unwrap();
 
+        cu::debug!("checking cxx version");
+
         let source_paths = sources
             .iter()
             .map(|rel_path| crate_root.join(rel_path))
@@ -68,6 +73,38 @@ impl RustCtx {
             source_paths,
             header_suffix,
         })
+    }
+
+    pub fn check_cxx_version(&self) -> cu::Result<()> {
+        let metadata = MetadataCommand::new()
+            .manifest_path(&self.manifest)
+            .exec()?;
+
+        let cxx = match metadata.packages.iter().find(|pack| pack.name == "cxx") {
+            Some(package) => package,
+            None => {
+                cu::debug!("cxx package not found, skipping cxx version check");
+                return Ok(());
+            }
+        };
+
+        let blessed_version = Version::parse(BLESSED_CXX_VERSION).unwrap();
+        if cxx.version < blessed_version {
+            cu::bail!(
+                "cxx version is older than the supported version; supported: {}, found: {} ",
+                blessed_version,
+                cxx.version
+            );
+        }
+        if cxx.version > blessed_version {
+            cu::warn!(
+                "cxx version is newer than the supported version; supported: {}, found: {}",
+                blessed_version,
+                cxx.version
+            );
+        }
+
+        Ok(())
     }
 
     pub fn has_build_script(&self) -> bool {
@@ -282,6 +319,7 @@ async fn cxxbridge_process(
 // Run the cxxbridge cmd and update the corresponding file if changed
 // returns Ok(true) iff new code was generated and written
 async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::Result<bool> {
+    let env = environment();
     let mut args = vec![];
     if let Some(file) = file {
         args.push(cu::check!(file.to_str(), "Not utf-8: {}", file.display())?);
@@ -290,8 +328,14 @@ async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::
         args.push("--header");
     }
 
-    let exe = cu::which("cxxbridge")
-        .context("cxxbridge executable not found; `cargo install cxxbridge-cmd`")?;
+    let exe = env.cxxbridge();
+    if !exe.exists() {
+        cu::debug!("cxxbridge-cmd not installed, installing to MEGATON_HOME/bin");
+        install_cxxbridge(env.home())
+            .await
+            .context("Failed to install cxxbridge Make sure you are connected to the internet")?;
+    }
+
     let command = exe
         .command()
         .stdout(cu::pio::buffer())
@@ -317,6 +361,24 @@ async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::
         }
         None => cu::bail!("cxxbridge terminated early"),
     }
+}
+
+async fn install_cxxbridge(dir: &Path) -> cu::Result<()> {
+    cu::fs::make_dir(dir)?;
+    let dir = dir.as_utf8()?;
+    let command = cu::which("cargo")?
+        .command()
+        .add(cu::args![
+            "install",
+            "--root",
+            dir,
+            "--no-track",
+            "-q", // suppress warning about adding ./bin to path
+            format!("cxxbridge-cmd@{BLESSED_CXX_VERSION}"),
+        ])
+        .preset(cu::pio::cargo("Installing cxxbridge-cmd"));
+
+    command.co_spawn().await?.0.co_wait_nz().await
 }
 
 fn write_if_changed(path: &Path, bytes: &[u8]) -> cu::Result<bool> {

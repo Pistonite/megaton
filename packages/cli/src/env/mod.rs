@@ -27,6 +27,8 @@ pub struct Environment {
     devkitpro: PathBuf,
     dkp_version: String,
     dkp_includes: Vec<String>,
+
+    cxxbridge: PathBuf,
 }
 
 impl Environment {
@@ -51,6 +53,8 @@ impl Environment {
             .expect("Failed to init environment: check that DKP is installed correctly");
         let dkp_includes = get_dkp_includes(&devkitpro, &dkp_version);
 
+        let cxxbridge = megaton_home.join("bin").join("cxxbridge");
+
         Self {
             megaton_home,
             cc,
@@ -66,6 +70,7 @@ impl Environment {
             devkitpro,
             dkp_version,
             dkp_includes,
+            cxxbridge,
         }
     }
 
@@ -111,6 +116,9 @@ impl Environment {
     }
     pub fn asm_version(&self) -> &str {
         &self.asm_version
+    }
+    pub fn cxxbridge(&self) -> &Path {
+        &self.cxxbridge
     }
 }
 
