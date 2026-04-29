@@ -66,8 +66,8 @@ fn try_write_file(fd: &mut FileDescriptor, buf: *const u8, len: usize) -> isize 
     let write_result = unsafe { fs_helpers::write_file(fd.inner, fd.seek_offset, buf, len) };
     
     if write_result.result.success {
-        fd.seek_offset += write_result.bytes_written;
-        write_result.bytes_written as isize
+        fd.seek_offset += len as u64;
+        len as isize
     } else {
         assert!(write_result.result.module == fs_helpers::FS_ERR_MODULE);
         match write_result.result.description {

@@ -9,6 +9,7 @@ pub struct NNResult {
 }
 
 #[derive(Clone, Copy, Debug)]
+#[repr(C)]
 pub enum FileDescriptorType {
     FILE,
     DIR,
@@ -45,12 +46,6 @@ pub struct GetEntryTypeResult {
 }
 
 #[repr(C)]
-pub struct WriteResult {
-    pub result: NNResult,
-    pub bytes_written: u64
-}
-
-#[repr(C)]
 pub struct GetSizeResult {
     pub result: NNResult,
     pub size: i64
@@ -67,7 +62,7 @@ pub struct StatResult {
 unsafe extern "C" {
     // include!("toolkit/tcp.hpp");
     // #[namespace = "botw::tcp"]
-    #[link_name = "foobar"]
+    #[link_name = "write_file"]
     pub unsafe fn write_file(nn_fd: u64, seek_offset: u64, buf: *const u8, len: usize) -> WriteResult;
 
     #[link_name = "foobar"]
@@ -180,6 +175,7 @@ struct DirectoryHandle {
 }
 
 /* Kinds of entries within a directory. */
+#[repr(C)]
 enum DirectoryEntryType {
     DirectoryEntryType_Directory,
     DirectoryEntryType_File,
@@ -187,6 +183,7 @@ enum DirectoryEntryType {
 
 
 /* Bitfield to define the kinds of entries to open from a directory. */
+#[repr(C)]
 enum OpenDirectoryMode {
     OpenDirectoryMode_Directory = 1 << 0,
     OpenDirectoryMode_File = 1 << 1,

@@ -18,3 +18,31 @@ struct FileDescriptor {
     FileDescriptorType kind;
     uint64_t seek_offset;
 };
+
+struct NNResult {
+    bool success;
+    int32_t module;
+    int32_t description;
+};
+
+struct OpenResult {
+    NNResult result;
+    FileDescriptor fd;
+};
+
+struct ReadResult {
+    NNResult result;
+    size_t bytes_read;
+};
+
+struct GetEntryTypeResult { 
+    NNResult result;
+    nn::fs::DirectoryEntryType entry_type;
+};
+
+struct WriteResult {
+    NNResult result;
+    uint64_t bytes_written;
+};
+
+extern "C" NNResult write_file(uint64_t fd, const uint8_t* buf, uint64_t size, size_t position);
