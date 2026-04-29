@@ -80,9 +80,12 @@ impl RustCtx {
             .manifest_path(&self.manifest)
             .exec()?;
 
-        let cxx = match metadata.packages.iter().find(|pack| pack.name == "cxx"){
+        let cxx = match metadata.packages.iter().find(|pack| pack.name == "cxx") {
             Some(package) => package,
-            None => return Ok(()),
+            None => {
+                cu::debug!("cxx package not found, skipping cxx version check");
+                return Ok(());
+            }
         };
 
         let blessed_version = Version::parse(BLESSED_CXX_VERSION).unwrap();
