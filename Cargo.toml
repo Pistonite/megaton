@@ -4,6 +4,9 @@ members = [
     "packages/cli", 
     "packages/lib",
 ]
+exclude = [
+    "packages/test-mod"
+]
 
 [workspace.dependencies]
 
