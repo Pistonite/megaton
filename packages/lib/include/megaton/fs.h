@@ -40,9 +40,13 @@ struct GetEntryTypeResult {
     nn::fs::DirectoryEntryType entry_type;
 };
 
-struct WriteResult {
+struct GetSizeResult {
     NNResult result;
-    uint64_t bytes_written;
+    uint64_t size;
 };
 
-extern "C" NNResult write_file(uint64_t fd, const uint8_t* buf, uint64_t size, size_t position);
+
+extern "C" NNResult __megaton_lib_write_file(uint64_t nn_fd, const uint8_t* buf, uint64_t size, size_t position);
+extern "C" OpenResult __megaton_lib_open(const char* name, int32_t flags, uint32_t mode);
+extern "C" GetEntryTypeResult __megaton_lib_get_entry_type(const char* name);
+extern "C" GetSizeResult __megaton_lib_get_file_size(uint64_t nn_fd);

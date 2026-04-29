@@ -2,4 +2,7 @@
 // Copyright (c) 2025-2026 Megaton contributors
 
 mod fs;
-mod fs_helpers;
+
+unsafe extern "C" fn __megaton_librs_init() {
+    fs::init_stdio();
+}

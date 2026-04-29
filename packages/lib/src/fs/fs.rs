@@ -2,8 +2,12 @@ use std::{array, sync::{Arc, LazyLock, Mutex}};
 
 const NUM_FDS: usize = 1000;
 const GENERIC_ERRNO: i32 = -1;
+// TODO: Allow user to configure stdio paths
+const STDIN_PATH: &str = "sd:/megaton_stdin.txt";
+const STDOUT_PATH: &str = "sd:/megaton_stdout.txt";
+const STDERR_PATH: &str = "sd:/megaton_stderr.txt";
 
-use crate::fs_helpers::{self, FileDescriptor, FileDescriptorType, GetEntryTypeResult, O_RDONLY};
+use crate::fs::fs_helpers::{self, FileDescriptor, FileDescriptorType, GetEntryTypeResult, O_CREAT, O_RDONLY, O_RDWR, O_TRUNC, STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO};
 
 static LIST: Mutex<[Option<FileDescriptor>; NUM_FDS]> = Mutex::new([None; NUM_FDS]);
 
@@ -28,18 +32,39 @@ fn get_fd_entry(fd: usize) -> Option<FileDescriptor> {
     LIST.try_lock().unwrap()[fd]
 }
 
+pub fn init_stdio(){
+    // stdio takes up 3 entries in the fd list, but makes the indexing logic simpler.
+    // Otherwise, we need to offset every fd we give to the user, or given to us by the user, by 3. 
+    // If we need more fds later, we can just make the list bigger.
+    let list = &mut LIST.try_lock().unwrap();
+    let stdin_path: *const i8 = STDIN_PATH.as_ptr() as *const i8;
+    let stdout_path: *const i8 = STDOUT_PATH.as_ptr() as *const i8;
+    let stderr_path: *const i8 = STDERR_PATH.as_ptr() as *const i8;
+    
+    // open for read/write, create it if the file doesn't exist, and delete all existing content if it does
+    let stdin_fd = unsafe { fs_helpers::open(stdin_path, O_RDWR | O_CREAT | O_TRUNC, 0) };
+    let stdout_fd = unsafe { fs_helpers::open(stdout_path, O_RDWR | O_CREAT | O_TRUNC, 0) };
+    let stderr_fd = unsafe { fs_helpers::open(stderr_path, O_RDWR | O_CREAT | O_TRUNC, 0) };
+
+    assert!(stdin_fd.result.success && stdout_fd.result.success && stderr_fd.result.success);
+    list[STDIN_FILENO] = Some(stdin_fd.fd);
+    list[STDOUT_FILENO] = Some(stdout_fd.fd);
+    list[STDERR_FILENO] = Some(stderr_fd.fd);
+}
+
 
 #[unsafe(no_mangle)]
 pub extern "C" fn sys_open(name: *const i8, flags: i32, mode: i32) -> i32 {
     // TODO: map flags and mode to nnheaders flags and mode
     let open_result = unsafe { fs_helpers::open(name, flags, mode) };
-    if open_result.result.description != 0 {
-        open_result.result.description
-    } else {
+    if open_result.result.success  {
         match insert_into_fd_list(open_result.fd) {
             Some(fd_index) => fd_index as i32,
             None => GENERIC_ERRNO,
         }
+    } else {
+        assert!(open_result.result.module == fs_helpers::FS_ERR_MODULE);
+        GENERIC_ERRNO
     }
 }
 
@@ -53,24 +78,23 @@ pub fn sys_write(fd: i32, buf: *const u8, len: usize) -> isize {
                 FileDescriptorType::FILE => try_write_file(fd, buf, len),
                 FileDescriptorType::DIR => GENERIC_ERRNO as isize,
                 FileDescriptorType::TCP => todo!(),
-                FileDescriptorType::STDIN => todo!(),
-                FileDescriptorType::STDOUT => todo!(),
-                FileDescriptorType::STDERR => todo!(),
+                FileDescriptorType::STDIN => try_write_file(fd, buf, len),
+                FileDescriptorType::STDOUT => try_write_file(fd, buf, len),
+                FileDescriptorType::STDERR => try_write_file(fd, buf, len),
             }
         }
     }
 }
 
-
 fn try_write_file(fd: &mut FileDescriptor, buf: *const u8, len: usize) -> isize {
     let write_result = unsafe { fs_helpers::write_file(fd.inner, fd.seek_offset, buf, len) };
     
-    if write_result.result.success {
+    if write_result.success {
         fd.seek_offset += len as u64;
         len as isize
     } else {
-        assert!(write_result.result.module == fs_helpers::FS_ERR_MODULE);
-        match write_result.result.description {
+        assert!(write_result.module == fs_helpers::FS_ERR_MODULE);
+        match write_result.description {
             _ => GENERIC_ERRNO as isize // TODO: Map nn error to errno
         }
     }    

@@ -62,31 +62,28 @@ pub struct StatResult {
 unsafe extern "C" {
     // include!("toolkit/tcp.hpp");
     // #[namespace = "botw::tcp"]
-    #[link_name = "write_file"]
-    pub unsafe fn write_file(nn_fd: u64, seek_offset: u64, buf: *const u8, len: usize) -> WriteResult;
+    #[link_name = "__megaton_lib_fs_write_file"]
+    pub unsafe fn write_file(nn_fd: u64, seek_offset: u64, buf: *const u8, len: usize) -> NNResult;
 
-    #[link_name = "foobar"]
+    #[link_name = "__megaton_lib_fs_open"]
     pub unsafe fn open(name: *const i8,  flags: i32, mode: i32) -> OpenResult;
 
-    #[link_name = "foobar"]
+    #[link_name = "__megaton_lib_fs_get_entry_type"]
     pub unsafe fn get_entry_type(name: *const i8) -> GetEntryTypeResult;
 
-    #[link_name = "foobar"]
-    pub unsafe fn get_file_size(file_handle: u64) -> GetSizeResult;
+    #[link_name = "__megaton_lib_fs_get_file_size"]
+    pub unsafe fn get_file_size(nn_fd: u64) -> GetSizeResult;
 
-    #[link_name = "foobar"]
-    pub unsafe fn do_stat(file_handle: u64, stat_struct: *mut stat) -> GetSizeResult;
-
-    #[link_name = "foobar"]
-    pub unsafe fn read_file(file_handle: u64, seek_pos: u64, buf: *mut u8, len: u64) -> ReadResult;
+    #[link_name = "__megaton_lib_fs_read_file"]
+    pub unsafe fn read_file(nn_fd: u64, seek_pos: u64, buf: *mut u8, len: u64) -> ReadResult;
 }
 
 
 
 // https://github.com/hermit-os/hermit-rs/blob/82146cf059bf3894eea1e96beed9da72b99b9d5a/hermit-abi/src/lib.rs#L44
-pub const STDIN_FILENO: c_int = 0;
-pub const STDOUT_FILENO: c_int = 1;
-pub const STDERR_FILENO: c_int = 2;
+pub const STDIN_FILENO: usize = 0;
+pub const STDOUT_FILENO: usize = 1;
+pub const STDERR_FILENO: usize = 2;
 pub const O_RDONLY: i32 = 0o0;
 pub const O_WRONLY: i32 = 0o1;
 pub const O_RDWR: i32 = 0o2;
