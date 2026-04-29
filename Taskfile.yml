@@ -2,7 +2,7 @@ version: '3'
 
 includes:
   common:
-    taskfile: packages/mono-dev/task/common.yaml
+    taskfile: mono-dev/task/common.yaml
     optional: true
     flatten: true
 
@@ -16,14 +16,15 @@ tasks:
 
   install-mono:
     - rm -rf packages/mono-dev
-    - git clone https://github.com/Pistonight/mono-dev --depth 1 packages/mono-dev
+    - rm -rf mono-dev
+    - git clone https://github.com/Pistonight/mono-dev --depth 1
 
   install-cargo-extra-tools:
     aliases: [icets]
     cmds:
       - task: cargo-binstall
         vars:
-          PACKAGES: lisensor mdbook@0.4 mdbook-admonish cargo-watch live-server
+          PACKAGES: lisensor mdbook@0.4 mdbook-admonish shwoop
 
   check:
     desc: run ALL of the checks

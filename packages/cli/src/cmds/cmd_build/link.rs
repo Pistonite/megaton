@@ -18,7 +18,7 @@ pub async fn build_elf(
     link_cmd_path: &Path,
 ) -> cu::Result<bool> {
     let env = environment();
-    let mut args = ldflags;
+    let mut args = vec![];
 
     // sort so args are always comparable regardless of compilation order
     objects.sort();
@@ -28,7 +28,7 @@ pub async fn build_elf(
     for lib in static_libs {
         args.push(lib.into_utf8()?);
     }
-
+    args.extend(ldflags);
     args.push(format!("-o{}", out_path.to_owned().into_utf8()?));
 
     let linker = env.cc();

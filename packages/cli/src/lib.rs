@@ -3,5 +3,3 @@
 
 pub mod cmds;
 pub mod env;
-
-pub static MEGATON_VERSION: &str = "0.1.1";
