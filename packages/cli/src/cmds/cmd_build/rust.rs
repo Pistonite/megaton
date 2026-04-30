@@ -314,9 +314,7 @@ async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::
         .stdin_null()
         .args(args);
 
-    let (child, stdout, stderr) = command
-        .co_spawn()
-        .await?;
+    let (child, stdout, stderr) = command.co_spawn().await?;
     let status = child.co_wait().await.context("Failed to wait cxxbridge")?;
 
     match status.code() {
