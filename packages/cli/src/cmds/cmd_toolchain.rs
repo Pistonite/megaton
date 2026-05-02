@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use cu::pre::*;
 
-use crate::env;
+use crate::{BLESSED_CXX_VERSION, env};
 
 /// The Rust toolchain name to be installed/linked
 static TOOLCHAIN_NAME: &str = "megaton";
@@ -13,8 +13,6 @@ static TOOLCHAIN_NAME: &str = "megaton";
 static RUST_REPO: &str = "https://github.com/rust-lang/rust";
 /// The "blessed" commit hash to use (i.e. tested and will work)
 static RUST_COMMIT: &str = "caadc8df3519f1c92ef59ea816eb628345d9f52a";
-/// The "blessed" cxxbridge-cmd version to use
-pub static BLESSED_CXX_VERSION: &str = "1.0.194";
 
 /// Manage the custom `megaton` Rust toolchain
 #[derive(Debug, Clone, clap::Subcommand)]

@@ -9,7 +9,7 @@ use std::{
 use cargo_metadata::{MetadataCommand, semver::Version};
 use cu::pre::*;
 
-use crate::{cmds::cmd_toolchain::BLESSED_CXX_VERSION, env::environment};
+use crate::{BLESSED_CXX_VERSION, env::environment};
 
 use super::config::CargoConfig;
 
