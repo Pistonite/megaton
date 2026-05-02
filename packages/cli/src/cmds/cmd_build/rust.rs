@@ -9,7 +9,7 @@ use std::{
 use cargo_metadata::{MetadataCommand, semver::Version};
 use cu::pre::*;
 
-use crate::env::environment;
+use crate::{BLESSED_CXX_VERSION, env::environment};
 
 use super::config::CargoConfig;
 
@@ -20,8 +20,6 @@ pub struct RustCtx {
     source_paths: Vec<PathBuf>,
     header_suffix: String,
 }
-
-static BLESSED_CXX_VERSION: &str = "1.0.194";
 
 impl RustCtx {
     /// Gets the crate based on the cargo config. Returns `None` if rust is
@@ -110,26 +108,6 @@ impl RustCtx {
     pub fn has_build_script(&self) -> bool {
         let script = self.manifest.parent().unwrap().join("build.rs");
         script.exists()
-    }
-
-    /// Add the megaton rust library to the crate
-    /// libmegaton must be installed when this is called
-    pub async fn add_megaton_rust_lib(&self, lib_path: &Path) -> cu::Result<()> {
-        let cargo = cu::which("cargo")
-            .context("Cargo executable not found: ensure rust is properly installed")?;
-        let command = cargo
-            .command()
-            .add(cu::args![
-                "add",
-                "--manifest-path",
-                &self.manifest,
-                "--path",
-                lib_path,
-            ])
-            .stdio_null()
-            .stderr(cu::lv::I);
-
-        command.co_wait_nz().await
     }
 
     /// Build the rust crate with `cargo build +megaton`
@@ -328,25 +306,15 @@ async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::
         args.push("--header");
     }
 
-    let exe = env.cxxbridge();
-    if !exe.exists() {
-        cu::debug!("cxxbridge-cmd not installed, installing to MEGATON_HOME/bin");
-        install_cxxbridge(env.home())
-            .await
-            .context("Failed to install cxxbridge Make sure you are connected to the internet")?;
-    }
-
-    let command = exe
+    let command = env
+        .cxxbridge()
         .command()
         .stdout(cu::pio::buffer())
         .stderr(cu::pio::string())
         .stdin_null()
         .args(args);
 
-    let (child, stdout, stderr) = command
-        .co_spawn()
-        .await
-        .context("Failed to spawn cxxbridge")?;
+    let (child, stdout, stderr) = command.co_spawn().await?;
     let status = child.co_wait().await.context("Failed to wait cxxbridge")?;
 
     match status.code() {
@@ -361,24 +329,6 @@ async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::
         }
         None => cu::bail!("cxxbridge terminated early"),
     }
-}
-
-async fn install_cxxbridge(dir: &Path) -> cu::Result<()> {
-    cu::fs::make_dir(dir)?;
-    let dir = dir.as_utf8()?;
-    let command = cu::which("cargo")?
-        .command()
-        .add(cu::args![
-            "install",
-            "--root",
-            dir,
-            "--no-track",
-            "-q", // suppress warning about adding ./bin to path
-            format!("cxxbridge-cmd@{BLESSED_CXX_VERSION}"),
-        ])
-        .preset(cu::pio::cargo("Installing cxxbridge-cmd"));
-
-    command.co_spawn().await?.0.co_wait_nz().await
 }
 
 fn write_if_changed(path: &Path, bytes: &[u8]) -> cu::Result<bool> {

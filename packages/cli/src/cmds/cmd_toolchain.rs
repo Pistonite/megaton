@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use cu::pre::*;
 
-use crate::env;
+use crate::{BLESSED_CXX_VERSION, env};
 
 /// The Rust toolchain name to be installed/linked
 static TOOLCHAIN_NAME: &str = "megaton";
@@ -65,6 +65,28 @@ fn install(keep: bool, clean: bool) -> cu::Result<()> {
         .context("rustup is required to manage Rust toolchains. Please install Rust")?;
     cu::which("rustc")
         .context("rustc is required to manage Rust toolchains. Please install Rust")?;
+
+    // Cargo will create `.../bin/cxxbridge` subdirectory path
+    let cxxbridge_install_location = env::environment().home();
+
+    match check_cxxbridge(false) {
+        Err(e) => {
+            cu::debug!("error with checking cxxbridge-cmd version: {e}, proceeding with reinstall");
+            install_cxxbridge_cmd(cxxbridge_install_location)?;
+        }
+        Ok(None) => {
+            cu::debug!("no cxxbridge-cmd installation found");
+            install_cxxbridge_cmd(cxxbridge_install_location)?;
+        }
+        Ok(Some(version)) => {
+            if version != BLESSED_CXX_VERSION {
+                cu::debug!("cxxbridge-cmd version doesn't match blessed version, reinstalling");
+                install_cxxbridge_cmd(cxxbridge_install_location)?;
+            } else {
+                cu::hint!("found existing cxxbridge-cmd installation, skipping");
+            }
+        }
+    }
 
     match check_toolchain(false) {
         Err(e) => {
@@ -299,6 +321,11 @@ fn check() -> cu::Result<()> {
         cu::warn!("{TOOLCHAIN_NAME} toolchain is not found!");
         cu::hint!("run `megaton toolchain install` to install the toolchain");
     }
+    cu::info!("checking cxxbridge-cmd installation");
+    if check_cxxbridge(true)?.is_none() {
+        cu::warn!("cxxbridge binary is not found!");
+        cu::hint!("run `megaton toolchain install` to install the cxxbridge tool");
+    }
     Ok(())
 }
 
@@ -314,6 +341,7 @@ fn remove() -> cu::Result<()> {
         Ok(Some(_)) => {}
     }
     cu::info!("uninstalling toolchain");
+    remove_cxxbridge()?;
     remove_toolchain_internal()
 }
 
@@ -328,6 +356,10 @@ fn clean() -> cu::Result<()> {
         cu::info!("rust repo does not exist");
     }
     Ok(())
+}
+
+fn remove_cxxbridge() -> cu::Result<()> {
+    cu::fs::remove(cxxbridge_binary_path())
 }
 
 fn remove_toolchain_internal() -> cu::Result<()> {
@@ -351,6 +383,10 @@ fn remove_toolchain_internal() -> cu::Result<()> {
     );
     cu::fs::make_dir_empty(install_path).context("failed to clean up old toolchain files")?;
     Ok(())
+}
+
+fn cxxbridge_binary_path() -> PathBuf {
+    env::environment().home().join("bin").join("cxxbridge")
 }
 
 fn toolchain_install_location() -> PathBuf {
@@ -467,6 +503,23 @@ fn get_rustc_host_triple() -> cu::Result<String> {
     cu::bail!("failed to get host triple from rustc");
 }
 
+fn install_cxxbridge_cmd(location: &Path) -> cu::Result<()> {
+    let location = location.as_utf8()?;
+    let command = cu::which("cargo")?
+        .command()
+        .add(cu::args![
+            "install",
+            "--root",
+            location,
+            "--no-track",
+            "-q", // suppress warning about adding ./bin to path
+            format!("cxxbridge-cmd@{BLESSED_CXX_VERSION}"),
+        ])
+        .preset(cu::pio::cargo("installing cxxbridge-cmd"));
+
+    command.spawn()?.0.wait_nz()
+}
+
 struct ToolchainInfo {
     commit_hash: Option<String>,
 }
@@ -501,4 +554,24 @@ fn check_toolchain(print: bool) -> cu::Result<Option<ToolchainInfo>> {
         }
     }
     Ok(Some(ToolchainInfo { commit_hash }))
+}
+
+fn check_cxxbridge(print: bool) -> cu::Result<Option<String>> {
+    let (child, out) = cxxbridge_binary_path()
+        .command()
+        .arg("--version")
+        .stdout(cu::pio::string())
+        .stdie_null()
+        .spawn()?;
+    let status = child.wait()?;
+    if !status.success() {
+        return Ok(None);
+    }
+    let output = out.join().flatten().unwrap_or_default();
+    if print {
+        cu::print!("{output}");
+    }
+    let words = output.split_whitespace().collect::<Vec<_>>();
+    let version = cu::check!(words.get(1), "couldn't get version number")?.to_string();
+    Ok(Some(version))
 }
