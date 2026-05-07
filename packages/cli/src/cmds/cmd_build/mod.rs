@@ -123,8 +123,12 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
 
         let mut lib_flags = build_flags.clone();
 
+        // Add nnheaders includes
+        lib_flags.add_includes([
+            env.dkp_path().join("libnx").join("include").into_utf8()?, // TODO: remove this
+            target_lib.join("nnheaders").join("include").into_utf8()?,
+        ]);
         cu::hint!("TODO: remove libnx includes");
-        lib_flags.add_includes([env.dkp_path().join("libnx").join("include").into_utf8()?]);
 
         lib_flags.add_defines([
             "MEGATON_LIB",
