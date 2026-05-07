@@ -6,9 +6,10 @@ use std::{
     sync::Arc,
 };
 
+use cargo_metadata::{MetadataCommand, semver::Version};
 use cu::pre::*;
 
-use crate::env::environment;
+use crate::{BLESSED_CXX_VERSION, env::environment};
 
 use super::config::CargoConfig;
 
@@ -54,6 +55,8 @@ impl RustCtx {
 
         let crate_root = manifest.parent().unwrap();
 
+        cu::debug!("checking cxx version");
+
         let source_paths = sources
             .iter()
             .map(|rel_path| crate_root.join(rel_path))
@@ -70,29 +73,41 @@ impl RustCtx {
         })
     }
 
+    pub fn check_cxx_version(&self) -> cu::Result<()> {
+        let metadata = MetadataCommand::new()
+            .manifest_path(&self.manifest)
+            .exec()?;
+
+        let cxx = match metadata.packages.iter().find(|pack| pack.name == "cxx") {
+            Some(package) => package,
+            None => {
+                cu::debug!("cxx package not found, skipping cxx version check");
+                return Ok(());
+            }
+        };
+
+        let blessed_version = Version::parse(BLESSED_CXX_VERSION).unwrap();
+        if cxx.version < blessed_version {
+            cu::bail!(
+                "cxx version is older than the supported version; supported: {}, found: {} ",
+                blessed_version,
+                cxx.version
+            );
+        }
+        if cxx.version > blessed_version {
+            cu::warn!(
+                "cxx version is newer than the supported version; supported: {}, found: {}",
+                blessed_version,
+                cxx.version
+            );
+        }
+
+        Ok(())
+    }
+
     pub fn has_build_script(&self) -> bool {
         let script = self.manifest.parent().unwrap().join("build.rs");
         script.exists()
-    }
-
-    /// Add the megaton rust library to the crate
-    /// libmegaton must be installed when this is called
-    pub async fn add_megaton_rust_lib(&self, lib_path: &Path) -> cu::Result<()> {
-        let cargo = cu::which("cargo")
-            .context("Cargo executable not found: ensure rust is properly installed")?;
-        let command = cargo
-            .command()
-            .add(cu::args![
-                "add",
-                "--manifest-path",
-                &self.manifest,
-                "--path",
-                lib_path,
-            ])
-            .stdio_null()
-            .stderr(cu::lv::I);
-
-        command.co_wait_nz().await
     }
 
     /// Build the rust crate with `cargo build +megaton`
@@ -282,6 +297,7 @@ async fn cxxbridge_process(
 // Run the cxxbridge cmd and update the corresponding file if changed
 // returns Ok(true) iff new code was generated and written
 async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::Result<bool> {
+    let env = environment();
     let mut args = vec![];
     if let Some(file) = file {
         args.push(cu::check!(file.to_str(), "Not utf-8: {}", file.display())?);
@@ -290,19 +306,15 @@ async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::
         args.push("--header");
     }
 
-    let exe = cu::which("cxxbridge")
-        .context("cxxbridge executable not found; `cargo install cxxbridge-cmd`")?;
-    let command = exe
+    let command = env
+        .cxxbridge()
         .command()
         .stdout(cu::pio::buffer())
         .stderr(cu::pio::string())
         .stdin_null()
         .args(args);
 
-    let (child, stdout, stderr) = command
-        .co_spawn()
-        .await
-        .context("Failed to spawn cxxbridge")?;
+    let (child, stdout, stderr) = command.co_spawn().await?;
     let status = child.co_wait().await.context("Failed to wait cxxbridge")?;
 
     match status.code() {

@@ -87,10 +87,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     if lib_enabled && let Some(rust_ctx) = rust_ctx {
         let rust_ctx =
             rust_ctx.context("Rust is enabled, but cargo context could not be initialized")?;
-
-        rust_ctx.add_megaton_rust_lib(&target_lib).await.context(
-            "Failed to add megaton rust library, ensure libmegaton was properly installed",
-        )?;
+        rust_ctx.check_cxx_version()?;
 
         if !args.configure {
             need_link |= rust_ctx
@@ -127,8 +124,12 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
 
         let mut lib_flags = build_flags.clone();
 
+        // Add nnheaders includes
+        lib_flags.add_includes([
+            env.dkp_path().join("libnx").join("include").into_utf8()?, // TODO: remove this
+            target_lib.join("nnheaders").join("include").into_utf8()?,
+        ]);
         cu::hint!("TODO: remove libnx includes");
-        lib_flags.add_includes([env.dkp_path().join("libnx").join("include").into_utf8()?]);
 
         lib_flags.add_defines([
             "MEGATON_LIB",
