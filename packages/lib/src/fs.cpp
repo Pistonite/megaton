@@ -32,12 +32,13 @@ uint32_t hermit_to_nn_flags(uint32_t hermit_open_option_flags) {
 
 extern "C" OpenResult __megaton_lib_fs_open(const char* name, int32_t flags, uint32_t mode) {
     const int O_CREAT  = 0100;  // create file if it doesn't exist
-    const int O_EXCL   = 0200;  // fail if file already exists
+    // const int O_EXCL   = 0200;  // fail if file already exists
     const int O_TRUNC  = 01000; // truncate file to zero length on open
     const int O_APPEND = 02000; // set initial seek position to end of file
+    botw::tcp::sendf("Calling sys_open with %s %d %u!\n", name, flags, mode);
 
     bool o_creat  = flags & O_CREAT;
-    bool o_excl   = flags & O_EXCL;
+    // bool o_excl   = flags & O_EXCL;
     bool o_trunc  = flags & O_TRUNC;
     bool o_append = flags & O_APPEND;
 
@@ -49,18 +50,21 @@ extern "C" OpenResult __megaton_lib_fs_open(const char* name, int32_t flags, uin
     open_result.fd = { .inner=9999, .kind=FileDescriptorType::FILE, .seek_offset=0 };
 
     if (result.IsFailure()) { // no such file or directory
-        if (!o_creat) {
+        if (!o_creat) {    
             return open_result;
         }
+        botw::tcp::sendf("File %s does not exist: creating!\n", name);
         result = nn::fs::CreateFile(name, 0);
         open_result.result = buildSimpleResult(result);
         if (result.IsFailure()) {
+            botw::tcp::sendf("Creating file failed!\n");
             return open_result;
         }
         opened_type = nn::fs::DirectoryEntryType_File;
     }
 
     if (opened_type == nn::fs::DirectoryEntryType_File) { 
+        botw::tcp::sendf("sys_open target %s is a file!\n", name);
         uint32_t open_mode = hermit_to_nn_flags(flags);
 
         nn::fs::FileHandle inner;
@@ -102,7 +106,7 @@ extern "C" ReadResult __megaton_lib_fs_read_file(uint64_t nn_fd, uint64_t seek_p
     uint64_t bytes_read;
     //                                  u64 *outSize, nn::fs::FileHandle handle, s64 offset, void *buffer, u64 bufferSize
     nn::Result result = nn::fs::ReadFile(&bytes_read, { ._internal=nn_fd, }, seek_pos, buf, len);
-    ReadResult read_result = { .bytes_read=bytes_read, .result=buildSimpleResult(result) };
+    ReadResult read_result = {  .result=buildSimpleResult(result), .bytes_read=bytes_read };
     return read_result;
 }
 
@@ -111,17 +115,51 @@ extern "C" GetEntryTypeResult __megaton_lib_fs_get_entry_type(const char* name) 
     nn::Result result = nn::fs::GetEntryType(&type, name);
     // TODO: Am I being paranoid here? What actually happens to type if this function returns a failure?
     // entry_type defaults to file on failure to ensure the field always has valid data
-    GetEntryTypeResult entry_type_result = { .entry_type=nn::fs::DirectoryEntryType_File, .result=buildSimpleResult(result) };
+    GetEntryTypeResult entry_type_result = {  .result=buildSimpleResult(result), .entry_type=nn::fs::DirectoryEntryType_File };
     if(result.IsSuccess()) entry_type_result.entry_type = type; 
     return entry_type_result;
 }
 
 extern "C" GetSizeResult __megaton_lib_fs_get_file_size(uint64_t nn_fd) {
     long size;
-    nn::Result result = nn::fs::GetFileSize(&size, { ._internal=nn_fd });
+    nn::Result result = nn::fs::GetFileSize(&size, { nn_fd });
     // size defaults to 0 on failure to ensure the field always has valid data
-    GetSizeResult get_size_result = { .size=0, .result=buildSimpleResult(result) };
+    GetSizeResult get_size_result = { .result=buildSimpleResult(result), .size=0  };
     if(result.IsSuccess()) get_size_result.size = size;
     return get_size_result;
 }
 
+extern "C" void __megaton_lib_fs_close_file(uint64_t nn_fd) {
+    nn::fs::CloseFile( { nn_fd });
+}
+
+extern "C" void __megaton_lib_fs_close_dir(uint64_t nn_fd) {
+    nn::fs::CloseDirectory( { nn_fd });
+}
+
+extern "C" NNResult __megaton_lib_fs_unlink(const char* name) {
+    nn::fs::DirectoryEntryType type;
+    nn::Result result = nn::fs::GetEntryType(&type, name);
+    if(result.IsFailure()) return buildSimpleResult(result);
+     
+    switch(type) {
+        case nn::fs::DirectoryEntryType_File: {
+            result = nn::fs::DeleteFile(name);
+            return buildSimpleResult(result);
+        }
+        case nn::fs::DirectoryEntryType_Directory: {
+            result = nn::fs::DeleteDirectory(name);
+            return buildSimpleResult(result);
+        }
+        default: {}
+    }
+
+    return buildSimpleResult(result);
+}
+
+namespace megaton {
+    void debug_show_fd_list() {
+        // do nothing
+    }
+
+}

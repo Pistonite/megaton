@@ -1,6 +1,8 @@
 use std::ffi::c_int;
 
 
+
+#[derive(Debug)]
 #[repr(C)]
 pub struct NNResult {
     pub success: bool,
@@ -26,6 +28,7 @@ pub struct FileDescriptor {
     pub kind: FileDescriptorType,
     pub seek_offset: u64,
 }
+
 
 #[repr(C)]
 pub struct OpenResult {
@@ -60,8 +63,6 @@ pub struct StatResult {
 
 
 unsafe extern "C" {
-    // include!("toolkit/tcp.hpp");
-    // #[namespace = "botw::tcp"]
     #[link_name = "__megaton_lib_fs_write_file"]
     pub unsafe fn write_file(nn_fd: u64, seek_offset: u64, buf: *const u8, len: usize) -> NNResult;
 
@@ -76,6 +77,15 @@ unsafe extern "C" {
 
     #[link_name = "__megaton_lib_fs_read_file"]
     pub unsafe fn read_file(nn_fd: u64, seek_pos: u64, buf: *mut u8, len: u64) -> ReadResult;
+
+    #[link_name = "__megaton_lib_fs_close_file"]
+    pub unsafe fn close_file(nn_fd: u64);
+
+        #[link_name = "__megaton_lib_fs_close_dir"]
+    pub unsafe fn close_directory(nn_fd: u64);
+
+    #[link_name = "__megaton_lib_fs_unlink"]
+    pub unsafe fn unlink(name: *const i8) -> NNResult;
 }
 
 

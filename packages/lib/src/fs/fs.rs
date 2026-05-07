@@ -7,10 +7,9 @@ const STDIN_PATH: &str = "sd:/megaton_stdin.txt";
 const STDOUT_PATH: &str = "sd:/megaton_stdout.txt";
 const STDERR_PATH: &str = "sd:/megaton_stderr.txt";
 
-use crate::fs::fs_helpers::{self, FileDescriptor, FileDescriptorType, GetEntryTypeResult, O_CREAT, O_RDONLY, O_RDWR, O_TRUNC, STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO};
+use crate::fs::fs_helpers::{self, FileDescriptor, FileDescriptorType, GetEntryTypeResult, O_CREAT, O_RDONLY, O_RDWR, O_TRUNC, STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO, write_file};
 
 static LIST: Mutex<[Option<FileDescriptor>; NUM_FDS]> = Mutex::new([None; NUM_FDS]);
-
 
 fn insert_into_fd_list(fd: FileDescriptor) -> Option<usize> {
     let list = &mut LIST.try_lock().unwrap();
@@ -42,20 +41,40 @@ pub fn init_stdio(){
     let stderr_path: *const i8 = STDERR_PATH.as_ptr() as *const i8;
     
     // open for read/write, create it if the file doesn't exist, and delete all existing content if it does
-    let stdin_fd = unsafe { fs_helpers::open(stdin_path, O_RDWR | O_CREAT | O_TRUNC, 0) };
-    let stdout_fd = unsafe { fs_helpers::open(stdout_path, O_RDWR | O_CREAT | O_TRUNC, 0) };
-    let stderr_fd = unsafe { fs_helpers::open(stderr_path, O_RDWR | O_CREAT | O_TRUNC, 0) };
+    let stdin_fd = unsafe { fs_helpers::open(stdin_path, O_RDWR | O_CREAT, 0) };
+    let stdout_fd = unsafe { fs_helpers::open(stdout_path, O_RDWR | O_CREAT, 0) };
+    let stderr_fd = unsafe { fs_helpers::open(stderr_path, O_RDWR | O_CREAT, 0) };
 
-    assert!(stdin_fd.result.success && stdout_fd.result.success && stderr_fd.result.success);
-    list[STDIN_FILENO] = Some(stdin_fd.fd);
-    list[STDOUT_FILENO] = Some(stdout_fd.fd);
-    list[STDERR_FILENO] = Some(stderr_fd.fd);
+    if stdin_fd.result.success {
+        list[STDIN_FILENO] = Some(stdin_fd.fd);
+    } 
+    if stdout_fd.result.success {
+        list[STDOUT_FILENO] = Some(stdout_fd.fd);
+    }
+    if stderr_fd.result.success {
+        list[STDERR_FILENO] = Some(stderr_fd.fd);
+    }
+}
+
+fn write_stderr(msg: &str) {
+    let mut stderr = get_fd_entry(STDERR_FILENO);
+    if stderr.is_none() {
+        let stderr_fd = unsafe { fs_helpers::open(STDERR_PATH.as_ptr() as *const i8, O_RDWR | O_CREAT, 0) };
+        if stderr_fd.result.success {
+            let list = &mut LIST.try_lock().unwrap();
+            stderr = Some(stderr_fd.fd);
+            list[STDERR_FILENO] = stderr;
+        }
+    }
+    try_write_file(stderr.as_mut().unwrap(), msg.as_ptr(), msg.len());
+    
 }
 
 
 #[unsafe(no_mangle)]
 pub extern "C" fn sys_open(name: *const i8, flags: i32, mode: i32) -> i32 {
     // TODO: map flags and mode to nnheaders flags and mode
+    write_stderr(format!("Megaton: sys_open called! Args {:?} {} {}", name, flags, mode).as_str());
     let open_result = unsafe { fs_helpers::open(name, flags, mode) };
     if open_result.result.success  {
         match insert_into_fd_list(open_result.fd) {
@@ -63,6 +82,7 @@ pub extern "C" fn sys_open(name: *const i8, flags: i32, mode: i32) -> i32 {
             None => GENERIC_ERRNO,
         }
     } else {
+        write_stderr(format!("Megaton: sys_open failed! Result {:?}\n", open_result.result).as_str());
         assert!(open_result.result.module == fs_helpers::FS_ERR_MODULE);
         GENERIC_ERRNO
     }
@@ -85,6 +105,7 @@ pub fn sys_write(fd: i32, buf: *const u8, len: usize) -> isize {
         }
     }
 }
+
 
 fn try_write_file(fd: &mut FileDescriptor, buf: *const u8, len: usize) -> isize {
     let write_result = unsafe { fs_helpers::write_file(fd.inner, fd.seek_offset, buf, len) };
@@ -189,9 +210,48 @@ pub extern "C" fn sys_stat(name: *const i8, stat: *mut fs_helpers::stat) -> i32 
             stat.st_blksize = 1000;
             stat.st_blocks = ((size_result.size as f64) / 1000.0f64).ceil() as i64;
         }
-        
-
     };
 
     GENERIC_ERRNO
+}
+
+#[unsafe(no_mangle)]
+pub fn sys_close(fd: i32) -> i32 {
+    let fd_entry: &mut Option<FileDescriptor> = &mut get_fd_entry(fd as usize);
+    match fd_entry {
+        None => return GENERIC_ERRNO,
+        Some(fd) => {
+            match fd.kind {
+                FileDescriptorType::FILE => try_close_file(*fd),
+                FileDescriptorType::DIR => unsafe { fs_helpers::close_directory(fd.inner); },
+                FileDescriptorType::TCP => todo!(),
+                FileDescriptorType::STDIN => try_close_file(*fd),
+                FileDescriptorType::STDOUT => try_close_file(*fd),
+                FileDescriptorType::STDERR => try_close_file(*fd),
+            };
+        }
+    };
+
+    *fd_entry = None;
+    0
+}
+
+
+#[unsafe(no_mangle)]
+pub extern "C" fn sys_writev(fd: i32, iov: *const u8, iovcnt: usize) -> isize {
+    todo!()
+}
+
+fn try_close_file(fd: FileDescriptor) {
+    unsafe { fs_helpers::close_file(fd.inner) };
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn sys_unlink(name: *const i8) -> i32  {
+    let result = unsafe { fs_helpers::unlink(name) };
+    if result.success {
+        0
+    } else {
+        GENERIC_ERRNO
+    }
 }
