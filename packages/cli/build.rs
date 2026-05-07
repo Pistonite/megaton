@@ -51,7 +51,11 @@ fn make_lib_targz() -> cu::Result<PathBuf> {
     Ok(path)
 }
 
-fn add_to_tar(mut tar_builder: TarBuilder<GzEncoder<File>>, source_path: &Path, dest_path: &Path) -> cu::Result<TarBuilder<GzEncoder<File>>> {
+fn add_to_tar(
+    mut tar_builder: TarBuilder<GzEncoder<File>>,
+    source_path: &Path,
+    dest_path: &Path,
+) -> cu::Result<TarBuilder<GzEncoder<File>>> {
     let mut walk = cu::fs::walk(source_path)?;
     while let Some(entry) = walk.next() {
         let entry = entry?;
