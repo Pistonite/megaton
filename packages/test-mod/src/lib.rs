@@ -1,3 +1,5 @@
+use std::{fs::File, io::Write, path::PathBuf};
+
 #[cxx::bridge]
 mod ffi {
     unsafe extern "C++" {
@@ -44,6 +46,34 @@ impl<'a> MegatonTests<'a> {
         } else {
             self.passed_tests += 1;
             self.category_passed_tests += 1;
+        }
+    }
+
+    fn megaton_assert_msg<T: std::cmp::PartialEq + std::fmt::Debug>(&mut self, result: T, expected: T, msg: &str) {
+        self.total_tests += 1;
+        self.category_tests += 1;
+        if result != expected {
+            self.megaton_log(format!("Test number {:#?} failed: got {:#?}, expected {:#?}. Message: {:?}\n", self.total_tests, result, expected, msg).as_str());
+        } else {
+            self.passed_tests += 1;
+            self.category_passed_tests += 1;
+        }
+    }
+
+    fn megaton_assert_ok<T,E>(&mut self, result: Result<T,E>, msg: &str) -> Option<T> 
+    where 
+        T: std::fmt::Debug,
+        E: std::fmt::Debug 
+        {
+        self.total_tests += 1;
+        self.category_tests += 1;
+        if result.is_err() {
+            self.megaton_log(format!("Test number {:#?} failed: received Err: {:?}. Message: {:?}\n", self.total_tests, result.unwrap_err(), msg).as_str());
+            return None;
+        } else {
+            self.passed_tests += 1;
+            self.category_passed_tests += 1;
+            return Some(result.unwrap());
         }
     }
 
@@ -94,6 +124,34 @@ fn megaton_string_tests(mtt: &mut MegatonTests) {
 
 fn megaton_file_tests(mtt: &mut MegatonTests) {
     mtt.start_category("Files");
+
+    let path: PathBuf = PathBuf::from("sd:/testfile.txt");
+    const total_content: &[u8] = "Hello world!\nA".as_bytes();
+    const lines: [&[u8]; 2] = ["Hello world!\n".as_bytes(), "A".as_bytes()];
+    const total_len: usize = total_content.len();
+    
+    mtt.megaton_log("TEST: Testing exists!\n");
+    if path.exists() {
+        mtt.megaton_log("TEST: File exists, removing!\n");
+        let result = std::fs::remove_file(&path);
+        if mtt.megaton_assert_ok(result, "Failed to remove file!").is_none() {
+            return;
+        }
+    }
+
+    mtt.megaton_log("TEST: Creating test file");
+    let result = File::create(&path);
+    let result = mtt.megaton_assert_ok(result, "Failed to create file!");
+    if result.is_none() {
+        return;
+    }
+
+    let mut test_file = result.unwrap();
+    let result = test_file.write(lines[0]);
+    mtt.megaton_assert_ok(result, "Failed to write to file");
+
+    
+
     mtt.end_category();
 }
 
