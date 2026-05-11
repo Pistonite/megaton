@@ -12,6 +12,7 @@ NNResult buildSimpleResult(nn::Result result) {
 }
 
 extern "C" NNResult __megaton_lib_fs_write_file(uint64_t nn_fd, const uint8_t* buf, uint64_t size, size_t position) {
+    botw::tcp::sendf("Writing to file %u with content %s, size=%u pos=%u!\n", nn_fd, buf, size, position);
     nn::fs::WriteOption option = nn::fs::WriteOption::CreateOption(nn::fs::WriteOptionFlag_Flush);
     nn::Result result = nn::fs::WriteFile({ nn_fd }, position, (void*) buf, size, option);
     return buildSimpleResult(result);
@@ -51,13 +52,14 @@ extern "C" OpenResult __megaton_lib_fs_open(const char* name, int32_t flags, uin
 
     if (result.IsFailure()) { // no such file or directory
         if (!o_creat) {    
+            botw::tcp::sendf("sys_open failed! No such file or directory, and O_CREAT not passed!\n");
             return open_result;
         }
         botw::tcp::sendf("File %s does not exist: creating!\n", name);
         result = nn::fs::CreateFile(name, 0);
         open_result.result = buildSimpleResult(result);
         if (result.IsFailure()) {
-            botw::tcp::sendf("Creating file failed!\n");
+            botw::tcp::sendf("Creating file failed with %d!\n", result.GetDescription());
             return open_result;
         }
         opened_type = nn::fs::DirectoryEntryType_File;
@@ -70,7 +72,10 @@ extern "C" OpenResult __megaton_lib_fs_open(const char* name, int32_t flags, uin
         nn::fs::FileHandle inner;
         result = nn::fs::OpenFile(&inner, name, open_mode);
         open_result.result = buildSimpleResult(result);
-        if (result.IsFailure()) return open_result;
+        if (result.IsFailure()) {
+            botw::tcp::sendf("sys_open failed! nn::fs::OpenFile failed with %d!\n", result.GetDescription());
+            return open_result;
+        }
         
         open_result.fd.kind = FileDescriptorType::FILE;
         open_result.fd.inner = inner._internal;
@@ -78,14 +83,20 @@ extern "C" OpenResult __megaton_lib_fs_open(const char* name, int32_t flags, uin
         if (o_trunc) {
             result = nn::fs::SetFileSize(inner, 0);
             open_result.result = buildSimpleResult(result);
-            if(result.IsFailure()) return open_result;    
+            if(result.IsFailure()){
+                botw::tcp::sendf("sys_open failed! nn::fs::SetFileSize failed with %d!\n", result.GetDescription());
+                return open_result;    
+            } 
         }
 
         if (o_append) {
             long file_size = 0;
             result = nn::fs::GetFileSize(&file_size, inner);
             open_result.result = buildSimpleResult(result);
-            if(result.IsFailure()) return open_result;
+            if(result.IsFailure()) {
+                botw::tcp::sendf("sys_open failed! nn::fs::GetFileSize failed with %d!\n", result.GetDescription());
+                return open_result;
+            } 
             open_result.fd.seek_offset = file_size;
         }
 
@@ -96,7 +107,10 @@ extern "C" OpenResult __megaton_lib_fs_open(const char* name, int32_t flags, uin
         nn::fs::DirectoryHandle inner;
         result = nn::fs::OpenDirectory(&inner, name, nn::fs::OpenDirectoryMode_All);
         open_result.result = buildSimpleResult(result);
-        if(result.IsFailure()) return open_result;
+        if(result.IsFailure()){
+            botw::tcp::sendf("sys_open failed! nn::fs::OpenDirectory failed with %d!\n", result.GetDescription());
+            return open_result;  
+        } 
         open_result.fd.inner = inner._internal;
     }
     return open_result;
@@ -130,6 +144,7 @@ extern "C" GetSizeResult __megaton_lib_fs_get_file_size(uint64_t nn_fd) {
 }
 
 extern "C" void __megaton_lib_fs_close_file(uint64_t nn_fd) {
+    botw::tcp::sendf("Closing fd %d!\n", nn_fd);
     nn::fs::CloseFile( { nn_fd });
 }
 
@@ -138,10 +153,11 @@ extern "C" void __megaton_lib_fs_close_dir(uint64_t nn_fd) {
 }
 
 extern "C" NNResult __megaton_lib_fs_unlink(const char* name) {
+    botw::tcp::sendf("Removing file %s!\n", name);
     nn::fs::DirectoryEntryType type;
     nn::Result result = nn::fs::GetEntryType(&type, name);
     if(result.IsFailure()) return buildSimpleResult(result);
-     
+    
     switch(type) {
         case nn::fs::DirectoryEntryType_File: {
             result = nn::fs::DeleteFile(name);

@@ -1,7 +1,3 @@
-use std::ffi::c_int;
-
-
-
 #[derive(Debug)]
 #[repr(C)]
 pub struct NNResult {
@@ -13,11 +9,17 @@ pub struct NNResult {
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub enum FileDescriptorType {
+    #[allow(dead_code)]
     FILE,
+    #[allow(dead_code)]
     DIR,
+    #[allow(dead_code)]
     TCP,
+    #[allow(dead_code)]
     STDIN,
+    #[allow(dead_code)]
     STDOUT,
+    #[allow(dead_code)]
     STDERR,
 }
 
@@ -56,6 +58,7 @@ pub struct GetSizeResult {
 
 
 #[repr(C)]
+#[allow(dead_code)]
 pub struct StatResult {
     pub result: NNResult,
     pub stat_val: stat
@@ -64,7 +67,7 @@ pub struct StatResult {
 
 unsafe extern "C" {
     #[link_name = "__megaton_lib_fs_write_file"]
-    pub unsafe fn write_file(nn_fd: u64, seek_offset: u64, buf: *const u8, len: usize) -> NNResult;
+    pub unsafe fn write_file(nn_fd: u64,  buf: *const u8, size: usize, position: u64) -> NNResult;
 
     #[link_name = "__megaton_lib_fs_open"]
     pub unsafe fn open(name: *const i8,  flags: i32, mode: i32) -> OpenResult;
@@ -89,28 +92,42 @@ unsafe extern "C" {
 }
 
 
-
+#[allow(dead_code)]
 // https://github.com/hermit-os/hermit-rs/blob/82146cf059bf3894eea1e96beed9da72b99b9d5a/hermit-abi/src/lib.rs#L44
 pub const STDIN_FILENO: usize = 0;
+#[allow(dead_code)]
 pub const STDOUT_FILENO: usize = 1;
 pub const STDERR_FILENO: usize = 2;
+
 pub const O_RDONLY: i32 = 0o0;
+#[allow(dead_code)]
 pub const O_WRONLY: i32 = 0o1;
 pub const O_RDWR: i32 = 0o2;
 pub const O_CREAT: i32 = 0o100;
+#[allow(dead_code)]
 pub const O_EXCL: i32 = 0o200;
+#[allow(dead_code)]
 pub const O_TRUNC: i32 = 0o1000;
+#[allow(dead_code)]
 pub const O_APPEND: i32 = 0o2000;
+#[allow(dead_code)]
 pub const O_NONBLOCK: i32 = 0o4000;
+#[allow(dead_code)]
 pub const O_DIRECTORY: i32 = 0o200000;
 
+#[allow(dead_code)]
 pub const FS_ERR_MODULE: i32 = 2; // all fs errors will have module = 2
+#[allow(dead_code)]
 pub const PATH_NOT_FOUND: i32      = 1;
+#[allow(dead_code)]
 pub const PATH_ALREADY_EXISTS: i32 = 2;
+#[allow(dead_code)]
 pub const TARGET_LOCKED: i32       = 7;
+#[allow(dead_code)]
 pub const DIRECTORY_NOT_EMPTY: i32 = 8;
 
 // https://github.com/hermit-os/hermit-rs/blob/82146cf059bf3894eea1e96beed9da72b99b9d5a/hermit-abi/src/lib.rs#L169
+#[allow(non_camel_case_types, dead_code)]
 type time_t = i64;
 
 // https://github.com/hermit-os/hermit-rs/blob/82146cf059bf3894eea1e96beed9da72b99b9d5a/hermit-abi/src/lib.rs#L284
@@ -155,6 +172,7 @@ pub struct timespec {
 	pub tv_nsec: i32,
 }
 
+#[allow(dead_code)]
 impl timespec {
 	pub fn from_usec(microseconds: i64) -> Self {
 		Self {
@@ -170,29 +188,25 @@ impl timespec {
 	}
 }
 
-
-/* Handle representing an opened file. */
-struct FileHandle {
-    internal: u64
-}
-
-/* Handle representing an opened directory. */
-struct DirectoryHandle {
-    internal: u64
-}
-
 /* Kinds of entries within a directory. */
+#[allow(non_camel_case_types)]
 #[repr(C)]
-enum DirectoryEntryType {
+pub enum DirectoryEntryType {
+    #[allow(non_camel_case_types, dead_code)]
     DirectoryEntryType_Directory,
+    #[allow(non_camel_case_types, dead_code)]
     DirectoryEntryType_File,
 }
 
 
 /* Bitfield to define the kinds of entries to open from a directory. */
 #[repr(C)]
+#[allow(dead_code)]
 enum OpenDirectoryMode {
+    #[allow(non_camel_case_types, dead_code)]
     OpenDirectoryMode_Directory = 1 << 0,
+    #[allow(non_camel_case_types, dead_code)]
     OpenDirectoryMode_File = 1 << 1,
+    #[allow(non_camel_case_types, dead_code)]
     OpenDirectoryMode_All = (1 << 0) | (1 << 1),
 }
