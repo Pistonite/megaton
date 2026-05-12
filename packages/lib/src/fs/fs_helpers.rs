@@ -91,7 +91,7 @@ unsafe extern "C" {
     pub unsafe fn unlink(name: *const i8) -> NNResult;
 
     #[link_name = "__megaton_lib_fs_init_logging"]
-    pub unsafe fn init_logging(fd: u64);
+    pub unsafe fn init_cpp_logging(fd: u64);
 }
 
 
@@ -101,6 +101,7 @@ pub const STDIN_FILENO: usize = 0;
 #[allow(dead_code)]
 pub const STDOUT_FILENO: usize = 1;
 pub const STDERR_FILENO: usize = 2;
+pub const LOG_FILENO: usize = 3;
 
 pub const O_RDONLY: i32 = 0o0;
 #[allow(dead_code)]

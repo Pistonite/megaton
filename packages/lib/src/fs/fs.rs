@@ -6,14 +6,16 @@ const GENERIC_ERRNO: i32 = -1;
 const STDIN_PATH: &[u8] = b"sd:/megaton_stdin.txt\0";
 const STDOUT_PATH: &[u8] = b"sd:/megaton_stdout.txt\0";
 const STDERR_PATH: &[u8] = b"sd:/megaton_stderr.txt\0";
+const LOG_PATH: &[u8] = b"sd:/megaton_logs.txt\0";
 
-use crate::fs::fs_helpers::{self, FileDescriptor, FileDescriptorType, GetEntryTypeResult, NNResult, O_CREAT, O_RDONLY, O_RDWR, STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO};
+use crate::fs::fs_helpers::{self, FileDescriptor, FileDescriptorType, GetEntryTypeResult, LOG_FILENO, NNResult, O_CREAT, O_RDONLY, O_RDWR, STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO, init_cpp_logging};
 
 // Calling convention:
 //  To avoid double-locking, only top-level exported functions (just syscalls for now) are allowed to lock the list.
 //  Every other function should take a ListRef as needed.
 static LIST: Mutex<[Option<FileDescriptor>; NUM_FDS]> = Mutex::new([None; NUM_FDS]);
 type ListRef<'a> = MutexGuard<'a, [Option<FileDescriptor>; 1000]>;
+
 
 fn insert_into_fd_list(list: &mut ListRef, fd: FileDescriptor) -> Option<usize> {
     for i in 3..NUM_FDS {
@@ -45,7 +47,7 @@ fn get_fd_entry(list: &ListRef, fd: usize) -> Option<FileDescriptor> {
 }
 
 #[allow(dead_code)]
-pub fn init_stdio(){
+pub fn initialize_fs(){
     // stdio takes up 3 entries in the fd list, but makes the indexing logic simpler.
     // Otherwise, we need to offset every fd we give to the user, or given to us by the user, by 3. 
     // If we need more fds later, we can just make the list bigger.
@@ -53,11 +55,13 @@ pub fn init_stdio(){
     let stdin_path: *const i8 = STDIN_PATH.as_ptr() as *const i8; // TODO: Convert to C String.
     let stdout_path: *const i8 = STDOUT_PATH.as_ptr() as *const i8;
     let stderr_path: *const i8 = STDERR_PATH.as_ptr() as *const i8;
+    let log_path: *const i8 = LOG_PATH.as_ptr() as *const i8;
     
     // open for read/write, create it if the file doesn't exist, and delete all existing content if it does
     let stdin_fd = unsafe { fs_helpers::open(stdin_path, O_RDWR | O_CREAT, 0) };
     let stdout_fd = unsafe { fs_helpers::open(stdout_path, O_RDWR | O_CREAT, 0) };
     let stderr_fd = unsafe { fs_helpers::open(stderr_path, O_RDWR | O_CREAT, 0) };
+    let log_fd = unsafe { fs_helpers::open(log_path, O_RDWR | O_CREAT, 0) };
 
     if stdin_fd.result.success {
         list[STDIN_FILENO] = Some(stdin_fd.fd);
@@ -68,6 +72,12 @@ pub fn init_stdio(){
     if stderr_fd.result.success {
         list[STDERR_FILENO] = Some(stderr_fd.fd);
     }
+    if log_fd.result.success {
+        list[LOG_FILENO] = Some(log_fd.fd);
+    }
+
+    unsafe { init_cpp_logging(stderr_fd.fd.inner) };
+
 }
 
 // unsafe extern "C" {
@@ -81,9 +91,9 @@ fn megaton_log(list: &mut ListRef, msg: &str) {
     let len = (&msg).len();
     let msg = CString::new(msg).unwrap();
     
-    let stderr_fd = get_fd_entry(list, STDERR_FILENO);
-    if let Some(mut stderr) = stderr_fd {
-        try_write_file(&mut stderr, msg.as_c_str().as_ptr() as *const u8, len);
+    let log_fd = get_fd_entry(list, LOG_FILENO);
+    if let Some(mut log) = log_fd {
+        try_write_file(&mut log, msg.as_c_str().as_ptr() as *const u8, len);
     }
 }
 
@@ -115,7 +125,7 @@ pub extern "C" fn sys_open(name: *const i8, flags: i32, mode: i32) -> i32 {
     // write_stderr(format!("Megaton: sys_open called! Args {:?} {} {}", name, flags, mode).as_str());
     
     let list: &mut ListRef = &mut LIST.try_lock().unwrap();
-    // megaton_log(list,format!("sys_open called with {:#?} {} {}\n", name, flags, mode).as_str());
+    megaton_log(list,format!("sys_open called with {:#?} {} {}\n", name, flags, mode).as_str());
     // megaton_log(list, "sys_open!! \0");
 
     let open_result = unsafe { fs_helpers::open(name, flags, mode) };

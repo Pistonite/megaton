@@ -127,6 +127,14 @@ fn megaton_string_tests(mtt: &mut MegatonTests) {
 fn megaton_file_tests(mtt: &mut MegatonTests) {
     mtt.start_category("Files");
 
+    basic_tests(mtt);
+    
+    
+
+    mtt.end_category();
+}
+
+fn basic_tests(mtt: &mut MegatonTests) {
     let path: PathBuf = PathBuf::from("sd:/testfile.txt");
     const total_content: &[u8] = "Hello world!\nA".as_bytes();
     const lines: [&[u8]; 2] = ["Hello world!\n".as_bytes(), "A".as_bytes()];
@@ -151,10 +159,6 @@ fn megaton_file_tests(mtt: &mut MegatonTests) {
     let mut test_file = result.unwrap();
     let result = test_file.write(lines[0]);
     mtt.megaton_assert_ok(result, "Failed to write to file\n");
-
-    
-
-    mtt.end_category();
 }
 
 fn run_megaton_tests() {

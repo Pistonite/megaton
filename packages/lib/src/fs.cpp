@@ -8,7 +8,7 @@
 static FILE *f;
 
 void __megaton_lib_fs_init_logging(uint64_t fd) {
-    f = fdopen(fd, "w");
+    // f = fdopen(fd, "w");
 }
 
 bool logging_enabled(){
