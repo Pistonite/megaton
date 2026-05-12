@@ -5,9 +5,9 @@
 #include <cstdint>
 #include <nn/fs.h>
 
-namespace botw::tcp {
-    void sendf(const char* args, ...);
-}
+// namespace botw::tcp {
+//     void sendf(const char* args, ...);
+// }
 
 enum class FileDescriptorType {
     FILE,
@@ -57,6 +57,8 @@ extern "C" GetSizeResult __megaton_lib_fs_get_file_size(uint64_t nn_fd);
 extern "C" NNResult __megaton_lib_fs_unlink(const char* name);
 extern "C" void __megaton_lib_fs_close_file(uint64_t nn_fd);
 extern "C" void __megaton_lib_fs_close_dir(uint64_t nn_fd);
+extern "C" void __megaton_lib_fs_init_logging(uint64_t fd);
+
 namespace megaton {
     void debug_show_fd_list();
 }

@@ -1,5 +1,7 @@
 use std::{fs::File, io::Write, path::PathBuf};
 
+pub use megaton::*;
+
 #[cxx::bridge]
 mod ffi {
     unsafe extern "C++" {
@@ -134,21 +136,21 @@ fn megaton_file_tests(mtt: &mut MegatonTests) {
     if path.exists() {
         mtt.megaton_log("TEST: File exists, removing!\n");
         let result = std::fs::remove_file(&path);
-        if mtt.megaton_assert_ok(result, "Failed to remove file!").is_none() {
+        if mtt.megaton_assert_ok(result, "Failed to remove file!\n").is_none() {
             return;
         }
     }
 
-    mtt.megaton_log("TEST: Creating test file");
+    mtt.megaton_log("TEST: Creating test file\n");
     let result = File::create(&path);
-    let result = mtt.megaton_assert_ok(result, "Failed to create file!");
+    let result = mtt.megaton_assert_ok(result, "Failed to create file!\n");
     if result.is_none() {
         return;
     }
 
     let mut test_file = result.unwrap();
     let result = test_file.write(lines[0]);
-    mtt.megaton_assert_ok(result, "Failed to write to file");
+    mtt.megaton_assert_ok(result, "Failed to write to file\n");
 
     
 

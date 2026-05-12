@@ -1,4 +1,4 @@
-use std::{sync::{Mutex, MutexGuard}};
+use std::{ffi::CString, sync::{Mutex, MutexGuard}};
 
 const NUM_FDS: usize = 1000;
 const GENERIC_ERRNO: i32 = -1;
@@ -30,7 +30,7 @@ pub extern "C" fn debug_show_fd_list(){
     let list = LIST.try_lock().unwrap();
     for i in 0..NUM_FDS {
         if let Some(fd) = list[i] {
-            unsafe { sendf(b"%d=>{type=? inner=%u}\t\0".as_ptr() as *const std::ffi::c_char, fd.inner) };
+            // unsafe { sendf(b"%d=>{type=? inner=%u}\t\0".as_ptr() as *const std::ffi::c_char, fd.inner) };
         }
     }
 }
@@ -70,25 +70,25 @@ pub fn init_stdio(){
     }
 }
 
-unsafe extern "C" {
-    // include!("toolkit/tcp.hpp");
-    // #[namespace = "botw::tcp"]
-    #[link_name = "_ZN4botw3tcp5sendfEPKcz"]
-    unsafe fn sendf(format: *const std::ffi::c_char, ...);
+// unsafe extern "C" {
+//     // include!("toolkit/tcp.hpp");
+//     // #[namespace = "botw::tcp"]
+//     #[link_name = "_ZN4botw3tcp5sendfEPKcz"]
+//     unsafe fn sendf(format: *const std::ffi::c_char, ...);
+// }
+
+fn megaton_log(list: &mut ListRef, msg: &str) {
+    let len = (&msg).len();
+    let msg = CString::new(msg).unwrap();
+    
+    let stderr_fd = get_fd_entry(list, STDERR_FILENO);
+    if let Some(mut stderr) = stderr_fd {
+        try_write_file(&mut stderr, msg.as_c_str().as_ptr() as *const u8, len);
+    }
 }
 
-
-fn megaton_log(text: String) {
-    // send over tcp
-    let cs = std::ffi::CString::new(text).unwrap();
-    unsafe { sendf(cs.as_ptr()); }
-    // TODO: save to filesystem
-    // TODO: any additional logging
-}
-
-fn write_stderr(list: &mut ListRef, msg: &str, result: &NNResult) {
-    megaton_log(msg.to_string());
-    unsafe { sendf(b"Last result's description was %d\n\0".as_ptr() as *const std::ffi::c_char, result.description); }
+fn write_stderr(list: &mut ListRef, msg: &str, result: &NNResult) {   
+    // unsafe { sendf(b"Last result's description was %d\n\0".as_ptr() as *const std::ffi::c_char, result.description); }
     try_init_stderr(list);
     let mut stderr = get_fd_entry(list, STDERR_FILENO);
     try_write_file(stderr.as_mut().unwrap(), msg.as_ptr(), msg.len());
@@ -98,7 +98,7 @@ fn try_init_stderr(list: &mut ListRef) {
     let mut stderr = get_fd_entry(&list, STDERR_FILENO);
 
     if stderr.is_none() {
-        unsafe { sendf(b"opening stderr!\n\0".as_ptr() as *const std::ffi::c_char) };
+        // unsafe { sendf(b"opening stderr!\n\0".as_ptr() as *const std::ffi::c_char) };
         let stderr_fd = unsafe { fs_helpers::open(STDERR_PATH.as_ptr() as *const i8, O_RDWR | O_CREAT, 0) };
         if stderr_fd.result.success {
             stderr = Some(stderr_fd.fd);
@@ -113,10 +113,11 @@ fn try_init_stderr(list: &mut ListRef) {
 pub extern "C" fn sys_open(name: *const i8, flags: i32, mode: i32) -> i32 {
     // TODO: map flags and mode to nnheaders flags and mode
     // write_stderr(format!("Megaton: sys_open called! Args {:?} {} {}", name, flags, mode).as_str());
-    unsafe { sendf(b"sys_open!! \0".as_ptr() as *const std::ffi::c_char) }
-    unsafe { sendf(b"sys_open called with %s %d %d\n\0".as_ptr() as *const std::ffi::c_char, name, flags, mode) }
-
+    
     let list: &mut ListRef = &mut LIST.try_lock().unwrap();
+    // megaton_log(list,format!("sys_open called with {:#?} {} {}\n", name, flags, mode).as_str());
+    // megaton_log(list, "sys_open!! \0");
+
     let open_result = unsafe { fs_helpers::open(name, flags, mode) };
     if open_result.result.success  {
         match insert_into_fd_list(list, open_result.fd) {
@@ -124,16 +125,15 @@ pub extern "C" fn sys_open(name: *const i8, flags: i32, mode: i32) -> i32 {
             None => GENERIC_ERRNO,
         }
     } else {
-        write_stderr(list, "Megaton: sys_open failed!\n", &open_result.result);
-        unsafe { sendf(b"Result was module=%d description=%d\n\0".as_ptr() as *const std::ffi::c_char, open_result.result.module, open_result.result.description) }// 
-        // assert!(open_result.result.module == fs_helpers::FS_ERR_MODULE);
+        // write_stderr(list, "Megaton: sys_open failed!\n", &open_result.result);
+        // megaton_log(list, format!("Result was module={} description={}\n", open_result.result.module, open_result.result.description).as_str()) }// 
         GENERIC_ERRNO
     }
 }
 
 #[unsafe(no_mangle)]
 pub fn sys_write(fd: i32, buf: *const u8, len: usize) -> isize {
-    unsafe { sendf(b"sys_write called with %d %s %u\n\0".as_ptr() as *const std::ffi::c_char, fd, buf, len) }
+    // unsafe { sendf(b"sys_write called with %d %s %u\n\0".as_ptr() as *const std::ffi::c_char, fd, buf, len) }
     let list: &mut ListRef = &mut LIST.try_lock().unwrap();
     let fd_entry: &mut Option<FileDescriptor> = &mut get_fd_entry(list, fd as usize);
     match fd_entry {
@@ -146,8 +146,8 @@ pub fn sys_write(fd: i32, buf: *const u8, len: usize) -> isize {
                 FileDescriptorType::STDIN => try_write_file(fd, buf, len),
                 FileDescriptorType::STDOUT => try_write_file(fd, buf, len),
                 FileDescriptorType::STDERR => unsafe { 
-                    sendf("stderr: ".as_ptr() as *const std::ffi::c_char);
-                    sendf(buf as *const std::ffi::c_char);
+                    // sendf("stderr: ".as_ptr() as *const std::ffi::c_char);
+                    // sendf(buf as *const std::ffi::c_char);
                     try_write_file(fd, buf, len)
                 },
             }
@@ -157,14 +157,14 @@ pub fn sys_write(fd: i32, buf: *const u8, len: usize) -> isize {
 
 
 fn try_write_file(fd: &mut FileDescriptor, buf: *const u8, len: usize) -> isize {
-    unsafe { sendf(b"try_write_file %d %s\n\0".as_ptr() as *const std::ffi::c_char, fd.inner, buf) };
+    // unsafe { sendf(b"try_write_file %d %s\n\0".as_ptr() as *const std::ffi::c_char, fd.inner, buf) };
     let write_result = unsafe { fs_helpers::write_file(fd.inner, buf,  len, fd.seek_offset,) };
     
     if write_result.success {
         fd.seek_offset += len as u64;
         len as isize
     } else {
-        unsafe { sendf(b"Megaton: sys_write failed with %d\n\0".as_ptr() as *const std::ffi::c_char, write_result.description); }
+        // unsafe { sendf(b"Megaton: sys_write failed with %d\n\0".as_ptr() as *const std::ffi::c_char, write_result.description); }
         // assert!(write_result.module == fs_helpers::FS_ERR_MODULE);
         match write_result.description {
             _ => GENERIC_ERRNO as isize // TODO: Map nn error to errno
@@ -194,7 +194,7 @@ pub extern "C" fn sys_read(fd: i32, buf: *mut u8, len: usize) -> isize {
 fn try_read_file(fd_entry: &mut FileDescriptor, buf: *mut u8, len: usize) -> isize {
     let read_result = unsafe { fs_helpers::read_file(fd_entry.inner, fd_entry.seek_offset, buf, len as u64) };
     if !read_result.result.success {
-        unsafe { sendf(b"Result was module=%d description=%d\n\0".as_ptr() as *const std::ffi::c_char, read_result.result.module, read_result.result.description) }
+        // unsafe { sendf(b"Result was module=%d description=%d\n\0".as_ptr() as *const std::ffi::c_char, read_result.result.module, read_result.result.description) }
         // assert!(read_result.result.module == fs_helpers::FS_ERR_MODULE);
         return GENERIC_ERRNO as isize
     } 
@@ -206,7 +206,7 @@ fn try_read_file(fd_entry: &mut FileDescriptor, buf: *mut u8, len: usize) -> isi
 pub extern "C" fn sys_stat(name: *const i8, stat: *mut fs_helpers::stat) -> i32 {
     let entry_type: GetEntryTypeResult = unsafe { fs_helpers::get_entry_type(name) };
     if !entry_type.result.success {
-        unsafe { sendf(b"Result was module=%d description=%d\n\0".as_ptr() as *const std::ffi::c_char, entry_type.result.module, entry_type.result.description) }
+        // unsafe { sendf(b"Result was module=%d description=%d\n\0".as_ptr() as *const std::ffi::c_char, entry_type.result.module, entry_type.result.description) }
         // assert!(entry_type.result.module == fs_helpers::FS_ERR_MODULE);
         match entry_type.result.description {
             fs_helpers::PATH_NOT_FOUND => {
@@ -222,7 +222,7 @@ pub extern "C" fn sys_stat(name: *const i8, stat: *mut fs_helpers::stat) -> i32 
     let mut already_open = false;
     let open_result = unsafe{ fs_helpers::open(name,0, O_RDONLY) };
     if !open_result.result.success {
-        unsafe { sendf(b"sys_stat failed! Result was module=%d description=%d\n\0".as_ptr() as *const std::ffi::c_char, open_result.result.module, open_result.result.description) }
+        // unsafe { sendf(b"sys_stat failed! Result was module=%d description=%d\n\0".as_ptr() as *const std::ffi::c_char, open_result.result.module, open_result.result.description) }
         // assert!(open_result.result.module == fs_helpers::FS_ERR_MODULE);
         match open_result.result.description {
             fs_helpers::TARGET_LOCKED => {
@@ -273,7 +273,7 @@ pub extern "C" fn sys_stat(name: *const i8, stat: *mut fs_helpers::stat) -> i32 
 
 #[unsafe(no_mangle)]
 pub fn sys_close(fd: i32) -> i32 {
-    unsafe { sendf(b"Megaton: Closing file %d!\n\0".as_ptr() as *const std::ffi::c_char, fd) };
+    // unsafe { sendf(b"Megaton: Closing file %d!\n\0".as_ptr() as *const std::ffi::c_char, fd) };
     let list: &mut ListRef = &mut LIST.try_lock().unwrap();
     let fd_entry: &mut Option<FileDescriptor> = &mut get_fd_entry(list, fd as usize);
     match fd_entry {
