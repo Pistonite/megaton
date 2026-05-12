@@ -55,6 +55,6 @@ cargo = [
 [check] # *profile enabled*
 ignore = []
 symbols = [
-    "sdk.sym"
+    "sdk.syms"
 ]
 disallowed-instructions = []
