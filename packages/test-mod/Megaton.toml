@@ -11,28 +11,16 @@ enabled = true
 [build] # *profile enabled*
 sources = [
     "src",
-    # "../botw-symbols/src",
 ]
 
 includes = [
     "src", 
     "include",
-
-    # "../botw/src",
-    # "../botw/lib/agl/include",
-    # "../botw/lib/gsys/include",
-    # "../botw/lib/sead/include",
-    # "../botw/lib/NintendoSDK/include",
-    # "../botw-symbols/include",
-    # "/opt/devkitpro/libnx/include/",
 ]
 
 libpaths = [] # -L
 libraries = [] # -l
-ldscripts = [
-    # "../botw-symbols/ld/ld150.ld",
-    # "../botw-symbols/ld/toolkit150.ld",
-]
+ldscripts = []
 objects = []
 
 [build.flags] # https://megaton.pistonite.dev/config/build_flags.html
@@ -47,8 +35,6 @@ c = [
     "-DNN_WARE_MAJOR=4",
     "-DNN_WARE_MINOR=4",
     "-DNN_WARE_PATCH=0",
-    # "-DBOTW_VERSION=150",
-    # "-DBOTWTOOLKIT_TCP_SEND",
 ]
 cxx = [
     "<default>",
@@ -69,10 +55,6 @@ cargo = [
 [check] # *profile enabled*
 ignore = []
 symbols = [
-    "tm.sym"
-    # "../botw-symbols/symbols/150/main.syms",
-    # "../botw-symbols/symbols/150/rtld.syms",
-    # "../botw-symbols/symbols/150/sdk.syms",
-    # "../botw-symbols/symbols/150/subsdk0.syms",
+    "sdk.sym"
 ]
 disallowed-instructions = []
