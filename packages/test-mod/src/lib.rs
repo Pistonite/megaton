@@ -159,6 +159,29 @@ fn basic_tests(mtt: &mut MegatonTests) {
     let mut test_file = result.unwrap();
     let result = test_file.write(lines[0]);
     mtt.megaton_assert_ok(result, "Failed to write to file\n");
+
+
+    mtt.megaton_log("TEST: Testing consecutive writes append\n");
+    let result = test_file.write(lines[1]);
+    mtt.megaton_assert_ok(result, "Failed to write second chunk to file\n");
+    
+    let read_back = std::fs::read(&path);
+    if let Some(content) = mtt.megaton_assert_ok(read_back, "Failed to read back file after consecutive writes\n") {
+        mtt.megaton_assert_msg(content.as_slice(), total_content, "Consecutive writes did not append correctly");
+    }
+
+
+    mtt.megaton_log("TEST: Testing write modifies seek offset\n");
+    let result = File::create(&path);
+    if let Some(mut file) = mtt.megaton_assert_ok(result, "Failed to recreate file for seek offset test\n") {
+        let result = file.write(lines[0]);
+        if mtt.megaton_assert_ok(result, "Failed to write for seek offset test\n").is_some() {
+            let content = std::fs::read(&path);
+            if let Some(bytes) = mtt.megaton_assert_ok(content, "Failed to read back file\n") {
+                mtt.megaton_assert_msg(bytes.len(), lines[0].len(), "File length wrong after write");
+            }
+        }
+    }
 }
 
 fn run_megaton_tests() {
