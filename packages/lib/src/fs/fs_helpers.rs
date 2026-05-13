@@ -24,7 +24,7 @@ pub enum FileDescriptorType {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct FileDescriptor {
     pub inner: u64,
     pub kind: FileDescriptorType,
