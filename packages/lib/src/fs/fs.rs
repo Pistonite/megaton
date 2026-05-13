@@ -29,9 +29,10 @@ fn insert_into_fd_list(list: &mut ListRef, fd: FileDescriptor) -> Option<usize> 
 
 #[unsafe(no_mangle)]
 pub extern "C" fn debug_show_fd_list(){
-    let list = LIST.try_lock().unwrap();
+    let list = &mut LIST.try_lock().unwrap();
     for i in 0..NUM_FDS {
         if let Some(fd) = list[i] {
+            megaton_log(list, format!("{}=>(type={:?} inner={} seek={})\t", i, fd.kind, fd.inner, fd.seek_offset).as_str());
             // unsafe { sendf(b"%d=>{type=? inner=%u}\t\0".as_ptr() as *const std::ffi::c_char, fd.inner) };
         }
     }
@@ -42,7 +43,6 @@ fn get_fd_entry(list: &ListRef, fd: usize) -> Option<FileDescriptor> {
         return None;
     }
 
-    let fd = fd as usize;
     list[fd]
 }
 
@@ -80,6 +80,21 @@ pub fn initialize_fs(){
 
 }
 
+#[allow(dead_code)]
+pub fn try_initialize_fs(list: &mut ListRef){
+    // stdio takes up 3 entries in the fd list, but makes the indexing logic simpler.
+    // Otherwise, we need to offset every fd we give to the user, or given to us by the user, by 3. 
+    // If we need more fds later, we can just make the list bigger.
+    try_init_file(list, STDIN_FILENO, STDIN_PATH);
+    try_init_file(list, STDOUT_FILENO, STDOUT_PATH);
+    try_init_file(list, STDERR_FILENO, STDERR_PATH);
+    let _log = try_init_file(list, LOG_FILENO, LOG_PATH);
+    
+    // if let Some(log_fd) = log {
+    //     unsafe { init_cpp_logging(log_fd.inner) };
+    // }
+}
+
 // unsafe extern "C" {
 //     // include!("toolkit/tcp.hpp");
 //     // #[namespace = "botw::tcp"]
@@ -88,34 +103,34 @@ pub fn initialize_fs(){
 // }
 
 fn megaton_log(list: &mut ListRef, msg: &str) {
-    let len = (&msg).len();
-    let msg = CString::new(msg).unwrap();
-    
-    let log_fd = get_fd_entry(list, LOG_FILENO);
-    if let Some(mut log) = log_fd {
-        try_write_file(&mut log, msg.as_c_str().as_ptr() as *const u8, len);
+    try_initialize_fs(list);
+    if let Some(mut log) = get_fd_entry(list, LOG_FILENO) {
+        let len = (&msg).len();
+        let msg = CString::new(msg).unwrap();
+        try_write_file(list, &mut log, msg.as_c_str().as_ptr() as *const u8, len);
     }
 }
 
-fn write_stderr(list: &mut ListRef, msg: &str, result: &NNResult) {   
+fn log_error(list: &mut ListRef, msg: &str, result: &NNResult) {   
     // unsafe { sendf(b"Last result's description was %d\n\0".as_ptr() as *const std::ffi::c_char, result.description); }
-    try_init_stderr(list);
-    let mut stderr = get_fd_entry(list, STDERR_FILENO);
-    try_write_file(stderr.as_mut().unwrap(), msg.as_ptr(), msg.len());
+    megaton_log(list, format!("Megaton Error: NNResult description: {}\t message: {}\n", result.description, msg).as_str());
 }
 
-fn try_init_stderr(list: &mut ListRef) {
-    let mut stderr = get_fd_entry(&list, STDERR_FILENO);
 
-    if stderr.is_none() {
-        // unsafe { sendf(b"opening stderr!\n\0".as_ptr() as *const std::ffi::c_char) };
-        let stderr_fd = unsafe { fs_helpers::open(STDERR_PATH.as_ptr() as *const i8, O_RDWR | O_CREAT, 0) };
-        if stderr_fd.result.success {
-            stderr = Some(stderr_fd.fd);
-            (*list)[STDERR_FILENO] = stderr;
+fn try_init_file(list: &mut ListRef, desired_fileno: usize, path: &[u8],) -> Option<FileDescriptor> {
+    let mut file = get_fd_entry(&list, desired_fileno);
+    
+    if file.is_none() {
+        // unsafe { sendf(b"opening log!\n\0".as_ptr() as *const std::ffi::c_char) };
+        let file_fd = unsafe { fs_helpers::open(path.as_ptr() as *const i8, O_RDWR | O_CREAT, 0) };
+        if file_fd.result.success {
+            file = Some(file_fd.fd);
+            (*list)[desired_fileno] = file;
             
         }
     }
+    
+    list[LOG_FILENO]
 }
 
 
@@ -123,11 +138,10 @@ fn try_init_stderr(list: &mut ListRef) {
 pub extern "C" fn sys_open(name: *const i8, flags: i32, mode: i32) -> i32 {
     // TODO: map flags and mode to nnheaders flags and mode
     // write_stderr(format!("Megaton: sys_open called! Args {:?} {} {}", name, flags, mode).as_str());
-    
     let list: &mut ListRef = &mut LIST.try_lock().unwrap();
     megaton_log(list,format!("sys_open called with {:#?} {} {}\n", name, flags, mode).as_str());
-    // megaton_log(list, "sys_open!! \0");
-
+    
+    
     let open_result = unsafe { fs_helpers::open(name, flags, mode) };
     if open_result.result.success  {
         match insert_into_fd_list(list, open_result.fd) {
@@ -135,7 +149,7 @@ pub extern "C" fn sys_open(name: *const i8, flags: i32, mode: i32) -> i32 {
             None => GENERIC_ERRNO,
         }
     } else {
-        // write_stderr(list, "Megaton: sys_open failed!\n", &open_result.result);
+        log_error(list, "Megaton: sys_open failed!\n", &open_result.result);
         // megaton_log(list, format!("Result was module={} description={}\n", open_result.result.module, open_result.result.description).as_str()) }// 
         GENERIC_ERRNO
     }
@@ -150,15 +164,15 @@ pub fn sys_write(fd: i32, buf: *const u8, len: usize) -> isize {
         None => -1,
         Some(fd) => {
             match fd.kind {
-                FileDescriptorType::FILE => try_write_file(fd, buf, len),
+                FileDescriptorType::FILE => try_write_file(list, fd, buf, len),
                 FileDescriptorType::DIR => GENERIC_ERRNO as isize,
                 FileDescriptorType::TCP => todo!(),
-                FileDescriptorType::STDIN => try_write_file(fd, buf, len),
-                FileDescriptorType::STDOUT => try_write_file(fd, buf, len),
+                FileDescriptorType::STDIN => try_write_file(list, fd, buf, len),
+                FileDescriptorType::STDOUT => try_write_file(list, fd, buf, len),
                 FileDescriptorType::STDERR => unsafe { 
                     // sendf("stderr: ".as_ptr() as *const std::ffi::c_char);
                     // sendf(buf as *const std::ffi::c_char);
-                    try_write_file(fd, buf, len)
+                    try_write_file(list, fd, buf, len)
                 },
             }
         }
@@ -166,20 +180,21 @@ pub fn sys_write(fd: i32, buf: *const u8, len: usize) -> isize {
 }
 
 
-fn try_write_file(fd: &mut FileDescriptor, buf: *const u8, len: usize) -> isize {
+fn try_write_file(list: &mut ListRef, fd: &mut FileDescriptor, buf: *const u8, len: usize) -> isize {
     // unsafe { sendf(b"try_write_file %d %s\n\0".as_ptr() as *const std::ffi::c_char, fd.inner, buf) };
-    let write_result = unsafe { fs_helpers::write_file(fd.inner, buf,  len, fd.seek_offset,) };
+    let write_result = unsafe { fs_helpers::write_file(fd.inner, buf,  len, fd.seek_offset) };
     
     if write_result.success {
         fd.seek_offset += len as u64;
         len as isize
     } else {
+        log_error(list, "Megaton: sys_write failed!", &write_result);
         // unsafe { sendf(b"Megaton: sys_write failed with %d\n\0".as_ptr() as *const std::ffi::c_char, write_result.description); }
         // assert!(write_result.module == fs_helpers::FS_ERR_MODULE);
         match write_result.description {
             _ => GENERIC_ERRNO as isize // TODO: Map nn error to errno
         }
-    }    
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -209,6 +224,39 @@ fn try_read_file(fd_entry: &mut FileDescriptor, buf: *mut u8, len: usize) -> isi
         return GENERIC_ERRNO as isize
     } 
     read_result.bytes_read as isize
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn sys_fstat(fd: i32, stat: *mut fs_helpers::stat) -> i32 {
+    let list = &mut LIST.try_lock().unwrap();
+    megaton_log(list, format!("sys_fstat called for {}\n", fd).as_str());
+    if let Some(fd) = get_fd_entry(list, fd as usize) {
+        {
+            let mut stat = unsafe { *stat };
+            // TODO: implement
+            stat.st_gid = 0;
+            stat.st_dev = 0;
+            stat.st_ino = 0;
+            stat.st_nlink = 0;
+
+            const S_IRUSR: u32 = 0o400;
+            const S_IWUSR: u32 = 0o200;
+            stat.st_mode = S_IRUSR | S_IWUSR;
+
+            let size_result = unsafe { fs_helpers::get_file_size(fd.inner) };
+            if !size_result.result.success {
+                return GENERIC_ERRNO;
+            } else {
+                stat.st_size = size_result.size;
+                stat.st_blksize = 1000;
+                stat.st_blocks = ((size_result.size as f64) / 1000.0f64).ceil() as i64;
+                return 0;
+            }
+        };
+
+    } else {
+        return GENERIC_ERRNO
+    }
 }
 
 // https://github.com/hermit-os/hermit-rs/blob/111a7b480a18ce1b6c576d9dac02a688203432ee/hermit/src/syscall/mod.rs#L187
@@ -283,11 +331,14 @@ pub extern "C" fn sys_stat(name: *const i8, stat: *mut fs_helpers::stat) -> i32 
 
 #[unsafe(no_mangle)]
 pub fn sys_close(fd: i32) -> i32 {
-    // unsafe { sendf(b"Megaton: Closing file %d!\n\0".as_ptr() as *const std::ffi::c_char, fd) };
     let list: &mut ListRef = &mut LIST.try_lock().unwrap();
+    megaton_log(list, format!("Megaton: Closing file {}!\n", fd).as_str());
     let fd_entry: &mut Option<FileDescriptor> = &mut get_fd_entry(list, fd as usize);
     match fd_entry {
-        None => return GENERIC_ERRNO,
+        None => {
+            megaton_log(list, format!("Error: No entry for fd {} exists!\n", fd).as_str());
+            return GENERIC_ERRNO;
+        }
         Some(fd) => {
             match fd.kind {
                 FileDescriptorType::FILE => try_close_file(fd.inner),
