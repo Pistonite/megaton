@@ -4,6 +4,5 @@
 mod fs;
 
 unsafe extern "C" fn __megaton_librs_init() {
-    
     fs::init_stdio();
 }
