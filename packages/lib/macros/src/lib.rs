@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 Megaton contributors
+
 use pm::pre::*;
 
 #[proc_macro_attribute]
@@ -12,8 +15,7 @@ fn expand_main(_attr: TokenStream, input: TokenStream) -> pm::Result<TokenStream
     let expanded = pm::quote! {
         #[unsafe(no_mangle)]
         extern "C" fn __megaton_rs_main() {
-            // Call init code
-            megaton::librs_init();
+            // Add init code here?
 
             // Call user defined main
             #old_main_name();
