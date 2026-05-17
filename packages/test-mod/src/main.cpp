@@ -14,15 +14,15 @@ extern "C" void megaton_main() {
     __megaton_rs_main();
 }
 
-static FILE* f;
+static FILE* log_file;
 
 void write_test_output(rust::Str data) {
-    fwrite(data.data(), sizeof(char), data.length(), f);
+    fwrite(data.data(), sizeof(char), data.length(), log_file);
 }
 
 void init_function_in_c() {
     nn::fs::MountSdCard("sd");
-    f = fopen("sd:/test_output.txt", "w");
+    log_file = fopen("sd:/test_output.txt", "w");
     example_rs::run_megaton_tests();
-    fclose(f);
+    fclose(log_file);
 }

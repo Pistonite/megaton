@@ -57,7 +57,10 @@ extern "C" GetSizeResult __megaton_lib_fs_get_file_size(uint64_t nn_fd);
 extern "C" NNResult __megaton_lib_fs_unlink(const char* name);
 extern "C" void __megaton_lib_fs_close_file(uint64_t nn_fd);
 extern "C" void __megaton_lib_fs_close_dir(uint64_t nn_fd);
-extern "C" void __megaton_lib_fs_init_logging(uint64_t fd);
+extern "C" void __megaton_lib_log(const uint8_t* buf, uint64_t len);
+extern "C" void __megaton_lib_fs_write_stdout(const uint8_t* buf, uint64_t len);
+extern "C" void __megaton_lib_fs_write_stderr(const uint8_t* buf, uint64_t len);
+
 
 namespace megaton {
     void debug_show_fd_list();
