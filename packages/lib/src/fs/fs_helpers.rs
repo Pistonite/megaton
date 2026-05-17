@@ -14,13 +14,7 @@ pub enum FileDescriptorType {
     #[allow(dead_code)]
     DIR,
     #[allow(dead_code)]
-    TCP,
-    #[allow(dead_code)]
-    STDIN,
-    #[allow(dead_code)]
-    STDOUT,
-    #[allow(dead_code)]
-    STDERR,
+    TCP
 }
 
 #[repr(C)]
@@ -90,8 +84,17 @@ unsafe extern "C" {
     #[link_name = "__megaton_lib_fs_unlink"]
     pub unsafe fn unlink(name: *const i8) -> NNResult;
 
-    #[link_name = "__megaton_lib_fs_init_logging"]
-    pub unsafe fn init_cpp_logging(fd: u64);
+    // #[link_name = "__megaton_lib_fs_try_init_stdio"]
+    // pub unsafe fn try_init_stdio();
+
+    #[link_name = "__megaton_lib_log"]
+    pub unsafe fn megaton_log(buf: *const u8, len: u64);
+
+    #[link_name = "__megaton_lib_fs_write_stdout"]
+    pub unsafe fn write_stdout(buf: *const u8, len: u64);
+    
+    #[link_name = "__megaton_lib_fs_write_stderr"]
+    pub unsafe fn write_stderr(buf: *const u8, len: u64);
 }
 
 
