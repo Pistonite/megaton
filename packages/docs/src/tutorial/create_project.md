@@ -8,7 +8,7 @@ this step will be much faster and easier.
 
 ## Create Megaton Config
 To initialize a Megaton project, you will need a `Megaton.toml` config file.
-Add this file in an empty directory, which will be the root direcotry of the
+Add this file in an empty directory, which will be the root directory of the
 Megaton project.
 
 ```toml
@@ -44,7 +44,8 @@ manifest = "Cargo.toml"
 # Add the symbols from your target game's SDK
 symbols = []
 ```
-See the page [Configuration]() for a full specification of all the config options.
+See the pages under [Configuration](./reference/configuration/index.html)
+for a full specification of all the config options.
 
 ## Create Cargo Project
 If you are using rust, initialize a cargo project. The default location is the
