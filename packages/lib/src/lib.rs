@@ -2,6 +2,7 @@
 // Copyright (c) 2025-2026 Megaton contributors
 
 mod fs;
+pub use megaton_macros::main;
 
 unsafe extern "C" fn __megaton_librs_init() {
 }
