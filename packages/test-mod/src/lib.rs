@@ -12,17 +12,17 @@ mod ffi {
     }
 }
 
-struct MegatonTests<'a> {
+struct MegatonTests {
     total_tests: usize,
     passed_tests: usize,
     category_tests: usize,
     category_passed_tests: usize,
-    category: &'a str
+    category: &'static str
 }
 
-impl<'a> MegatonTests<'a> {
+impl MegatonTests {
 
-    fn new() -> MegatonTests<'a> {
+    fn new() -> MegatonTests {
         MegatonTests {
             total_tests: 0,
             passed_tests: 0,
@@ -47,7 +47,34 @@ impl<'a> MegatonTests<'a> {
         }
     }
 
-    fn start_category(&mut self, category: &'a str) {
+    fn megaton_assert_msg<T: std::cmp::PartialEq + std::fmt::Debug>(&mut self, result: T, expected: T, msg: &str) {
+        self.total_tests += 1;
+        self.category_tests += 1;
+        if result != expected {
+            self.megaton_log(format!("Test number {:#?} failed: got {:#?}, expected {:#?}. Message: {:?}\n", self.total_tests, result, expected, msg).as_str());
+        } else {
+            self.passed_tests += 1;
+            self.category_passed_tests += 1;
+        }
+    }
+
+    fn megaton_assert_ok<T,E>(&mut self, result: Result<T,E>, msg: &str) -> Option<T> 
+    where 
+        T: std::fmt::Debug,
+        E: std::fmt::Debug 
+        {
+        self.total_tests += 1;
+        self.category_tests += 1;
+        if result.is_err() {
+            self.megaton_log(format!("Test number {:#?} failed: received Err: {:?}. Message: {:?}\n", self.total_tests, result.unwrap_err(), msg).as_str());
+            return None;
+        } else {
+            self.passed_tests += 1;
+            self.category_passed_tests += 1;
+            return Some(result.unwrap());
+        }
+    }
+    fn start_category(&mut self, category: &'static str) {
         self.category_tests = 0;
         self.category_passed_tests = 0;
         self.category = category;
