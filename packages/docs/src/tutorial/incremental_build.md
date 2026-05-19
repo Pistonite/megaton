@@ -22,7 +22,7 @@ tool to determine which dependencies must be checked to know if a source must
 be recompiled. These filenames contain the hash of their path so that they
 can be stored in a flat directory without name collisions.
 
-The page [Output Directory (WIP)](./reference/output_formats/output_directory.html)
+The page [Output Directory (WIP)](../reference/output_formats/output_directory.html)
 contains a full description of the contents and layout of the target directory.
 
 ## Incremental step checks

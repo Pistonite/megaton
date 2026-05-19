@@ -44,7 +44,7 @@ manifest = "Cargo.toml"
 # Add the symbols from your target game's SDK
 symbols = []
 ```
-See the pages under [Configuration](./reference/configuration/index.html)
+See the pages under [Configuration](../reference/configuration/index.html)
 for a full specification of all the config options.
 
 ## Create Cargo Project
