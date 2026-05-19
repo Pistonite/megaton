@@ -14,3 +14,6 @@
 # Unmodified files
 # ["libnx Authors"]
 # "packages/lib/src/external/libnx/*.s" = "ISC"
+# ["Matthew Conte"]
+# "packages/lib/src/tlsf.c" = "BSD-3-Clause"
+# "packages/lib/include/megaton/__internal/tlsf.h" = "BSD-3-Clause"

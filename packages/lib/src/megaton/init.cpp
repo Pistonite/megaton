@@ -10,6 +10,7 @@
 #include <megaton/hook.h>
 #include <megaton/module_layout.h>
 #include <megaton/patch.h>
+#include <megaton/__internal/alloc.h>
 
 extern "C" {
 /**
@@ -50,6 +51,7 @@ void __megaton_lib_init() {
 }
 
 void __megaton_librs_init() {
+        allocator = tlsf_create_with_pool(bss_alloc, BSS_ALLOC_SIZE);
         return;
 }
 // TODO: this can probably be removed with rtld/reloc
