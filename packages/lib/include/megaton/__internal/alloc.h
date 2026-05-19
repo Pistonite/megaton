@@ -5,9 +5,7 @@
 #pragma once
 
 #include <switch/types.h>
-#include <megaton/__internal/tlsf.h>
 
-#define BSS_ALLOC_SIZE 0x20000
-
-extern pool_t allocator;
-extern u8 bss_alloc[BSS_ALLOC_SIZE];
+namespace megaton::alloc {
+void init_allocator();
+}

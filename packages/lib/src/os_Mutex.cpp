@@ -3,6 +3,9 @@
 
 #include <nn/os/os_Mutex.h>
 
+// these symbols are wrong in the header and shouldn't exist
+// might need to be fixed
+
 // this is required to generate the correct destructor for some reason
 // otherwise a different symbol is generated and it doesn't match with
 // what usage sites expect
