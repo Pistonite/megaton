@@ -1,3 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 Megaton contributors
+// * * * * *
+// This file was taken from mattconte/tlsf and modified.
+// See original license information below
+//
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) Matthew Conte 
+
 #include <assert.h>
 #include <limits.h>
 #include <stddef.h>
@@ -5,9 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <megaton/__internal/tlsf.h>
-
-// Added by Megaton Contributors (c) 2026
+// Megaton: modify include and define assert
+#include <megaton/__external/tlsf.h>
 #define tlsf_assert(condition) ((void)0)
 
 #if defined(__cplusplus)
