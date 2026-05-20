@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2026 Megaton contributors
-
 mod fs_tests;
 
 #[cxx::bridge]
@@ -120,7 +119,41 @@ fn megaton_num_tests(mtt: &mut MegatonTests) {
 
 fn megaton_string_tests(mtt: &mut MegatonTests) {
     mtt.start_category("Strings");
+
     mtt.megaton_assert("", "");
+
+    let mut s: String = "Hello, Megaton!".to_string();
+    mtt.megaton_assert(s.as_str(), "Hello, Megaton!");
+    s.make_ascii_uppercase();
+    mtt.megaton_assert(s.as_str(), "HELLO, MEGATON!");
+    s.push_str(" These are string tests");
+    mtt.megaton_assert(s, "HELLO, MEGATON! These are string tests".to_string());
+
+    let mut s: String = String::new();
+    let mut len = s.len();
+    for _ in 0..10 {
+        s.push('a');
+        len += 1;
+        mtt.megaton_assert(s.len(), len);
+    }
+    mtt.megaton_assert(s, "aaaaaaaaaa".to_string());
+
+    let mut s: String = "a".to_string();
+    s = s.chars().rev().collect();
+    mtt.megaton_assert(s.clone(), "a".to_string());
+    s.push('b');
+    mtt.megaton_assert(s.clone(), "ab".to_string());
+    s = s.chars().rev().collect();
+    mtt.megaton_assert(s.clone(), "ba".to_string());
+    s.push('c');
+    mtt.megaton_assert(s.clone(), "bac".to_string());
+    s = s.chars().rev().collect();
+    mtt.megaton_assert(s.clone(), "cab".to_string());
+    s.push('d');
+    mtt.megaton_assert(s.clone(), "cabd".to_string());
+    s = s.chars().rev().collect();
+    mtt.megaton_assert(s, "dbac".to_string());
+
     mtt.end_category();
 }
 
