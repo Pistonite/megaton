@@ -1,11 +1,20 @@
 ["Megaton contributors"]
 # C files
-"packages/lib/**/*.c" = "GPL-3.0-or-later"
-"packages/lib/**/*.cpp" = "GPL-3.0-or-later"
-"packages/lib/**/*.hpp" = "GPL-3.0-or-later"
-"packages/lib/**/*.h" = "GPL-3.0-or-later"
+"packages/lib/src/*.cpp" = "GPL-3.0-or-later"
 "packages/lib/src/megaton/*.s" = "GPL-3.0-or-later"
+"packages/lib/src/megaton/*.c" = "GPL-3.0-or-later"
+"packages/lib/src/megaton/*.cpp" = "GPL-3.0-or-later"
 "packages/lib/src/nximpl/*.s" = "GPL-3.0-or-later"
+"packages/lib/include/exl/**/*.h" = "GPL-3.0-or-later"
+"packages/lib/include/exl/**/*.hpp" = "GPL-3.0-or-later"
+"packages/lib/include/exl_armv8/**/*.h" = "GPL-3.0-or-later"
+"packages/lib/include/exl_armv8/**/*.hpp" = "GPL-3.0-or-later"
+"packages/lib/include/megaton/*.h" = "GPL-3.0-or-later"
+"packages/lib/include/megaton/*.hpp" = "GPL-3.0-or-later"
+"packages/lib/include/megaton/__internal/*.h" = "GPL-3.0-or-later"
+"packages/lib/include/megaton/__internal/*.hpp" = "GPL-3.0-or-later"
+"packages/lib/include/megaton/__priv/*.h" = "GPL-3.0-or-later"
+"packages/lib/include/megaton/__priv/*.hpp" = "GPL-3.0-or-later"
 "packages/test-mod/**/*.cpp" = "GPL-3.0-or-later"
 "packages/test-mod/**/*.h" = "GPL-3.0-or-later"
 
@@ -17,3 +26,5 @@
 # Unmodified files
 # ["libnx Authors"]
 # "packages/lib/src/external/libnx/*.s" = "ISC"
+# ["Matthew Conte"]
+# "packages/lib/include/megaton/__external/tlsf.h" = "BSD-3-Clause"
