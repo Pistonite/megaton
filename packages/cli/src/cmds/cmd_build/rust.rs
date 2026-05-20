@@ -312,12 +312,9 @@ async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::
         .stdout(cu::pio::buffer())
         .stderr(cu::pio::string())
         .stdin_null()
-        .args(args.clone());
+        .args(args);
 
-    let (child, stdout, stderr) = command
-        .co_spawn()
-        .await
-        .context(format!("CXX Args: {:#?}", args))?;
+    let (child, stdout, stderr) = command.co_spawn().await?;
     let status = child.co_wait().await.context("Failed to wait cxxbridge")?;
 
     match status.code() {
@@ -346,3 +343,13 @@ fn write_if_changed(path: &Path, bytes: &[u8]) -> cu::Result<bool> {
 
     Ok(changed)
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//
+//     #[test]
+//     fn test_new() {
+//
+//     }
+// }
