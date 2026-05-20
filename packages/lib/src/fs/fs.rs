@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2025-2026 Megaton contributors
-use std::{ffi::CString, sync::{Mutex}};
+use std::{ffi::CString, sync::Mutex};
 
 const MIN_FD: usize = 100; // fds other than stdio will be returned as their index into the list + MIN_FD
 const NUM_FDS: usize = 1000;
 const GENERIC_ERRNO: i32 = -1;
 
-
-use crate::fs::fs_helpers::{self, FileDescriptor, FileDescriptorType, GetEntryTypeResult, NNResult, O_RDONLY, STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO, write_stderr, write_stdout};
+use crate::fs::fs_helpers::{
+    self, FileDescriptor, FileDescriptorType, GetEntryTypeResult, NNResult, O_RDONLY,
+    STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO, write_stderr, write_stdout,
+};
 
 static LIST: Mutex<[Option<FileDescriptor>; NUM_FDS]> = Mutex::new([const { None }; NUM_FDS]);
 
@@ -23,27 +25,36 @@ fn insert_into_fd_list(fd: FileDescriptor) -> Option<usize> {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn debug_show_fd_list(){
+pub extern "C" fn debug_show_fd_list() {
     let list = &mut LIST.try_lock().unwrap();
     for i in 0..NUM_FDS {
         if let Some(fd) = &list[i] {
-            megaton_log(format!("{}=>(type={:?} inner={} seek={})\t", i+MIN_FD, fd.kind, fd.inner, fd.seek_offset).as_str());
+            megaton_log(
+                format!(
+                    "{}=>(type={:?} inner={} seek={})\t",
+                    i + MIN_FD,
+                    fd.kind,
+                    fd.inner,
+                    fd.seek_offset
+                )
+                .as_str(),
+            );
         }
     }
 }
 
 fn get_fd_entry(fd: usize) -> Option<FileDescriptor> {
     if fd < MIN_FD || fd - MIN_FD >= NUM_FDS {
-        return None
+        return None;
     }
 
     let list = LIST.try_lock().unwrap();
-    list[fd-MIN_FD].clone()
+    list[fd - MIN_FD].clone()
 }
 
 fn set_fd_entry(fd: usize, fd_entry: Option<FileDescriptor>) {
     assert!(fd >= MIN_FD && fd - MIN_FD < NUM_FDS);
-    LIST.try_lock().unwrap()[fd-MIN_FD] = fd_entry;
+    LIST.try_lock().unwrap()[fd - MIN_FD] = fd_entry;
 }
 
 fn megaton_log(msg: &str) {
@@ -53,16 +64,28 @@ fn megaton_log(msg: &str) {
 }
 
 fn log_error(msg: &str, result: &NNResult) {
-    megaton_log(format!("Megaton Error: NNResult description: {}\t message: {}\n", result.description, msg).as_str());
+    megaton_log(
+        format!(
+            "Megaton Error: NNResult description: {}\t message: {}\n",
+            result.description, msg
+        )
+        .as_str(),
+    );
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn sys_open(name: *const i8, flags: i32, mode: i32) -> i32 {
-    megaton_log(format!("sys_open called with name={:#?} flags={} mode={}\n", 
-        unsafe { std::ffi::CStr::from_ptr(name as *const std::ffi::c_char) }, flags, mode
-    ).as_str());
+    megaton_log(
+        format!(
+            "sys_open called with name={:#?} flags={} mode={}\n",
+            unsafe { std::ffi::CStr::from_ptr(name as *const std::ffi::c_char) },
+            flags,
+            mode
+        )
+        .as_str(),
+    );
     let open_result = unsafe { fs_helpers::open(name, flags, mode) };
-    if open_result.result.success  {
+    if open_result.result.success {
         match insert_into_fd_list(open_result.fd) {
             Some(fd_index) => fd_index as i32,
             None => GENERIC_ERRNO,
@@ -81,49 +104,45 @@ pub fn sys_write(fd: i32, buf: *const u8, len: usize) -> isize {
         STDOUT_FILENO => {
             unsafe { write_stdout(buf, len as u64) };
             return len as isize;
-        },
+        }
         STDERR_FILENO => {
             unsafe { write_stderr(buf, len as u64) };
             return len as isize;
-        },
+        }
         _ => {}
     };
-    
+
     let fd_index = fd as usize;
-    let fd_entry= get_fd_entry(fd_index);
+    let fd_entry = get_fd_entry(fd_index);
     match fd_entry {
         None => GENERIC_ERRNO as isize,
-        Some(fd) => {
-            match fd.kind {
-                FileDescriptorType::FILE => try_write_file(fd, fd_index, buf, len),
-                FileDescriptorType::DIR => GENERIC_ERRNO as isize,
-                FileDescriptorType::TCP => todo!(),
-                
-            }
-        }
+        Some(fd) => match fd.kind {
+            FileDescriptorType::FILE => try_write_file(fd, fd_index, buf, len),
+            FileDescriptorType::DIR => GENERIC_ERRNO as isize,
+            FileDescriptorType::TCP => todo!(),
+        },
     }
 }
 
-
 fn try_write_file(mut fd: FileDescriptor, fd_index: usize, buf: *const u8, len: usize) -> isize {
-    let write_result = unsafe { fs_helpers::write_file(fd.inner, buf,  len, fd.seek_offset) };
-    
+    let write_result = unsafe { fs_helpers::write_file(fd.inner, buf, len, fd.seek_offset) };
+
     if write_result.success {
         fd.seek_offset += len as u64;
         set_fd_entry(fd_index, Some(fd));
         len as isize
     } else {
-        log_error( "Megaton: sys_write failed!", &write_result);
+        log_error("Megaton: sys_write failed!", &write_result);
         match write_result.description {
-            _ => GENERIC_ERRNO as isize // TODO: Map nn error to errno
+            _ => GENERIC_ERRNO as isize, // TODO: Map nn error to errno
         }
     }
 }
 
 #[unsafe(no_mangle)]
 pub extern "C" fn sys_read(fd_index: i32, buf: *mut u8, len: usize) -> isize {
-    // Todo: Hold lock for the entire duration of read/write 
-    megaton_log(format!("sys_read called with fd={} len={}\n", fd_index,len).as_str());
+    // Todo: Hold lock for the entire duration of read/write
+    megaton_log(format!("sys_read called with fd={} len={}\n", fd_index, len).as_str());
 
     match fd_index as usize {
         STDIN_FILENO => return GENERIC_ERRNO as isize,
@@ -136,22 +155,21 @@ pub extern "C" fn sys_read(fd_index: i32, buf: *mut u8, len: usize) -> isize {
     let fd_entry: Option<FileDescriptor> = get_fd_entry(fd_index as usize);
     match fd_entry {
         None => -1,
-        Some(fd) => {
-            match fd.kind {
-                FileDescriptorType::FILE => try_read_file(fd, fd_index as usize, buf, len),
-                FileDescriptorType::DIR => todo!(),
-                FileDescriptorType::TCP => todo!(),
-            }
-        }
+        Some(fd) => match fd.kind {
+            FileDescriptorType::FILE => try_read_file(fd, fd_index as usize, buf, len),
+            FileDescriptorType::DIR => todo!(),
+            FileDescriptorType::TCP => todo!(),
+        },
     }
 }
 
 fn try_read_file(mut fd_entry: FileDescriptor, fd_index: usize, buf: *mut u8, len: usize) -> isize {
-    let read_result = unsafe { fs_helpers::read_file(fd_entry.inner, fd_entry.seek_offset, buf, len as u64) };
+    let read_result =
+        unsafe { fs_helpers::read_file(fd_entry.inner, fd_entry.seek_offset, buf, len as u64) };
     if !read_result.result.success {
         log_error("Failed to read file", &read_result.result);
-        return GENERIC_ERRNO as isize
-    } 
+        return GENERIC_ERRNO as isize;
+    }
     fd_entry.seek_offset += read_result.bytes_read as u64;
     set_fd_entry(fd_index, Some(fd_entry));
 
@@ -160,7 +178,7 @@ fn try_read_file(mut fd_entry: FileDescriptor, fd_index: usize, buf: *mut u8, le
 
 #[unsafe(no_mangle)]
 pub extern "C" fn sys_fstat(fd: i32, stat: *mut fs_helpers::stat) -> i32 {
-    megaton_log( format!("sys_fstat called for fd={}\n", fd).as_str());
+    megaton_log(format!("sys_fstat called for fd={}\n", fd).as_str());
     match fd as usize {
         STDIN_FILENO | STDOUT_FILENO | STDERR_FILENO => {
             return GENERIC_ERRNO;
@@ -171,37 +189,40 @@ pub extern "C" fn sys_fstat(fd: i32, stat: *mut fs_helpers::stat) -> i32 {
     if let Some(fd) = get_fd_entry(fd as usize) {
         stat_file(&fd, stat)
     } else {
-        return GENERIC_ERRNO
+        return GENERIC_ERRNO;
     }
 }
 
 // https://github.com/hermit-os/hermit-rs/blob/111a7b480a18ce1b6c576d9dac02a688203432ee/hermit/src/syscall/mod.rs#L187
 #[unsafe(no_mangle)]
 pub extern "C" fn sys_stat(name: *const i8, stat: *mut fs_helpers::stat) -> i32 {
-    megaton_log(format!("sys_stat called with name={:?}\n", 
-        unsafe { std::ffi::CStr::from_ptr(name as *const std::ffi::c_char) }
-    ).as_str());
+    megaton_log(
+        format!("sys_stat called with name={:?}\n", unsafe {
+            std::ffi::CStr::from_ptr(name as *const std::ffi::c_char)
+        })
+        .as_str(),
+    );
     let entry_type: GetEntryTypeResult = unsafe { fs_helpers::get_entry_type(name) };
     if !entry_type.result.success {
         match entry_type.result.description {
             fs_helpers::PATH_NOT_FOUND => {
                 return GENERIC_ERRNO; // TODO: get err code for this
-            },
-            
+            }
+
             _ => {
                 log_error("sys_stat: get_entry_type failed!", &entry_type.result);
-                return GENERIC_ERRNO;  // TODO: get err code for this
+                return GENERIC_ERRNO; // TODO: get err code for this
             }
         }
     }
 
     let mut already_open = false;
-    let open_result = unsafe{ fs_helpers::open(name,0, O_RDONLY) };
+    let open_result = unsafe { fs_helpers::open(name, 0, O_RDONLY) };
     if !open_result.result.success {
         match open_result.result.description {
             fs_helpers::TARGET_LOCKED => {
                 already_open = true;
-            },
+            }
             _ => {
                 log_error("sys_stat: open file failed!", &open_result.result);
                 return GENERIC_ERRNO;
@@ -254,11 +275,10 @@ fn stat_file(fd: &FileDescriptor, stat: *mut fs_helpers::stat) -> i32 {
     }
 }
 
-
 #[unsafe(no_mangle)]
 pub fn sys_close(fd: i32) -> i32 {
     megaton_log(format!("Megaton: Closing file {}!\n", fd).as_str());
-    let fd_entry  =  get_fd_entry(fd as usize);
+    let fd_entry = get_fd_entry(fd as usize);
 
     match fd as usize {
         STDIN_FILENO | STDOUT_FILENO | STDERR_FILENO => {
@@ -275,8 +295,10 @@ pub fn sys_close(fd: i32) -> i32 {
         Some(fd) => {
             match fd.kind {
                 FileDescriptorType::FILE => try_close_file(fd.inner),
-                FileDescriptorType::DIR => unsafe { fs_helpers::close_directory(fd.inner); },
-                FileDescriptorType::TCP => todo!()
+                FileDescriptorType::DIR => unsafe {
+                    fs_helpers::close_directory(fd.inner);
+                },
+                FileDescriptorType::TCP => todo!(),
             };
         }
     };
@@ -284,7 +306,6 @@ pub fn sys_close(fd: i32) -> i32 {
     set_fd_entry(fd as usize, None);
     0
 }
-
 
 #[unsafe(no_mangle)]
 pub extern "C" fn sys_writev(_fd: i32, _iov: *const u8, _iovcnt: usize) -> isize {
@@ -296,12 +317,13 @@ fn try_close_file(fd: u64) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn sys_unlink(name: *const i8) -> i32  {
-    megaton_log(format!("sys_unlink called with name={:?}\n", unsafe { std::ffi::CStr::from_ptr(name as *const std::ffi::c_char) }).as_str());
+pub extern "C" fn sys_unlink(name: *const i8) -> i32 {
+    megaton_log(
+        format!("sys_unlink called with name={:?}\n", unsafe {
+            std::ffi::CStr::from_ptr(name as *const std::ffi::c_char)
+        })
+        .as_str(),
+    );
     let result = unsafe { fs_helpers::unlink(name) };
-    if result.success {
-        0
-    } else {
-        GENERIC_ERRNO
-    }
+    if result.success { 0 } else { GENERIC_ERRNO }
 }

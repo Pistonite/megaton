@@ -4,5 +4,4 @@
 mod fs;
 pub use megaton_macros::main;
 
-unsafe extern "C" fn __megaton_librs_init() {
-}
+unsafe extern "C" fn __megaton_librs_init() {}
