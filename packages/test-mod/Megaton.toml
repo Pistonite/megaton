@@ -3,7 +3,6 @@ name = "TestMod"
 title-id = 0x01007ef00011e000
 
 [megaton]
-
 version = "0.1.0"
 
 [cargo]

@@ -1,9 +1,5 @@
-use std::{fs::{File, OpenOptions}, io::{Read, Write}, path::PathBuf};
-
-pub use megaton::*;
-mod fs_tests;
-
-
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 Megaton contributors
 
 #[cxx::bridge]
 mod ffi {
@@ -19,17 +15,17 @@ mod ffi {
     }
 }
 
-struct MegatonTests<'a> {
+struct MegatonTests {
     total_tests: usize,
     passed_tests: usize,
     category_tests: usize,
     category_passed_tests: usize,
-    category: &'a str
+    category: &'static str
 }
 
-impl<'a> MegatonTests<'a> {
+impl MegatonTests {
 
-    fn new() -> MegatonTests<'a> {
+    fn new() -> MegatonTests {
         MegatonTests {
             total_tests: 0,
             passed_tests: 0,
@@ -81,8 +77,7 @@ impl<'a> MegatonTests<'a> {
             return Some(result.unwrap());
         }
     }
-
-    fn start_category(&mut self, category: &'a str) {
+    fn start_category(&mut self, category: &'static str) {
         self.category_tests = 0;
         self.category_passed_tests = 0;
         self.category = category;
