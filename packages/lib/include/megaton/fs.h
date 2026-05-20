@@ -8,10 +8,7 @@
 enum class FileDescriptorType {
     FILE,
     DIR,
-    TCP,
-    STDIN,
-    STDOUT,
-    STDERR,
+    TCP
 };
 struct FileDescriptor {
     uint64_t inner;
