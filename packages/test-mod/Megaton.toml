@@ -36,7 +36,6 @@ c = [
     "-DNN_WARE_MINOR=4",
     "-DNN_WARE_PATCH=0",
 ]
-
 cxx = [
     "<default>",
     "-Wno-invalid-offsetof",
