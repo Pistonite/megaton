@@ -5,27 +5,7 @@ tasks:
     cmds:
      - megaton build -v
 
-
-  build-cargo:
-    env:
-      # these would be supplied by megaton build tool
-      # this is needed to ensure any C code built by cargo
-      # is also built by the same compiler
-      CC: /opt/devkitpro/devkitA64/bin/aarch64-none-elf-gcc
-      CXX: /opt/devkitpro/devkitA64/bin/aarch64-none-elf-g++
-      AR: /opt/devkitpro/devkitA64/bin/aarch64-none-elf-ar
-      # this will use release build but still have symbols..
-      # maybe an option in Megaton.toml
-      # CARGO_PROFILE_RELEASE_DEBUG: true
-    cmds:
-      # --release is needed to remove unnecessary dynamic symbols
-      # to pass the symbol checker
-      - cargo +megaton build --target aarch64-unknown-hermit
-     
-
-    
-
-  # this is to upload the mod to console via ftp. you don't need to worry about this
+  # this is to upload the mod to console via ftp
   upload:
     cmds:
       - lftp 192.168.0.170:5000 < scripts/lftp-upload.sh
