@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 Megaton contributors
+
 #[cxx::bridge]
 mod ffi {
     unsafe extern "C++" {

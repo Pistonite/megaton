@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 Megaton contributors
+
 #include <megaton/prelude.h>
 
 #include <test-mod/mod.h>
@@ -12,15 +15,6 @@ extern "C" void __megaton_rs_main();
 
 extern "C" void megaton_main() {
     __megaton_rs_main();
-}
-
-
-extern "C" i64 sys_write(void* fd, u8* buf, usize len) {
-    return len;
-}
-
-extern "C" i64 sys_writev(void* fd, void* iov, usize iovcnt) {
-    return iovcnt;
 }
 
 static FILE* f;
