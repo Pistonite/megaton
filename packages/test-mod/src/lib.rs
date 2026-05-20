@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2026 Megaton contributors
 
+mod fs_tests;
+
 #[cxx::bridge]
 mod ffi {
     unsafe extern "C++" {
@@ -122,16 +124,11 @@ fn megaton_string_tests(mtt: &mut MegatonTests) {
     mtt.end_category();
 }
 
-fn megaton_file_tests(mtt: &mut MegatonTests) {
-    mtt.start_category("Files");
-    mtt.end_category();
-}
-
 fn run_megaton_tests() {
     let mut mtt = MegatonTests::new();
     megaton_num_tests(&mut mtt);
     megaton_string_tests(&mut mtt);
-    megaton_file_tests(&mut mtt);
+    fs_tests::megaton_file_tests(&mut mtt);
     mtt.megaton_log(format!("Tests finished, {:#?}/{:#?} Passed\n", mtt.passed_tests, mtt.total_tests).as_str());
 }
 
