@@ -11,6 +11,7 @@ const char* STDIN_PATH = "sd:/megaton_stdin.txt";
 const char* STDOUT_PATH = "sd:/megaton_stdout.txt";
 const char* STDERR_PATH = "sd:/megaton_stderr.txt";
 
+
 extern "C" void __megaton_lib_log(const uint8_t* buf, uint64_t len) {
     FILE *log_file = fopen(LOG_PATH, "a");
     if(log_file != NULL) fwrite(buf, sizeof(uint8_t), len, log_file);

@@ -275,7 +275,6 @@ fn stat_file(fd: &FileDescriptor, stat: *mut fs_helpers::stat) -> i32 {
     }
 }
 
-
 #[unsafe(no_mangle)]
 pub fn sys_close(fd: i32) -> i32 {
     megaton_log(format!("Megaton: Closing file {}!\n", fd).as_str());

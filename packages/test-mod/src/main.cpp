@@ -17,9 +17,7 @@ extern "C" void megaton_main() {
     __megaton_rs_main();
 }
 
-
 static FILE* f;
-
 
 void write_test_output(rust::Str data) {
     fwrite(data.data(), sizeof(char), data.length(), f);
