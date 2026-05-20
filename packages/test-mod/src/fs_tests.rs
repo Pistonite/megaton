@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2025-2026 Megaton contributors
+
 use std::{fs::{File, OpenOptions}, io::{Read, Write}, path::PathBuf};
 
 use crate::MegatonTests;
