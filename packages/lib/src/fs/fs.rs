@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2025-2026 Megaton contributors
 use std::{ffi::CString, sync::{Mutex}};
 
 const MIN_FD: usize = 100; // fds other than stdio will be returned as their index into the list + MIN_FD
