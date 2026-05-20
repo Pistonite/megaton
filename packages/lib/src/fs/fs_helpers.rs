@@ -84,9 +84,6 @@ unsafe extern "C" {
     #[link_name = "__megaton_lib_fs_unlink"]
     pub unsafe fn unlink(name: *const i8) -> NNResult;
 
-    // #[link_name = "__megaton_lib_fs_try_init_stdio"]
-    // pub unsafe fn try_init_stdio();
-
     #[link_name = "__megaton_lib_log"]
     pub unsafe fn megaton_log(buf: *const u8, len: u64);
 

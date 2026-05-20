@@ -7,9 +7,9 @@
 
 // TODO: Allow user to configure stdio paths
 static char* LOG_PATH = "sd:/megaton_logs.txt";
-static char* STDIN_PATH = "sd:/megaton_logs.txt";
-static char* STDOUT_PATH = "sd:/megaton_logs.txt";
-static char* STDERR_PATH = "sd:/megaton_logs.txt";
+static char* STDIN_PATH = "sd:/megaton_stdin.txt";
+static char* STDOUT_PATH = "sd:/megaton_stdout.txt";
+static char* STDERR_PATH = "sd:/megaton_stderr.txt";
 
 extern "C" void __megaton_lib_log(const uint8_t* buf, uint64_t len) {
     FILE *log_file = fopen(LOG_PATH, "a");
