@@ -3,7 +3,7 @@ version: '3'
 tasks:
   build:
     cmds:
-     - ~/Documents/School/Capstone/megaton/target/debug/megaton build -v
+     - megaton build -v
 
 
   build-cargo:
