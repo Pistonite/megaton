@@ -40,19 +40,30 @@ fn make_lib_targz() -> cu::Result<PathBuf> {
         builder
     };
 
-    let lib_path = {
-        let mut path = crate_path.parent_abs()?;
-        path.push("lib");
-        path
-    };
-    let mut walk = cu::fs::walk(&lib_path)?;
+    let packages_path = crate_path.parent_abs()?;
+    let lib_path = packages_path.join("lib");
+    let nnheaders_path = packages_path.join("nnheaders");
+
+    tar_builder = add_to_tar(tar_builder, &lib_path, &PathBuf::from("."))?;
+    tar_builder = add_to_tar(tar_builder, &nnheaders_path, &PathBuf::from("nnheaders"))?;
+
+    tar_builder.into_inner()?.finish()?.flush()?;
+    Ok(path)
+}
+
+fn add_to_tar(
+    mut tar_builder: TarBuilder<GzEncoder<File>>,
+    source_path: &Path,
+    dest_path: &Path,
+) -> cu::Result<TarBuilder<GzEncoder<File>>> {
+    let mut walk = cu::fs::walk(source_path)?;
     while let Some(entry) = walk.next() {
         let entry = entry?;
         let entry_path = entry.path();
         if !entry_path.is_file() {
             continue;
         }
-        let rel_path = entry_path.try_to_rel_from(&lib_path);
+        let rel_path = dest_path.join(entry_path.try_to_rel_from(source_path));
         cu::ensure!(
             rel_path.is_relative(),
             "not relative: {}",
@@ -66,8 +77,7 @@ fn make_lib_targz() -> cu::Result<PathBuf> {
         println!("cargo::rerun-if-changed={}", entry_path.as_utf8()?);
         tar_builder.append_file(&rel_path, &mut file)?;
     }
-    tar_builder.into_inner()?.finish()?.flush()?;
-    Ok(path)
+    Ok(tar_builder)
 }
 
 fn gen_lib_hash(lib: &Path) -> cu::Result<()> {

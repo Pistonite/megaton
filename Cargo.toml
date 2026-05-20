@@ -1,8 +1,9 @@
 [workspace]
 resolver = "2"
 members = [
-    "packages/cli", 
+    "packages/cli",
     "packages/lib",
+    "packages/lib/macros",
     "packages/test-mod"
 ]
 

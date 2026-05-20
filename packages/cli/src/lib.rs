@@ -4,4 +4,5 @@
 pub mod cmds;
 pub mod env;
 
-pub static MEGATON_VERSION: &str = "0.1.1";
+/// The "blessed" cxxbridge-cmd version to use
+pub static BLESSED_CXX_VERSION: &str = "1.0.194";
