@@ -1,0 +1,60 @@
+[module]
+name = "TestMod"
+title-id = 0x01007ef00011e000
+
+[megaton]
+version = "0.1.0"
+
+[cargo]
+enabled = true
+
+[build] # *profile enabled*
+sources = [
+    "src",
+]
+
+includes = [
+    "src", 
+    "include",
+]
+
+libpaths = [] # -L
+libraries = [] # -l
+ldscripts = []
+objects = []
+
+[build.flags] # https://megaton.pistonite.dev/config/build_flags.html
+c = [
+    "<default>",
+    "-DNNSDK",
+    "-DSWITCH",
+    "-D__SWITCH__",
+    "-DNN_SDK_MAJOR=4",
+    "-DNN_SDK_MINOR=4",
+    "-DNN_SDK_PATCH=0",
+    "-DNN_WARE_MAJOR=4",
+    "-DNN_WARE_MINOR=4",
+    "-DNN_WARE_PATCH=0",
+]
+cxx = [
+    "<default>",
+    "-Wno-invalid-offsetof",
+]
+
+ld = [
+    "<default>",
+]
+
+rust = [
+]
+
+cargo = [
+    "<default>",
+]
+
+[check] # *profile enabled*
+ignore = []
+symbols = [
+    "sdk.syms"
+]
+disallowed-instructions = []

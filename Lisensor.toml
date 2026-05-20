@@ -6,10 +6,13 @@
 "packages/lib/**/*.h" = "GPL-3.0-or-later"
 "packages/lib/src/megaton/*.s" = "GPL-3.0-or-later"
 "packages/lib/src/nximpl/*.s" = "GPL-3.0-or-later"
+"packages/test-mod/**/*.cpp" = "GPL-3.0-or-later"
+"packages/test-mod/**/*.h" = "GPL-3.0-or-later"
 
 # Rust files
 "packages/lib/**/*.rs" = "GPL-3.0-or-later"
 "packages/cli/**/*.rs" = "MIT"
+"packages/test-mod/**/*.rs" = "GPL-3.0-or-later"
 
 # Unmodified files
 # ["libnx Authors"]
