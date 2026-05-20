@@ -48,6 +48,7 @@ void __megaton_lib_init() {
 
     __init_array();
     megaton::hook::init();
+    
 }
 
 void __megaton_librs_init() {

@@ -3,6 +3,8 @@ resolver = "2"
 members = [
     "packages/cli",
     "packages/lib",
+    "packages/lib/macros",
+    "packages/test-mod"
 ]
 
 [workspace.dependencies]
