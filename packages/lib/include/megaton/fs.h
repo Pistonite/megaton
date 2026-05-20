@@ -5,17 +5,10 @@
 #include <cstdint>
 #include <nn/fs.h>
 
-// namespace botw::tcp {
-//     void sendf(const char* args, ...);
-// }
-
 enum class FileDescriptorType {
     FILE,
     DIR,
-    TCP,
-    STDIN,
-    STDOUT,
-    STDERR,
+    TCP
 };
 struct FileDescriptor {
     uint64_t inner;

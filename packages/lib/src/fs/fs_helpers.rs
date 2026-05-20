@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2025-2026 Megaton contributors
+
 #[derive(Debug)]
 #[repr(C)]
 pub struct NNResult {
@@ -14,7 +17,7 @@ pub enum FileDescriptorType {
     #[allow(dead_code)]
     DIR,
     #[allow(dead_code)]
-    TCP
+    TCP,
 }
 
 #[repr(C)]
@@ -25,11 +28,10 @@ pub struct FileDescriptor {
     pub seek_offset: u64,
 }
 
-
 #[repr(C)]
 pub struct OpenResult {
     pub result: NNResult,
-    pub fd: FileDescriptor
+    pub fd: FileDescriptor,
 }
 
 #[repr(C)]
@@ -41,30 +43,28 @@ pub struct ReadResult {
 #[repr(C)]
 pub struct GetEntryTypeResult {
     pub result: NNResult,
-    pub entry_type: DirectoryEntryType
+    pub entry_type: DirectoryEntryType,
 }
 
 #[repr(C)]
 pub struct GetSizeResult {
     pub result: NNResult,
-    pub size: i64
+    pub size: i64,
 }
-
 
 #[repr(C)]
 #[allow(dead_code)]
 pub struct StatResult {
     pub result: NNResult,
-    pub stat_val: stat
+    pub stat_val: stat,
 }
-
 
 unsafe extern "C" {
     #[link_name = "__megaton_lib_fs_write_file"]
-    pub unsafe fn write_file(nn_fd: u64,  buf: *const u8, size: usize, position: u64) -> NNResult;
+    pub unsafe fn write_file(nn_fd: u64, buf: *const u8, size: usize, position: u64) -> NNResult;
 
     #[link_name = "__megaton_lib_fs_open"]
-    pub unsafe fn open(name: *const i8,  flags: i32, mode: i32) -> OpenResult;
+    pub unsafe fn open(name: *const i8, flags: i32, mode: i32) -> OpenResult;
 
     #[link_name = "__megaton_lib_fs_get_entry_type"]
     pub unsafe fn get_entry_type(name: *const i8) -> GetEntryTypeResult;
@@ -78,25 +78,21 @@ unsafe extern "C" {
     #[link_name = "__megaton_lib_fs_close_file"]
     pub unsafe fn close_file(nn_fd: u64);
 
-        #[link_name = "__megaton_lib_fs_close_dir"]
+    #[link_name = "__megaton_lib_fs_close_dir"]
     pub unsafe fn close_directory(nn_fd: u64);
 
     #[link_name = "__megaton_lib_fs_unlink"]
     pub unsafe fn unlink(name: *const i8) -> NNResult;
-
-    // #[link_name = "__megaton_lib_fs_try_init_stdio"]
-    // pub unsafe fn try_init_stdio();
 
     #[link_name = "__megaton_lib_log"]
     pub unsafe fn megaton_log(buf: *const u8, len: u64);
 
     #[link_name = "__megaton_lib_fs_write_stdout"]
     pub unsafe fn write_stdout(buf: *const u8, len: u64);
-    
+
     #[link_name = "__megaton_lib_fs_write_stderr"]
     pub unsafe fn write_stderr(buf: *const u8, len: u64);
 }
-
 
 #[allow(dead_code)]
 // https://github.com/hermit-os/hermit-rs/blob/82146cf059bf3894eea1e96beed9da72b99b9d5a/hermit-abi/src/lib.rs#L44
@@ -125,11 +121,11 @@ pub const O_DIRECTORY: i32 = 0o200000;
 #[allow(dead_code)]
 pub const FS_ERR_MODULE: i32 = 2; // all fs errors will have module = 2
 #[allow(dead_code)]
-pub const PATH_NOT_FOUND: i32      = 1;
+pub const PATH_NOT_FOUND: i32 = 1;
 #[allow(dead_code)]
 pub const PATH_ALREADY_EXISTS: i32 = 2;
 #[allow(dead_code)]
-pub const TARGET_LOCKED: i32       = 7;
+pub const TARGET_LOCKED: i32 = 7;
 #[allow(dead_code)]
 pub const DIRECTORY_NOT_EMPTY: i32 = 8;
 
@@ -141,31 +137,30 @@ type time_t = i64;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
 pub struct stat {
-	pub st_dev: u64,
-	pub st_ino: u64,
-	pub st_nlink: u64,
-	/// access permissions
-	pub st_mode: u32,
-	/// user id
-	pub st_uid: u32,
-	/// group id
-	pub st_gid: u32,
-	/// device id
-	pub st_rdev: u64,
-	/// size in bytes
-	pub st_size: i64,
-	/// block size
-	pub st_blksize: i64,
-	/// size in blocks
-	pub st_blocks: i64,
-	/// time of last access
-	pub st_atim: timespec,
-	/// time of last modification
-	pub st_mtim: timespec,
-	/// time of last status change
-	pub st_ctim: timespec,
+    pub st_dev: u64,
+    pub st_ino: u64,
+    pub st_nlink: u64,
+    /// access permissions
+    pub st_mode: u32,
+    /// user id
+    pub st_uid: u32,
+    /// group id
+    pub st_gid: u32,
+    /// device id
+    pub st_rdev: u64,
+    /// size in bytes
+    pub st_size: i64,
+    /// block size
+    pub st_blksize: i64,
+    /// size in blocks
+    pub st_blocks: i64,
+    /// time of last access
+    pub st_atim: timespec,
+    /// time of last modification
+    pub st_mtim: timespec,
+    /// time of last status change
+    pub st_ctim: timespec,
 }
-
 
 // https://github.com/hermit-os/kernel/blob/884cdccf6a5ca532b5aad102a530e2d6e7cf5b25/src/time.rs
 /// Represent the number of seconds and nanoseconds since
@@ -173,26 +168,26 @@ pub struct stat {
 #[derive(Copy, Clone, Debug, Default)]
 #[repr(C)]
 pub struct timespec {
-	/// seconds
-	pub tv_sec: time_t,
-	/// nanoseconds
-	pub tv_nsec: i32,
+    /// seconds
+    pub tv_sec: time_t,
+    /// nanoseconds
+    pub tv_nsec: i32,
 }
 
 #[allow(dead_code)]
 impl timespec {
-	pub fn from_usec(microseconds: i64) -> Self {
-		Self {
-			tv_sec: (microseconds / 1_000_000),
-			tv_nsec: ((microseconds % 1_000_000) * 1000) as i32,
-		}
-	}
+    pub fn from_usec(microseconds: i64) -> Self {
+        Self {
+            tv_sec: (microseconds / 1_000_000),
+            tv_nsec: ((microseconds % 1_000_000) * 1000) as i32,
+        }
+    }
 
-	pub fn into_usec(&self) -> Option<i64> {
-		self.tv_sec
-			.checked_mul(1_000_000)
-			.and_then(|usec| usec.checked_add((self.tv_nsec / 1000).into()))
-	}
+    pub fn into_usec(&self) -> Option<i64> {
+        self.tv_sec
+            .checked_mul(1_000_000)
+            .and_then(|usec| usec.checked_add((self.tv_nsec / 1000).into()))
+    }
 }
 
 /* Kinds of entries within a directory. */
@@ -204,7 +199,6 @@ pub enum DirectoryEntryType {
     #[allow(non_camel_case_types, dead_code)]
     DirectoryEntryType_File,
 }
-
 
 /* Bitfield to define the kinds of entries to open from a directory. */
 #[repr(C)]

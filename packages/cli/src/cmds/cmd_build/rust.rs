@@ -306,8 +306,6 @@ async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::
         args.push("--header");
     }
 
-    
-
     let command = env
         .cxxbridge()
         .command()
@@ -316,7 +314,10 @@ async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::
         .stdin_null()
         .args(args.clone());
 
-    let (child, stdout, stderr) = command.co_spawn().await.context(format!("CXX Args: {:#?}", args))?;
+    let (child, stdout, stderr) = command
+        .co_spawn()
+        .await
+        .context(format!("CXX Args: {:#?}", args))?;
     let status = child.co_wait().await.context("Failed to wait cxxbridge")?;
 
     match status.code() {
@@ -345,4 +346,3 @@ fn write_if_changed(path: &Path, bytes: &[u8]) -> cu::Result<bool> {
 
     Ok(changed)
 }
-
