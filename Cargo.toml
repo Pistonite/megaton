@@ -4,6 +4,9 @@ members = [
     "packages/cli",
     "packages/lib",
     "packages/lib/macros",
+]
+
+exclude = [
     "packages/test-mod"
 ]
 

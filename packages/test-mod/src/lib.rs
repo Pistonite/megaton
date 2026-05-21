@@ -2,6 +2,8 @@
 // Copyright (c) 2026 Megaton contributors
 mod fs_tests;
 
+pub use megaton::*;
+
 #[cxx::bridge]
 mod ffi {
     unsafe extern "C++" {
