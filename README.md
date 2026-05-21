@@ -1,3 +1,5 @@
+<img src="https://github.com/Pistonite/megaton/blob/main/packages/docs/src/icon.png?raw=true" width="256px" align="right" />
+
 # megaton
 
 NOTE: If you were using the megaton tool for build C projects,
