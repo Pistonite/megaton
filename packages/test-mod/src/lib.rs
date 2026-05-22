@@ -23,11 +23,10 @@ struct MegatonTests {
     passed_tests: usize,
     category_tests: usize,
     category_passed_tests: usize,
-    category: &'static str
+    category: &'static str,
 }
 
 impl MegatonTests {
-
     fn new() -> MegatonTests {
         MegatonTests {
             total_tests: 0,
@@ -46,33 +45,58 @@ impl MegatonTests {
         self.total_tests += 1;
         self.category_tests += 1;
         if result != expected {
-            self.megaton_log(format!("Test number {:#?} failed: got {:#?}, expected {:#?}\n", self.total_tests, result, expected).as_str());
+            self.megaton_log(
+                format!(
+                    "Test number {:#?} failed: got {:#?}, expected {:#?}\n",
+                    self.total_tests, result, expected
+                )
+                .as_str(),
+            );
         } else {
             self.passed_tests += 1;
             self.category_passed_tests += 1;
         }
     }
 
-    fn megaton_assert_msg<T: std::cmp::PartialEq + std::fmt::Debug>(&mut self, result: T, expected: T, msg: &str) {
+    fn megaton_assert_msg<T: std::cmp::PartialEq + std::fmt::Debug>(
+        &mut self,
+        result: T,
+        expected: T,
+        msg: &str,
+    ) {
         self.total_tests += 1;
         self.category_tests += 1;
         if result != expected {
-            self.megaton_log(format!("Test number {:#?} failed: got {:#?}, expected {:#?}. Message: {:?}\n", self.total_tests, result, expected, msg).as_str());
+            self.megaton_log(
+                format!(
+                    "Test number {:#?} failed: got {:#?}, expected {:#?}. Message: {:?}\n",
+                    self.total_tests, result, expected, msg
+                )
+                .as_str(),
+            );
         } else {
             self.passed_tests += 1;
             self.category_passed_tests += 1;
         }
     }
 
-    fn megaton_assert_ok<T,E>(&mut self, result: Result<T,E>, msg: &str) -> Option<T> 
-    where 
+    fn megaton_assert_ok<T, E>(&mut self, result: Result<T, E>, msg: &str) -> Option<T>
+    where
         T: std::fmt::Debug,
-        E: std::fmt::Debug 
-        {
+        E: std::fmt::Debug,
+    {
         self.total_tests += 1;
         self.category_tests += 1;
         if result.is_err() {
-            self.megaton_log(format!("Test number {:#?} failed: received Err: {:?}. Message: {:?}\n", self.total_tests, result.unwrap_err(), msg).as_str());
+            self.megaton_log(
+                format!(
+                    "Test number {:#?} failed: received Err: {:?}. Message: {:?}\n",
+                    self.total_tests,
+                    result.unwrap_err(),
+                    msg
+                )
+                .as_str(),
+            );
             return None;
         } else {
             self.passed_tests += 1;
@@ -87,7 +111,13 @@ impl MegatonTests {
     }
 
     fn end_category(&mut self) {
-        self.megaton_log(format!("{:#?} tests finished, {:#?}/{:#?} Passed\n", self.category, self.category_passed_tests, self.category_tests).as_str());
+        self.megaton_log(
+            format!(
+                "{:#?} tests finished, {:#?}/{:#?} Passed\n",
+                self.category, self.category_passed_tests, self.category_tests
+            )
+            .as_str(),
+        );
         self.category_tests = 0;
         self.category_passed_tests = 0;
         self.category = "";
@@ -164,7 +194,13 @@ fn run_megaton_tests() {
     megaton_num_tests(&mut mtt);
     megaton_string_tests(&mut mtt);
     fs_tests::megaton_file_tests(&mut mtt);
-    mtt.megaton_log(format!("Tests finished, {:#?}/{:#?} Passed\n", mtt.passed_tests, mtt.total_tests).as_str());
+    mtt.megaton_log(
+        format!(
+            "Tests finished, {:#?}/{:#?} Passed\n",
+            mtt.passed_tests, mtt.total_tests
+        )
+        .as_str(),
+    );
 }
 
 #[unsafe(no_mangle)]
