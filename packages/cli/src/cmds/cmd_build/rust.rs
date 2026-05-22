@@ -16,7 +16,6 @@ use super::config::CargoConfig;
 #[derive(Debug, Clone)]
 pub struct RustCtx {
     pub manifest: PathBuf,
-    target_path: PathBuf,
     source_paths: Vec<PathBuf>,
     header_suffix: String,
 }
@@ -62,12 +61,8 @@ impl RustCtx {
             .map(|rel_path| crate_root.join(rel_path))
             .collect::<Vec<_>>();
 
-        // This should always be target, even if the megaton target dir is different
-        let target_path = crate_root.join("target");
-
         Ok(Self {
             manifest,
-            target_path,
             source_paths,
             header_suffix,
         })
@@ -117,7 +112,7 @@ impl RustCtx {
         rustflags: &str,
         check: bool,
     ) -> cu::Result<bool> {
-        let old_output = self.get_output();
+        let old_output = self.get_output().await;
         let old_mtime = match old_output {
             Ok(file) => cu::fs::get_mtime(file).unwrap_or(None),
             Err(_) => None,
@@ -151,7 +146,7 @@ impl RustCtx {
             return Ok(false);
         }
 
-        let new_output = self.get_output().unwrap();
+        let new_output = self.get_output().await?;
         let new_mtime = cu::fs::get_mtime(new_output).unwrap();
 
         // Return true if artifact changed
@@ -161,9 +156,27 @@ impl RustCtx {
     /// Gets the path to the static lib compiled by cargo
     /// Error if the Cargo manifest can't be parsed, filename
     /// can't be parsed, or if file doesn't exist
-    pub fn get_output(&self) -> cu::Result<PathBuf> {
-        let rel_path = self
-            .target_path
+    pub async fn get_output(&self) -> cu::Result<PathBuf> {
+        let cargo = cu::which("cargo")
+            .context("Cargo executable not found: ensure rust is properly installed")?;
+        let (child, stdout_handle) = cargo
+            .command()
+            .add(cu::args![
+                "locate-project",
+                "--workspace",
+                "--message-format=plain",
+                "--manifest-path",
+                &self.manifest,
+            ])
+            .stdie_null()
+            .stdout(cu::pio::string())
+            .co_spawn().await?;
+        child.co_wait_nz().await?;
+
+        let workspace_root = PathBuf::from(stdout_handle.co_join().await??);
+
+        let rel_path = workspace_root.parent().unwrap()
+            .join("target")
             .join("aarch64-unknown-hermit")
             .join("release");
 

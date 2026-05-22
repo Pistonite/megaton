@@ -1037,6 +1037,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "test-mod"
+version = "0.0.0"
+dependencies = [
+ "cxx",
+ "megaton",
+]
+
+[[package]]
 name = "thiserror"
 version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
