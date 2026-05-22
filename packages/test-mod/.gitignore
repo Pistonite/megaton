@@ -2,3 +2,4 @@ target/
 target/**
 debug-font
 compile_commands.json
+Cargo.lock

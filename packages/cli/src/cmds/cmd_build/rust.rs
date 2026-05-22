@@ -170,12 +170,15 @@ impl RustCtx {
             ])
             .stdie_null()
             .stdout(cu::pio::string())
-            .co_spawn().await?;
+            .co_spawn()
+            .await?;
         child.co_wait_nz().await?;
 
         let workspace_root = PathBuf::from(stdout_handle.co_join().await??);
 
-        let rel_path = workspace_root.parent().unwrap()
+        let workspace_path = workspace_root
+            .parent()
+            .unwrap()
             .join("target")
             .join("aarch64-unknown-hermit")
             .join("release");
@@ -190,7 +193,7 @@ impl RustCtx {
         let name = name.replace("-", "_");
 
         let filename = format!("lib{name}.a");
-        rel_path.join(&filename).normalize_exists()
+        workspace_path.join(&filename).normalize_exists()
     }
 
     /// Scan rust sources and generate cxxbridge sources and headers
