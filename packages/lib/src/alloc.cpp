@@ -5,7 +5,7 @@
 #include <nn/os/os_Mutex.h>
 #include <mutex>
 
-#include <megaton/__internal/tlsf.h>
+#include <megaton/__external/tlsf.h>
 
 #define BSS_ALLOC_SIZE 0x20000
 static u8 bss_alloc[BSS_ALLOC_SIZE] = {0};
