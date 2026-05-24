@@ -96,6 +96,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
             static_libs.push(
                 rust_ctx
                     .get_output()
+                    .await
                     .context("Failed to get cargo output")?,
             );
         } else if rust_ctx.has_build_script() {

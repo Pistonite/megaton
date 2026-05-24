@@ -430,13 +430,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "example-rs"
-version = "0.0.0"
-dependencies = [
- "cxx",
-]
-
-[[package]]
 name = "filetime"
 version = "0.2.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1041,6 +1034,14 @@ checksum = "60b8cb979cb11c32ce1603f8137b22262a9d131aaa5c37b5678025f22b8becd0"
 dependencies = [
  "rustix",
  "windows-sys 0.60.2",
+]
+
+[[package]]
+name = "test-mod"
+version = "0.0.0"
+dependencies = [
+ "cxx",
+ "megaton",
 ]
 
 [[package]]
