@@ -22,4 +22,4 @@ void Mutex::lock() {
 void Mutex::unlock() {
     this->Unlock();
 }
-}
+} // namespace nn::os

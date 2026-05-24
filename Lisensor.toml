@@ -1,6 +1,5 @@
 ["Megaton contributors"]
 # C files
-"packages/lib/src/*.cpp" = "GPL-3.0-or-later"
 "packages/lib/src/megaton/*.s" = "GPL-3.0-or-later"
 "packages/lib/src/megaton/*.c" = "GPL-3.0-or-later"
 "packages/lib/src/megaton/*.cpp" = "GPL-3.0-or-later"

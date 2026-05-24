@@ -3,9 +3,5 @@ name = "megaton"
 version = "0.1.0"
 edition = "2024"
 
-[lib]
-panic = "abort"
-
 [dependencies]
-megaton-macros = {version = "0.1.0", path = "macros"}
-cxx = "1.0.186"
+megaton-macros.path = "macros"

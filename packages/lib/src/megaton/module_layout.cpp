@@ -14,9 +14,11 @@ extern "C" {
 }
 #include <megaton/__priv/rtld.h>
 #include <megaton/module_layout.h>
+#include <megaton/panic_abort.h>
 
 extern "C" {
 /** RTLD injects info into this */
+// NOLINTNEXTLINE(bugprone-reserved-identifier) FIXME
 __attribute__((section(".bss"))) rtld::ModuleObject __megaton_nx_module_runtime;
 }
 
@@ -27,7 +29,9 @@ static std::array<Info, MAX_MODULES> s_info_array;
 static u32 s_count = 0;
 static u32 s_self_idx = MAX_MODULES + 1;
 
-u32 count() { return s_count; }
+u32 count() {
+    return s_count;
+}
 
 const Info& info_at(u32 index) {
     assert_(index < s_count);
@@ -37,18 +41,22 @@ const Info& sdk_info() {
     // SDK is always placed last in our impl
     return s_info_array[s_count - 1];
 }
-const Info& self_info() { return s_info_array[s_self_idx]; }
+const Info& self_info() {
+    return s_info_array[s_self_idx];
+}
 
 /* Provided by linker script, the start of our executable. */
 extern "C" {
+// NOLINTNEXTLINE(bugprone-reserved-identifier) linker magic symbol
 extern char __module_start;
 }
 
 /*
  * This initialization is adapted from exlaunch
  */
+// NOLINTNEXTLINE(readability-function-cognitive-complexity) FIXME clang-tidy tuning
 void init_layout() {
-    enum class State {
+    enum class State : u8 {
         /** Looking for code (text) section. */
         Text,
         /** Expecting rodata section. */
@@ -72,8 +80,7 @@ void init_layout() {
         prev_offset = offset;
 
         // Query next range.
-        if (R_FAILED(svcQueryMemory(&meminfo, &pageinfo,
-                                    meminfo.addr + meminfo.size))) {
+        if (R_FAILED(svcQueryMemory(&meminfo, &pageinfo, meminfo.addr + meminfo.size))) {
             panic_("init_layout: svcQueryMemory failed");
         }
 
@@ -111,7 +118,7 @@ void init_layout() {
 
             builder.data().set(meminfo.addr, meminfo.size);
 
-            if (builder.start() == (uintptr_t)&__module_start) {
+            if (builder.start() == reinterpret_cast<uintptr_t>(&__module_start)) {
                 s_self_idx = next_id;
             }
 

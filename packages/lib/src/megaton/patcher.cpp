@@ -12,10 +12,12 @@ extern "C" {
 namespace megaton::patch {
 static __priv::AlignedStorage<__priv::Mirror> s_main_rx;
 
-const __priv::Mirror& main_ro() { return s_main_rx.reference(); }
+const __priv::Mirror& main_ro() {
+    return s_main_rx.reference();
+}
 
 void init() {
-    auto& mod = module::main_info();
+    const auto& mod = module::main_info();
     // map the text and rodata sections
     auto start = mod.start();
     auto size = mod.text().size() + mod.rodata().size();
@@ -28,13 +30,15 @@ void Stream::flush() {
         return;
     }
     // find the region to flush
-    void* ro = (void*)ro_start_addr;
-    void* rw = (void*)rw_start_addr;
+    // NOLINTNEXTLINE(performance-no-int-to-ptr) FIXME
+    void* ro_ptr = reinterpret_cast<void*>(ro_start_addr);
+    // NOLINTNEXTLINE(performance-no-int-to-ptr) FIXME
+    void* rw_ptr = reinterpret_cast<void*>(rw_start_addr);
     auto size = rw_current_addr - rw_start_addr;
 
     /* Flush data/instructions. */
-    armDCacheFlush(rw, size);
-    armICacheInvalidate(ro, size);
+    armDCacheFlush(rw_ptr, size);
+    armICacheInvalidate(ro_ptr, size);
 
     // Reset start position for next flush
     rw_start_addr += size;

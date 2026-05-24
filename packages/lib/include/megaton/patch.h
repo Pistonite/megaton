@@ -6,6 +6,7 @@
  */
 #pragma once
 #include <exl_armv8/prelude.h>
+#include <megaton/attributes.h>
 #include <megaton/__priv/mirror.h>
 
 namespace megaton::patch {
@@ -33,14 +34,13 @@ class Branch {
 public:
     explicit Branch(uintptr_t target, bool link) : target(target), link(link) {}
 
-    exl::armv8::InstBitSet get_insn(uintptr_t ro_current_addr) {
+    [[nodiscard]] exl::armv8::InstBitSet get_insn(uintptr_t ro_current_addr) const {
         // relative address to jump to the function
-        ptrdiff_t rel_addr = target - ro_current_addr;
+        auto rel_addr = target - ro_current_addr;
         if (link) {
             return exl::armv8::inst::BranchLink(rel_addr);
-        } else {
-            return exl::armv8::inst::Branch(rel_addr);
         }
+        return exl::armv8::inst::Branch(rel_addr);
     }
 
 private:
@@ -145,8 +145,9 @@ private:
      */
     uintptr_t rw_current_addr;
 
-    exl::armv8::InstBitSet& at(const uintptr_t rw_offset) {
-        auto ptr = reinterpret_cast<exl::armv8::InstBitSet*>(rw_offset);
+    static exl::armv8::InstBitSet& at(uintptr_t rw_offset) {
+        // NOLINTNEXTLINE(performance-no-int-to-ptr)
+        auto* ptr = reinterpret_cast<exl::armv8::InstBitSet*>(rw_offset);
         return *ptr;
     }
 

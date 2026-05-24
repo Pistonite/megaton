@@ -16,6 +16,7 @@
 #define make_jit_(name, size)                                                  \
     namespace __jit::name {                                                    \
     alignas(PAGE_SIZE) __attribute__((                                         \
+        /* NOLINTNEXTLINE(modernize-avoid-c-arrays) */ \
         section(".text.jit_" #name))) static const u8 code[size]{};            \
     }                                                                          \
     megaton::__priv::Jit name(__jit::name::code, size);

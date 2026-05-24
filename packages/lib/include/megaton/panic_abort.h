@@ -5,17 +5,21 @@
  * panic and abort
  */
 #pragma once
-#include <megaton/prelude.h>
+#include <megaton/attributes.h>
+#include <megaton/types.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /** Panic entry point */
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 noreturn_ __megaton_handle_panic(const char* file, u32 line, const char* msg);
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 noreturn_ __megaton_handle_panic_nx_result(const char* file, u32 line,
                                            const char* msg, u32 result);
 
+// NOLINTNEXTLINE(modernize-use-using)
 typedef void (*panic_hook_t)(const char* msg);
 
 /**
@@ -23,6 +27,7 @@ typedef void (*panic_hook_t)(const char* msg);
  * but before aborting. Returns if the hook was added successfully.
  * Currently a maximum of 32 hooks can be added.
  */
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 bool __megaton_add_panic_hook(panic_hook_t hook);
 
 #ifdef __cplusplus

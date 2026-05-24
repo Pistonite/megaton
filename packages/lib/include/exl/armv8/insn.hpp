@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Megaton contributors
 
 #pragma once
-#include <megaton/prelude.h>
+#include <megaton/types.h>
 
 #include <exl/armv8/macros.h>
 #include <exl/armv8/util/bitset.hpp>

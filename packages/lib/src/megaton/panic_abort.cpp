@@ -1,16 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2025-2026 Megaton contributors
 
+#include <array>
 #include <cstdio>
-#include <megaton/prelude.h>
+
+#include <megaton/attributes.h>
+#include <megaton/panic_abort.h>
+#include <megaton/types.h>
 
 extern "C" {
 
-static panic_hook_t s_panic_hooks[32] = {nullptr};
+constexpr usize PANIC_HOOKS_LEN = 32;
+static std::array<panic_hook_t, PANIC_HOOKS_LEN> s_panic_hooks = {nullptr};
 static u32 s_panic_hooks_len = 0;
 
 bool __megaton_add_panic_hook(panic_hook_t hook) {
-    if (s_panic_hooks_len >= 32) {
+    if (s_panic_hooks_len >= s_panic_hooks.size()) {
         return false;
     }
     s_panic_hooks[s_panic_hooks_len++] = hook;
@@ -18,26 +23,24 @@ bool __megaton_add_panic_hook(panic_hook_t hook) {
 }
 
 /** Trigger data abort */
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 noreturn_ __megaton_abort(void) {
     // from: exlaunch/source/lib/diag/abort.cpp
     // this will store val to an invalid address, causing a data abort
     register s64 addr __asm__("x27") = 0x6969696969696969;
     register s64 val __asm__("x28") = 0x00DEAD0000DEAD00;
     while (true) {
-        __asm__ __volatile__("str %[val], [%[addr]]"
-                             :
-                             : [val] "r"(val), [addr] "r"(addr));
+        __asm__ __volatile__("str %[val], [%[addr]]" : : [val] "r"(val), [addr] "r"(addr));
     }
 }
 
 /** Trigger abort from CRT */
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 noreturn_ __megaton_crt_abort(void) {
     register s64 addr __asm__("x27") = 0x6969696969696969;
-    register s64 val __asm__("x28") = 0xCCCCCCCCCCCCCCCC;
+    register s64 val __asm__("x28") = 0x0CCCCCCCCCCCCCCC;
     while (true) {
-        __asm__ __volatile__("str %[val], [%[addr]]"
-                             :
-                             : [val] "r"(val), [addr] "r"(addr));
+        __asm__ __volatile__("str %[val], [%[addr]]" : : [val] "r"(val), [addr] "r"(addr));
     }
 }
 
@@ -56,12 +59,11 @@ noreturn_ __megaton_handle_panic(const char* file, u32 line, const char* msg) {
     __megaton_abort();
 }
 
-noreturn_ __megaton_handle_panic_nx_result(const char* file, u32 line,
-                                           const char* msg, u32 result) {
+noreturn_ __megaton_handle_panic_nx_result(const char* file, u32 line, const char* msg,
+                                           u32 result) {
     char nx_result_msg[256];
     nx_result_msg[0] = '\0';
-    snprintf(nx_result_msg, sizeof(nx_result_msg), "%s (nx result 0x%08x)", msg,
-             result);
+    snprintf(nx_result_msg, sizeof(nx_result_msg), "%s (nx result 0x%08x)", msg, result);
     nx_result_msg[sizeof(nx_result_msg) - 1] = '\0';
 
     __megaton_handle_panic(file, line, nx_result_msg);

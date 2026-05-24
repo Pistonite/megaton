@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (c) 2026 Megaton contributors
 
-#include <megaton/prelude.h>
+#include <megaton/types.h>
 
 /**
  * module name needs to put at nx-module-name section
@@ -18,19 +18,26 @@ const struct module_name_t s_module_name = {.unknown = 0,
                                                 MEGART_NX_MODULE_NAME_LEN,
                                             .name = MEGART_NX_MODULE_NAME};
 
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 const char* __megaton_module_name() { return MEGART_NX_MODULE_NAME; }
 
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 usize __megaton_module_name_len() { return MEGART_NX_MODULE_NAME_LEN; }
 
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 u64 __megaton_title_id() { return MEGART_TITLE_ID; }
 
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 const char* __megaton_title_id_hex() { return MEGART_TITLE_ID_HEX; }
 
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 void __megaton_lib_init();
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 void __megaton_librs_init();
 void megaton_main();
 
 // real module entry point
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 void __megaton_module_entry() {
     // initialize C lib
     __megaton_lib_init();
