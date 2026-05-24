@@ -49,7 +49,6 @@ fn make_lib_targz() -> cu::Result<()> {
     let output_path = crate_path.join("libmegaton.tar.gz");
 
     let mut tar_builder = {
-        // let file = cu::fs::writer(&path)?;
         let gz_encoder = GzEncoder::new(vec![], Compression::default());
         let mut builder = TarBuilder::new(gz_encoder);
         builder.mode(HeaderMode::Deterministic);
