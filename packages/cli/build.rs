@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025-2026 Megaton contributors
+use std::fs::File;
 use std::path::Path;
 use std::process::ExitCode;
-use std::fs::File;
 
 use cu::pre::*;
 use flate2::{Compression, write::GzEncoder};
+use ignore::{Walk as IgnoreWalk, WalkBuilder as IgnoreWalkBuilder};
 use sha2::{Digest, Sha256};
 use tar::{Builder as TarBuilder, HeaderMode};
-use ignore::{WalkBuilder as IgnoreWalkBuilder, Walk as IgnoreWalk};
 
 fn main() -> ExitCode {
     match main_internal() {
@@ -48,7 +48,6 @@ fn make_lib_targz() -> cu::Result<()> {
     let crate_path = crate_path();
     let output_path = crate_path.join("libmegaton.tar.gz");
 
-
     let mut tar_builder = {
         // let file = cu::fs::writer(&path)?;
         let gz_encoder = GzEncoder::new(vec![], Compression::default());
@@ -62,7 +61,8 @@ fn make_lib_targz() -> cu::Result<()> {
     // lib
     {
         let source_path = packages_path.join("lib");
-        let walk = IgnoreWalkBuilder::new(&source_path).require_git(true)
+        let walk = IgnoreWalkBuilder::new(&source_path)
+            .require_git(true)
             .add_custom_ignore_filename(".libpackignore")
             .build();
         add_to_tar(&mut tar_builder, walk, &source_path, Path::new("."))?;
@@ -71,17 +71,21 @@ fn make_lib_targz() -> cu::Result<()> {
     // nnheaders
     {
         let source_path = packages_path.join("nnheaders");
-        let walk = IgnoreWalkBuilder::new(&source_path).require_git(true).build();
+        let walk = IgnoreWalkBuilder::new(&source_path)
+            .require_git(true)
+            .build();
         add_to_tar(&mut tar_builder, walk, &source_path, Path::new("nnheaders"))?;
     }
     // lib/Cargo.toml - need to make it a workspace
     {
         let mut cargo_toml = cu::fs::read_string(packages_path.join("lib").join("Cargo.toml"))?;
-        cargo_toml.push_str(r##"
+        cargo_toml.push_str(
+            r##"
 [workspace]
 resolver = 2
 members = [ "macros" ]
-        "##);
+        "##,
+        );
         let bytes = cargo_toml.as_bytes();
         let mut header = tar::Header::new_gnu();
         header.set_path("Cargo.toml")?;
@@ -113,11 +117,7 @@ fn add_to_tar(
             continue;
         }
         let rel_path = dest_path.join(entry_path.try_to_rel_from(source_path));
-        cu::ensure!(
-            rel_path.is_relative(),
-            "{}",
-            rel_path.display()
-        )?;
+        cu::ensure!(rel_path.is_relative(), "{}", rel_path.display())?;
         let mut file = cu::check!(
             File::open(entry_path),
             "failed to open '{}'",

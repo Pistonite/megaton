@@ -3,26 +3,38 @@ on:
   pull_request:
     branches:
       - main
-  push:
-    branches:
-      - main
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: Pistonight/mono-dev/actions/setup@main
         with:
           rust: stable
           tool-cargo-binstall: lisensor
-      - run: task check
+          ccpp-cmake: true
+          ccpp-lint: true
+      - run: task check-non-dkp
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: Pistonight/mono-dev/actions/setup@main
         with:
           rust: stable
           tool-mdbook: true
-      - run: task exec -- docs:install
-      - run: task build
+      - run: task install-ci
+      - run: task build-non-dkp
+
+  dkp:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    container:
+      image: devkitpro/devkita64
+    steps:
+      - uses: Pistonight/mono-dev/actions/setup@main
+        with:
+          rust: stable
+          tool-mdbook: true
+          ccpp-cmake: true
+      - run: task build-dkp
+      - run: task check-dkp

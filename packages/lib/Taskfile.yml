@@ -5,6 +5,10 @@ includes:
     taskfile: ../../mono-dev/task/ccpp.yaml
     internal: true
     optional: true
+  cargo:
+    taskfile: ../../mono-dev/task/cargo.yaml
+    internal: true
+    optional: true
 
 tasks:
   configure:
@@ -22,7 +26,7 @@ tasks:
     cmds:
       - rm -rf build
 
-  check:
+  check-c:
     cmds:
       - task: ccpp:fmt-check
         vars:

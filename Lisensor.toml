@@ -14,8 +14,7 @@
 "packages/lib/include/megaton/__internal/*.hpp" = "GPL-3.0-or-later"
 "packages/lib/include/megaton/__priv/*.h" = "GPL-3.0-or-later"
 "packages/lib/include/megaton/__priv/*.hpp" = "GPL-3.0-or-later"
-"packages/test-mod/**/*.cpp" = "GPL-3.0-or-later"
-"packages/test-mod/**/*.h" = "GPL-3.0-or-later"
+"packages/test-mod/{src,include}/*.{cpp,h}" = "GPL-3.0-or-later"
 
 # Rust files
 "packages/lib/**/*.rs" = "GPL-3.0-or-later"
