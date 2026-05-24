@@ -36,6 +36,7 @@ jobs:
       - uses: Pistonight/mono-dev/actions/setup@main
         with:
           rust: stable
+          submodules: true
           tool-mdbook: true
           ccpp-cmake: true
       - run: task build-dkp
