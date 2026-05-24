@@ -14,8 +14,8 @@ features = ["cli", "process", "prompt", "toml", "json", "fs", "coroutine-heavy"]
 [dependencies]
 serde = "1"
 tokio = "1"
-flate2 = "1.1.2"
-tar = "0.4.44"
+flate2.workspace = true
+tar.workspace = true
 derive_more = { version = "2.0.1", features = ["as_ref", "deref", "deref_mut"] }
 which = "8.0.0"
 walkdir = "2.5.0"
@@ -30,9 +30,10 @@ workspace = true
 features = ["process"]
 
 [build-dependencies]
-flate2 = "1.1.2"
-tar = "0.4.44"
-sha2 = "0.11.0"
+ignore.workspace = true
+flate2.workspace = true
+tar.workspace = true
+sha2.workspace = true
 
 [[bin]]
 name = "megaton"

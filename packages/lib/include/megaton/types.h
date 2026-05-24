@@ -8,12 +8,6 @@
 // Copyright (c) shadowninja
 // SPDX-License-Identifier: ISC
 // Copyright (c) libnx Authors
-
-/**
- * prelude.h should be included by all source files.
- *
- * This includes common primitive types, macros, and attributes
- */
 #pragma once
 
 #include <stdbool.h>
@@ -53,10 +47,3 @@ typedef volatile s64 vs64;   ///<  64-bit volatile signed integer.
 typedef volatile s128 vs128; ///< 128-bit volatile signed integer.
 
 typedef size_t usize;
-
-
-// prelude headers
-
-#include <megaton/types.h>
-#include <megaton/attributes.h>
-#include <megaton/panic_abort.h>

@@ -14,8 +14,10 @@
 #include <new>
 #include <utility>
 
-#include <megaton/prelude.h>
+#include <megaton/types.h>
+#include <megaton/attributes.h>
 
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 namespace megaton::__priv {
 
 /** Aligned storage for an object of type T. */
@@ -39,7 +41,7 @@ public:
     }
 
 private:
-    typename std::aligned_storage<Size, Align>::type _storage;
+    std::aligned_storage_t<Size, Align> _storage;
 
     inline_member_ T* pointer_internal() {
         return reinterpret_cast<T*>(std::addressof(_storage));

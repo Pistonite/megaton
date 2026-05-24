@@ -9,9 +9,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2018 Rprop (r_prop@outlook.com)
 
+// NOLINTBEGIN
+
 #define __STDC_FORMAT_MACROS
+#include <cstdlib>
 #include <cstring>
-#include <stdlib.h>
 
 #include <switch/result.h>
 
@@ -20,6 +22,7 @@
 #include <megaton/align.h>
 #include <megaton/hook.h>
 #include <megaton/module_layout.h>
+#include <megaton/panic_abort.h>
 
 #define __attribute __attribute__
 #define aligned(x) __aligned__(x)
@@ -28,10 +31,8 @@
 #define __ptr(p) reinterpret_cast<void*>(p)
 #define __page_size PAGE_SIZE
 #define __page_align(n) __align_up(static_cast<uintptr_t>(n), __page_size)
-#define __ptr_align(x)                                                         \
-    __ptr(__align_down(reinterpret_cast<uintptr_t>(x), __page_size))
-#define __countof(x)                                                           \
-    static_cast<intptr_t>(sizeof(x) / sizeof((x)[0])) // must be signed
+#define __ptr_align(x) __ptr(__align_down(reinterpret_cast<uintptr_t>(x), __page_size))
+#define __countof(x) static_cast<intptr_t>(sizeof(x) / sizeof((x)[0])) // must be signed
 #define __atomic_increase(p) __sync_add_and_fetch(p, 1)
 #define __sync_cmpswap(p, v, n) __sync_bool_compare_and_swap(p, v, n)
 
@@ -81,22 +82,18 @@ public:
         return absolute_addr >= this->basep && absolute_addr < this->endp;
     }
     inline intptr_t get_ref_ins_index(const int64_t absolute_addr) {
-        return static_cast<intptr_t>((absolute_addr - this->basep) /
-                                     sizeof(uint32_t));
+        return static_cast<intptr_t>((absolute_addr - this->basep) / sizeof(uint32_t));
     }
-    inline intptr_t get_and_set_current_index(uint32_t* __restrict inp,
-                                              uint32_t* __restrict outp) {
-        intptr_t current_idx =
-            this->get_ref_ins_index(reinterpret_cast<int64_t>(inp));
+    inline intptr_t get_and_set_current_index(uint32_t* __restrict inp, uint32_t* __restrict outp) {
+        intptr_t current_idx = this->get_ref_ins_index(reinterpret_cast<int64_t>(inp));
         this->dat[current_idx].insp = outp;
         return current_idx;
     }
-    inline void reset_current_ins(const intptr_t idx,
-                                  uint32_t* __restrict outp) {
+    inline void reset_current_ins(const intptr_t idx, uint32_t* __restrict outp) {
         this->dat[idx].insp = outp;
     }
-    void insert_fix_map(const intptr_t idx, uint32_t* bprw, uint32_t* bprx,
-                        uint32_t ls = 0u, uint32_t ad = 0xffffffffu) {
+    void insert_fix_map(const intptr_t idx, uint32_t* bprw, uint32_t* bprx, uint32_t ls = 0u,
+                        uint32_t ad = 0xffffffffu) {
         for (auto& f : this->dat[idx].fmap) {
             if (f.bprw == NULL) {
                 f.bprw = bprw;
@@ -113,11 +110,9 @@ public:
             if (f.bprw == NULL)
                 break;
             *(f.bprw) =
-                *(f.bprx) | (((int32_t(this->dat[idx].ins -
-                                       reinterpret_cast<int64_t>(f.bprx)) >>
-                               2)
-                              << f.ls) &
-                             f.ad);
+                *(f.bprx) |
+                (((int32_t(this->dat[idx].ins - reinterpret_cast<int64_t>(f.bprx)) >> 2) << f.ls) &
+                 f.ad);
             f.bprw = NULL;
             f.bprx = NULL;
         }
@@ -126,13 +121,12 @@ public:
 
 //-------------------------------------------------------------------------
 
-bool __fix_branch_imm(instruction inprwp, instruction inprxp,
-                      instruction outprw, instruction outprx, context* ctxp) {
+bool __fix_branch_imm(instruction inprwp, instruction inprxp, instruction outprw,
+                      instruction outprx, context* ctxp) {
     constexpr uint32_t mbits = 6u;
-    constexpr uint32_t mask = 0xfc000000u; // 0b11111100000000000000000000000000
-    constexpr uint32_t rmask =
-        0x03ffffffu;                       // 0b00000011111111111111111111111111
-    constexpr uint32_t op_b = 0x14000000u; // "b"  ADDR_PCREL26
+    constexpr uint32_t mask = 0xfc000000u;  // 0b11111100000000000000000000000000
+    constexpr uint32_t rmask = 0x03ffffffu; // 0b00000011111111111111111111111111
+    constexpr uint32_t op_b = 0x14000000u;  // "b"  ADDR_PCREL26
     constexpr uint32_t op_bl = 0x94000000u; // "bl" ADDR_PCREL26
 
     const uint32_t ins = *(*inprwp);
@@ -140,20 +134,17 @@ bool __fix_branch_imm(instruction inprwp, instruction inprxp,
     switch (opc) {
     case op_b:
     case op_bl: {
-        intptr_t current_idx =
-            ctxp->get_and_set_current_index(*inprxp, *outprx);
-        int64_t absolute_addr = reinterpret_cast<int64_t>(*inprxp) +
-                                (static_cast<int32_t>(ins << mbits) >>
-                                 (mbits - 2u)); // sign-extended
+        intptr_t current_idx = ctxp->get_and_set_current_index(*inprxp, *outprx);
+        int64_t absolute_addr =
+            reinterpret_cast<int64_t>(*inprxp) +
+            (static_cast<int32_t>(ins << mbits) >> (mbits - 2u)); // sign-extended
         int64_t new_pc_offset =
-            static_cast<int64_t>(absolute_addr -
-                                 reinterpret_cast<int64_t>(*outprx)) >>
+            static_cast<int64_t>(absolute_addr - reinterpret_cast<int64_t>(*outprx)) >>
             2; // shifted
         bool special_fix_type = ctxp->is_in_fixing_range(absolute_addr);
         // whether the branch should be converted to absolute jump
         if (!special_fix_type && llabs(new_pc_offset) >= (rmask >> 1)) {
-            bool b_aligned =
-                (reinterpret_cast<uint64_t>(*outprx + 2) & 7u) == 0u;
+            bool b_aligned = (reinterpret_cast<uint64_t>(*outprx + 2) & 7u) == 0u;
             if (opc == op_b) {
                 if (b_aligned != true) {
                     (*outprw)[0] = Aarch64Nop;
@@ -182,9 +173,8 @@ bool __fix_branch_imm(instruction inprwp, instruction inprxp,
             if (special_fix_type) {
                 intptr_t ref_idx = ctxp->get_ref_ins_index(absolute_addr);
                 if (ref_idx <= current_idx) {
-                    new_pc_offset = static_cast<int64_t>(
-                                        ctxp->dat[ref_idx].ins -
-                                        reinterpret_cast<int64_t>(*outprx)) >>
+                    new_pc_offset = static_cast<int64_t>(ctxp->dat[ref_idx].ins -
+                                                         reinterpret_cast<int64_t>(*outprx)) >>
                                     2;
                 } else {
                     ctxp->insert_fix_map(ref_idx, *outprw, *outprx, 0u, rmask);
@@ -207,29 +197,21 @@ bool __fix_branch_imm(instruction inprwp, instruction inprxp,
 
 //-------------------------------------------------------------------------
 
-bool __fix_cond_comp_test_branch(instruction inprwp, instruction inprxp,
-                                 instruction outprw, instruction outprx,
-                                 context* ctxp) {
+bool __fix_cond_comp_test_branch(instruction inprwp, instruction inprxp, instruction outprw,
+                                 instruction outprx, context* ctxp) {
     constexpr uint32_t lsb = 5u;
-    constexpr uint32_t lmask01 =
-        0xff00001fu; // 0b11111111000000000000000000011111
-    constexpr uint32_t mask0 =
-        0xff000010u; // 0b11111111000000000000000000010000
-    constexpr uint32_t op_bc = 0x54000000u; // "b.c"  ADDR_PCREL19
-    constexpr uint32_t mask1 =
-        0x7f000000u; // 0b01111111000000000000000000000000
+    constexpr uint32_t lmask01 = 0xff00001fu; // 0b11111111000000000000000000011111
+    constexpr uint32_t mask0 = 0xff000010u;   // 0b11111111000000000000000000010000
+    constexpr uint32_t op_bc = 0x54000000u;   // "b.c"  ADDR_PCREL19
+    constexpr uint32_t mask1 = 0x7f000000u;   // 0b01111111000000000000000000000000
     constexpr uint32_t op_cbz = 0x34000000u;  // "cbz"  Rt, ADDR_PCREL19
     constexpr uint32_t op_cbnz = 0x35000000u; // "cbnz" Rt, ADDR_PCREL19
-    constexpr uint32_t lmask2 =
-        0xfff8001fu; // 0b11111111111110000000000000011111
-    constexpr uint32_t mask2 =
-        0x7f000000u; // 0b01111111000000000000000000000000
-    constexpr uint32_t op_tbz =
-        0x36000000u; // 0b00110110000000000000000000000000
-                     // "tbz"  Rt, BIT_NUM, ADDR_PCREL14
-    constexpr uint32_t op_tbnz =
-        0x37000000u; // 0b00110111000000000000000000000000 "tbnz" Rt, BIT_NUM,
-                     // ADDR_PCREL14
+    constexpr uint32_t lmask2 = 0xfff8001fu;  // 0b11111111111110000000000000011111
+    constexpr uint32_t mask2 = 0x7f000000u;   // 0b01111111000000000000000000000000
+    constexpr uint32_t op_tbz = 0x36000000u;  // 0b00110110000000000000000000000000
+                                              // "tbz"  Rt, BIT_NUM, ADDR_PCREL14
+    constexpr uint32_t op_tbnz = 0x37000000u; // 0b00110111000000000000000000000000 "tbnz" Rt,
+                                              // BIT_NUM, ADDR_PCREL14
 
     const uint32_t ins = *(*inprwp);
     uint32_t lmask = lmask01;
@@ -245,12 +227,9 @@ bool __fix_cond_comp_test_branch(instruction inprwp, instruction inprxp,
     } // if
 
     intptr_t current_idx = ctxp->get_and_set_current_index(*inprxp, *outprx);
-    int64_t absolute_addr =
-        reinterpret_cast<int64_t>(*inprxp) + ((ins & ~lmask) >> (lsb - 2u));
+    int64_t absolute_addr = reinterpret_cast<int64_t>(*inprxp) + ((ins & ~lmask) >> (lsb - 2u));
     int64_t new_pc_offset =
-        static_cast<int64_t>(absolute_addr -
-                             reinterpret_cast<int64_t>(*outprx)) >>
-        2; // shifted
+        static_cast<int64_t>(absolute_addr - reinterpret_cast<int64_t>(*outprx)) >> 2; // shifted
     bool special_fix_type = ctxp->is_in_fixing_range(absolute_addr);
     if (!special_fix_type && llabs(new_pc_offset) >= (~lmask >> (lsb + 1))) {
         if ((reinterpret_cast<uint64_t>(*outprx + 4) & 7u) != 0u) {
@@ -260,11 +239,10 @@ bool __fix_cond_comp_test_branch(instruction inprwp, instruction inprxp,
             (*outprx)++;
             (*outprw)++;
         } // if
-        (*outprw)[0] =
-            (((8u >> 2u) << lsb) & ~lmask) | (ins & lmask); // B.C #0x8
-        (*outprw)[1] = 0x14000005u;                         // B #0x14
-        (*outprw)[2] = 0x58000051u;                         // LDR X17, #0x8
-        (*outprw)[3] = 0xd61f0220u;                         // BR X17
+        (*outprw)[0] = (((8u >> 2u) << lsb) & ~lmask) | (ins & lmask); // B.C #0x8
+        (*outprw)[1] = 0x14000005u;                                    // B #0x14
+        (*outprw)[2] = 0x58000051u;                                    // LDR X17, #0x8
+        (*outprw)[3] = 0xd61f0220u;                                    // BR X17
         memcpy(*outprw + 4, &absolute_addr, sizeof(absolute_addr));
         *outprw += 6;
         *outprx += 6;
@@ -272,18 +250,16 @@ bool __fix_cond_comp_test_branch(instruction inprwp, instruction inprxp,
         if (special_fix_type) {
             intptr_t ref_idx = ctxp->get_ref_ins_index(absolute_addr);
             if (ref_idx <= current_idx) {
-                new_pc_offset =
-                    static_cast<int64_t>(ctxp->dat[ref_idx].ins -
-                                         reinterpret_cast<int64_t>(*outprx)) >>
-                    2;
+                new_pc_offset = static_cast<int64_t>(ctxp->dat[ref_idx].ins -
+                                                     reinterpret_cast<int64_t>(*outprx)) >>
+                                2;
             } else {
                 ctxp->insert_fix_map(ref_idx, *outprw, *outprx, lsb, ~lmask);
                 new_pc_offset = 0;
             } // if
         } // if
 
-        (*outprw)[0] = (static_cast<uint32_t>(new_pc_offset << lsb) & ~lmask) |
-                       (ins & lmask);
+        (*outprw)[0] = (static_cast<uint32_t>(new_pc_offset << lsb) & ~lmask) | (ins & lmask);
         ++(*outprw);
         ++(*outprx);
     } // if
@@ -295,15 +271,14 @@ bool __fix_cond_comp_test_branch(instruction inprwp, instruction inprxp,
 
 //-------------------------------------------------------------------------
 
-bool __fix_loadlit(instruction inprwp, instruction inprxp, instruction outprw,
-                   instruction outprx, context* ctxp) {
+bool __fix_loadlit(instruction inprwp, instruction inprxp, instruction outprw, instruction outprx,
+                   context* ctxp) {
     const uint32_t ins = *(*inprwp);
 
     // memory prefetch("prfm"), just skip it
     // http://infocenter.arm.com/help/topic/com.arm.doc.100069_0608_00_en/pge1427897420050.html
     if ((ins & 0xff000000u) == 0xd8000000u) {
-        ctxp->process_fix_map(
-            ctxp->get_and_set_current_index(*inprxp, *outprx));
+        ctxp->process_fix_map(ctxp->get_and_set_current_index(*inprxp, *outprx));
         ++(*inprwp);
         ++(*inprxp);
         return true;
@@ -311,27 +286,18 @@ bool __fix_loadlit(instruction inprwp, instruction inprxp, instruction outprw,
 
     constexpr uint32_t msb = 8u;
     constexpr uint32_t lsb = 5u;
-    constexpr uint32_t mask_30 =
-        0x40000000u; // 0b01000000000000000000000000000000
-    constexpr uint32_t mask_31 =
-        0x80000000u; // 0b10000000000000000000000000000000
-    constexpr uint32_t lmask =
-        0xff00001fu; // 0b11111111000000000000000000011111
-    constexpr uint32_t mask_ldr =
-        0xbf000000u; // 0b10111111000000000000000000000000
-    constexpr uint32_t op_ldr =
-        0x18000000u; // 0b00011000000000000000000000000000 "LDR Wt/Xt, label" |
-                     // ADDR_PCREL19
-    constexpr uint32_t mask_ldrv =
-        0x3f000000u; // 0b00111111000000000000000000000000
-    constexpr uint32_t op_ldrv =
-        0x1c000000u; // 0b00011100000000000000000000000000 "LDR St/Dt/Qt, label"
-                     // | ADDR_PCREL19
-    constexpr uint32_t mask_ldrsw =
-        0xff000000u; // 0b11111111000000000000000000000000
-    constexpr uint32_t op_ldrsw =
-        0x98000000u; // "LDRSW Xt, label" | ADDR_PCREL19 | load register signed
-                     // word
+    constexpr uint32_t mask_30 = 0x40000000u;   // 0b01000000000000000000000000000000
+    constexpr uint32_t mask_31 = 0x80000000u;   // 0b10000000000000000000000000000000
+    constexpr uint32_t lmask = 0xff00001fu;     // 0b11111111000000000000000000011111
+    constexpr uint32_t mask_ldr = 0xbf000000u;  // 0b10111111000000000000000000000000
+    constexpr uint32_t op_ldr = 0x18000000u;    // 0b00011000000000000000000000000000 "LDR Wt/Xt,
+                                                // label" | ADDR_PCREL19
+    constexpr uint32_t mask_ldrv = 0x3f000000u; // 0b00111111000000000000000000000000
+    constexpr uint32_t op_ldrv = 0x1c000000u;   // 0b00011100000000000000000000000000 "LDR St/Dt/Qt,
+                                                // label" | ADDR_PCREL19
+    constexpr uint32_t mask_ldrsw = 0xff000000u; // 0b11111111000000000000000000000000
+    constexpr uint32_t op_ldrsw = 0x98000000u;   // "LDRSW Xt, label" | ADDR_PCREL19 | load register
+                                                 // signed word
     // LDR S0, #0 | 0b00011100000000000000000000000000 | 32-bit
     // LDR D0, #0 | 0b01011100000000000000000000000000 | 64-bit
     // LDR Q0, #0 | 0b10011100000000000000000000000000 | 128-bit
@@ -353,18 +319,14 @@ bool __fix_loadlit(instruction inprwp, instruction inprxp, instruction outprw,
     } // if
 
     intptr_t current_idx = ctxp->get_and_set_current_index(*inprxp, *outprx);
-    int64_t absolute_addr =
-        reinterpret_cast<int64_t>(*inprxp) +
-        ((static_cast<int32_t>(ins << msb) >> (msb + lsb - 2u)) & ~3u);
+    int64_t absolute_addr = reinterpret_cast<int64_t>(*inprxp) +
+                            ((static_cast<int32_t>(ins << msb) >> (msb + lsb - 2u)) & ~3u);
     int64_t new_pc_offset =
-        static_cast<int64_t>(absolute_addr -
-                             reinterpret_cast<int64_t>(*outprx)) >>
-        2; // shifted
+        static_cast<int64_t>(absolute_addr - reinterpret_cast<int64_t>(*outprx)) >> 2; // shifted
     bool special_fix_type = ctxp->is_in_fixing_range(absolute_addr);
     // special_fix_type may encounter issue when there are mixed data and code
-    if (special_fix_type ||
-        (llabs(new_pc_offset) + (faligned + 1u - 4u) / 4u) >=
-            (~lmask >> (lsb + 1))) { // inaccurate, but it works
+    if (special_fix_type || (llabs(new_pc_offset) + (faligned + 1u - 4u) / 4u) >=
+                                (~lmask >> (lsb + 1))) { // inaccurate, but it works
         while ((reinterpret_cast<uint64_t>(*outprx + 2) & faligned) != 0u) {
             *(*outprw)++ = Aarch64Nop;
             (*outprx)++;
@@ -375,11 +337,9 @@ bool __fix_loadlit(instruction inprwp, instruction inprxp, instruction outprw,
         // will fail to fetch it. And what's worse, we may unexpectedly
         // overwrite something if special_fix_type is true...
         uint32_t ns = static_cast<uint32_t>((faligned + 1) / sizeof(uint32_t));
-        (*outprw)[0] =
-            (((8u >> 2u) << lsb) & ~mask) | (ins & lmask); // LDR #0x8
-        (*outprw)[1] = 0x14000001u + ns;                   // B #0xc
-        memcpy(*outprw + 2, reinterpret_cast<void*>(absolute_addr),
-               faligned + 1);
+        (*outprw)[0] = (((8u >> 2u) << lsb) & ~mask) | (ins & lmask); // LDR #0x8
+        (*outprw)[1] = 0x14000001u + ns;                              // B #0xc
+        memcpy(*outprw + 2, reinterpret_cast<void*>(absolute_addr), faligned + 1);
         *outprw += 2 + ns;
         *outprx += 2 + ns;
     } else {
@@ -388,14 +348,11 @@ bool __fix_loadlit(instruction inprwp, instruction inprxp, instruction outprw,
             *(*outprw)++ = Aarch64Nop;
             (*outprx)++;
             new_pc_offset =
-                static_cast<int64_t>(absolute_addr -
-                                     reinterpret_cast<int64_t>(*outprx)) >>
-                2;
+                static_cast<int64_t>(absolute_addr - reinterpret_cast<int64_t>(*outprx)) >> 2;
         }
         ctxp->reset_current_ins(current_idx, *outprx);
 
-        (*outprw)[0] = (static_cast<uint32_t>(new_pc_offset << lsb) & ~mask) |
-                       (ins & lmask);
+        (*outprw)[0] = (static_cast<uint32_t>(new_pc_offset << lsb) & ~mask) | (ins & lmask);
         ++(*outprx);
         ++(*outprw);
     } // if
@@ -407,21 +364,17 @@ bool __fix_loadlit(instruction inprwp, instruction inprxp, instruction outprw,
 
 //-------------------------------------------------------------------------
 
-bool __fix_pcreladdr(instruction inprwp, instruction inprxp, instruction outprw,
-                     instruction outprx, context* ctxp) {
+bool __fix_pcreladdr(instruction inprwp, instruction inprxp, instruction outprw, instruction outprx,
+                     context* ctxp) {
     // Load a PC-relative address into a register
     // http://infocenter.arm.com/help/topic/com.arm.doc.100069_0608_00_en/pge1427897645644.html
     constexpr uint32_t msb = 8u;
     constexpr uint32_t lsb = 5u;
-    constexpr uint32_t mask = 0x9f000000u; // 0b10011111000000000000000000000000
-    constexpr uint32_t rmask =
-        0x0000001fu; // 0b00000000000000000000000000011111
-    constexpr uint32_t lmask =
-        0xff00001fu; // 0b11111111000000000000000000011111
-    constexpr uint32_t fmask =
-        0x00ffffffu; // 0b00000000111111111111111111111111
-    constexpr uint32_t max_val =
-        0x001fffffu; // 0b00000000000111111111111111111111
+    constexpr uint32_t mask = 0x9f000000u;    // 0b10011111000000000000000000000000
+    constexpr uint32_t rmask = 0x0000001fu;   // 0b00000000000000000000000000011111
+    constexpr uint32_t lmask = 0xff00001fu;   // 0b11111111000000000000000000011111
+    constexpr uint32_t fmask = 0x00ffffffu;   // 0b00000000111111111111111111111111
+    constexpr uint32_t max_val = 0x001fffffu; // 0b00000000000111111111111111111111
     constexpr uint32_t op_adr = 0x10000000u;  // "adr"  Rd, ADDR_PCREL21
     constexpr uint32_t op_adrp = 0x90000000u; // "adrp" Rd, ADDR_ADRP
 
@@ -433,10 +386,9 @@ bool __fix_pcreladdr(instruction inprwp, instruction inprxp, instruction outprw,
         int64_t lsb_bytes = static_cast<uint32_t>(ins << 1u) >> 30u;
         int64_t absolute_addr =
             reinterpret_cast<int64_t>(*inprxp) +
-            (((static_cast<int32_t>(ins << msb) >> (msb + lsb - 2u)) & ~3u) |
-             lsb_bytes);
-        int64_t new_pc_offset = static_cast<int64_t>(
-            absolute_addr - reinterpret_cast<int64_t>(*outprx));
+            (((static_cast<int32_t>(ins << msb) >> (msb + lsb - 2u)) & ~3u) | lsb_bytes);
+        int64_t new_pc_offset =
+            static_cast<int64_t>(absolute_addr - reinterpret_cast<int64_t>(*outprx));
         bool special_fix_type = ctxp->is_in_fixing_range(absolute_addr);
         if (!special_fix_type && llabs(new_pc_offset) >= (max_val >> 1)) {
             if ((reinterpret_cast<uint64_t>(*outprx + 2) & 7u) != 0u) {
@@ -445,20 +397,17 @@ bool __fix_pcreladdr(instruction inprwp, instruction inprxp, instruction outprw,
                 ++*(outprw);
             } // if
 
-            (*outprw)[0] = 0x58000000u | (((8u >> 2u) << lsb) & ~mask) |
-                           (ins & rmask); // LDR #0x8
-            (*outprw)[1] = 0x14000003u;   // B #0xc
+            (*outprw)[0] = 0x58000000u | (((8u >> 2u) << lsb) & ~mask) | (ins & rmask); // LDR #0x8
+            (*outprw)[1] = 0x14000003u;                                                 // B #0xc
             memcpy(*outprw + 2, &absolute_addr, sizeof(absolute_addr));
             *outprw += 4;
             *outprx += 4;
         } else {
             if (special_fix_type) {
-                intptr_t ref_idx =
-                    ctxp->get_ref_ins_index(absolute_addr & ~3ull);
+                intptr_t ref_idx = ctxp->get_ref_ins_index(absolute_addr & ~3ull);
                 if (ref_idx <= current_idx) {
-                    new_pc_offset = static_cast<int64_t>(
-                        ctxp->dat[ref_idx].ins -
-                        reinterpret_cast<int64_t>(*outprx));
+                    new_pc_offset = static_cast<int64_t>(ctxp->dat[ref_idx].ins -
+                                                         reinterpret_cast<int64_t>(*outprx));
                 } else {
                     ctxp->insert_fix_map(ref_idx, *outprw, *outprx, lsb, fmask);
                     new_pc_offset = 0;
@@ -468,8 +417,7 @@ bool __fix_pcreladdr(instruction inprwp, instruction inprxp, instruction outprw,
             // the lsb_bytes will never be changed, so we can use lmask to keep
             // it
             (*outprw)[0] =
-                (static_cast<uint32_t>(new_pc_offset << (lsb - 2u)) & fmask) |
-                (ins & lmask);
+                (static_cast<uint32_t>(new_pc_offset << (lsb - 2u)) & fmask) | (ins & lmask);
             ++(*outprw);
             ++(*outprx);
         } // if
@@ -479,12 +427,9 @@ bool __fix_pcreladdr(instruction inprwp, instruction inprxp, instruction outprw,
         int32_t lsb_bytes = static_cast<uint32_t>(ins << 1u) >> 30u;
         int64_t absolute_addr =
             (reinterpret_cast<int64_t>(*inprxp) & ~0xfffll) +
-            ((((static_cast<int32_t>(ins << msb) >> (msb + lsb - 2u)) & ~3u) |
-              lsb_bytes)
-             << 12);
+            ((((static_cast<int32_t>(ins << msb) >> (msb + lsb - 2u)) & ~3u) | lsb_bytes) << 12);
         if (ctxp->is_in_fixing_range(absolute_addr)) {
-            intptr_t ref_idx =
-                ctxp->get_ref_ins_index(absolute_addr /* & ~3ull*/);
+            intptr_t ref_idx = ctxp->get_ref_ins_index(absolute_addr /* & ~3ull*/);
             if (ref_idx > current_idx) {
                 // the bottom 12 bits of absolute_addr are masked out,
                 // so ref_idx must be less than or equal to current_idx!
@@ -503,9 +448,8 @@ bool __fix_pcreladdr(instruction inprwp, instruction inprxp, instruction outprw,
                 ++*(outprw);
             } // if
 
-            (*outprw)[0] = 0x58000000u | (((8u >> 2u) << lsb) & ~mask) |
-                           (ins & rmask); // LDR #0x8
-            (*outprw)[1] = 0x14000003u;   // B #0xc
+            (*outprw)[0] = 0x58000000u | (((8u >> 2u) << lsb) & ~mask) | (ins & rmask); // LDR #0x8
+            (*outprw)[1] = 0x14000003u;                                                 // B #0xc
             memcpy(*outprw + 2, &absolute_addr,
                    sizeof(absolute_addr)); // potential overflow?
             *outprw += 4;
@@ -522,15 +466,13 @@ bool __fix_pcreladdr(instruction inprwp, instruction inprxp, instruction outprw,
     return true;
 }
 
-#define __flush_cache(c, n)                                                    \
-    __builtin___clear_cache(reinterpret_cast<char*>(c),                        \
-                            reinterpret_cast<char*>(c) + n)
+#define __flush_cache(c, n)                                                                        \
+    __builtin___clear_cache(reinterpret_cast<char*>(c), reinterpret_cast<char*>(c) + n)
 
 //-------------------------------------------------------------------------
 
-void __fix_instructions(uint32_t* __restrict inprw, uint32_t* __restrict inprx,
-                        int32_t count, uint32_t* __restrict outrwp,
-                        uint32_t* __restrict outrxp) {
+void __fix_instructions(uint32_t* __restrict inprw, uint32_t* __restrict inprx, int32_t count,
+                        uint32_t* __restrict outrwp, uint32_t* __restrict outrxp) {
     context ctx;
     ctx.basep = reinterpret_cast<int64_t>(inprx);
     ctx.endp = reinterpret_cast<int64_t>(inprx + count);
@@ -561,11 +503,9 @@ void __fix_instructions(uint32_t* __restrict inprw, uint32_t* __restrict inprx,
         inprx++;
     }
 
-    constexpr uint_fast64_t mask =
-        0x03ffffffu; // 0b00000011111111111111111111111111
+    constexpr uint_fast64_t mask = 0x03ffffffu; // 0b00000011111111111111111111111111
     auto callback = reinterpret_cast<int64_t>(inprx);
-    auto pc_offset =
-        static_cast<int64_t>(callback - reinterpret_cast<int64_t>(outrxp)) >> 2;
+    auto pc_offset = static_cast<int64_t>(callback - reinterpret_cast<int64_t>(outrxp)) >> 2;
     if (llabs(pc_offset) >= (mask >> 1)) {
         if ((reinterpret_cast<uint64_t>(outrxp + 2) & 7u) != 0u) {
             outrwp[0] = Aarch64Nop;
@@ -617,24 +557,20 @@ inline_always_ void AllocForTrampoline(uint32_t** rx, uint32_t** rw) {
 
 //-------------------------------------------------------------------------
 
-inline_always_ bool HookFuncImpl(void* const symbol, void* const replace,
-                                 void* const rxtr, void* const rwtr) {
-    static constexpr uint_fast64_t mask =
-        0x03ffffffu; // 0b00000011111111111111111111111111
+inline_always_ bool HookFuncImpl(void* const symbol, void* const replace, void* const rxtr,
+                                 void* const rwtr) {
+    static constexpr uint_fast64_t mask = 0x03ffffffu; // 0b00000011111111111111111111111111
 
     uint32_t *rxtrampoline = static_cast<uint32_t*>(rxtr),
              *rwtrampoline = static_cast<uint32_t*>(rwtr),
              *original = static_cast<uint32_t*>(symbol);
 
     static_assert(MaxInstructions >= 5, "please fix MaxInstructions!");
-    auto pc_offset =
-        static_cast<int64_t>(__intval(replace) - __intval(symbol)) >> 2;
+    auto pc_offset = static_cast<int64_t>(__intval(replace) - __intval(symbol)) >> 2;
     if (llabs(pc_offset) >= (mask >> 1)) {
-        const megaton::__priv::Mirror ctrl((uintptr_t)original,
-                                           5 * sizeof(uint32_t));
+        const megaton::__priv::Mirror ctrl((uintptr_t)original, 5 * sizeof(uint32_t));
 
-        int32_t count =
-            (reinterpret_cast<uint64_t>(original + 2) & 7u) != 0u ? 5 : 4;
+        int32_t count = (reinterpret_cast<uint64_t>(original + 2) & 7u) != 0u ? 5 : 4;
 
         original = (u32*)ctrl.rw_start();
 
@@ -642,8 +578,7 @@ inline_always_ bool HookFuncImpl(void* const symbol, void* const replace,
             if (TrampolineSize < count * 10u) {
                 return false;
             } // if
-            __fix_instructions(original, (u32*)ctrl.ro_start(), count,
-                               rwtrampoline, rxtrampoline);
+            __fix_instructions(original, (u32*)ctrl.ro_start(), count, rwtrampoline, rxtrampoline);
         } // if
 
         if (count == 5) {
@@ -655,8 +590,7 @@ inline_always_ bool HookFuncImpl(void* const symbol, void* const replace,
         *reinterpret_cast<int64_t*>(original + 2) = __intval(replace);
         __flush_cache(symbol, 5 * sizeof(uint32_t));
     } else {
-        const megaton::__priv::Mirror ctrl((uintptr_t)original,
-                                           1 * sizeof(uint32_t));
+        const megaton::__priv::Mirror ctrl((uintptr_t)original, 1 * sizeof(uint32_t));
 
         original = (u32*)ctrl.rw_start();
 
@@ -664,8 +598,7 @@ inline_always_ bool HookFuncImpl(void* const symbol, void* const replace,
             if (TrampolineSize < 1u * 10u) {
                 return false;
             } // if
-            __fix_instructions(original, (u32*)ctrl.ro_start(), 1, rwtrampoline,
-                               rxtrampoline);
+            __fix_instructions(original, (u32*)ctrl.ro_start(), 1, rwtrampoline, rxtrampoline);
         } // if
 
         __sync_cmpswap(original, *original,
@@ -678,29 +611,31 @@ inline_always_ bool HookFuncImpl(void* const symbol, void* const replace,
 
 } // namespace megaton::__priv::hook_impl
 
+// NOLINTEND
 namespace megaton::__priv {
-void init_hook() { hook_impl::s_HookJit.init(); }
-uintptr_t do_install_hook_at_offset(ptrdiff_t main_offset, uintptr_t callback,
-                                    bool is_trampoline) {
-    return do_install_hook(megaton::module::main_info().start() + main_offset,
-                           callback, is_trampoline);
+void init_hook() {
+    hook_impl::s_HookJit.init();
 }
-uintptr_t do_install_hook(uintptr_t hook, uintptr_t callback,
-                          bool do_trampoline) {
-    u32* rxtrampoline = NULL;
-    u32* rwtrampoline = NULL;
-    if (do_trampoline) {
+uintptr_t do_install_hook_at_offset(ptrdiff_t target_main_offset, uintptr_t callback,
+                                    bool is_trampoline) {
+    return do_install_hook(megaton::module::main_info().start() + target_main_offset, callback,
+                           is_trampoline);
+}
+uintptr_t do_install_hook(uintptr_t target, uintptr_t callback, bool is_trampoline) {
+    u32* rxtrampoline = nullptr;
+    u32* rwtrampoline = nullptr;
+    if (is_trampoline) {
         hook_impl::AllocForTrampoline(&rxtrampoline, &rwtrampoline);
     }
 
-    if (!hook_impl::HookFuncImpl(reinterpret_cast<void*>(hook),
-                                 reinterpret_cast<void*>(callback),
+    // NOLINTNEXTLINE(performance-no-int-to-ptr)
+    if (!hook_impl::HookFuncImpl(reinterpret_cast<void*>(target), reinterpret_cast<void*>(callback),
                                  rxtrampoline, rwtrampoline)) {
         panic_("HookFuncImpl failed");
     }
 
     hook_impl::s_HookJit.flush();
 
-    return (uintptr_t)rxtrampoline;
+    return reinterpret_cast<uintptr_t>(rxtrampoline);
 }
 } // namespace megaton::__priv

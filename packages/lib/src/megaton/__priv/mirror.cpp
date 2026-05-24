@@ -7,10 +7,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) shadowninja
 
-#include <megaton/prelude.h>
-
 #include <algorithm>
 #include <cstring>
+
+#include <megaton/panic_abort.h>
+#include <megaton/types.h>
 
 extern "C" {
 #include <switch/arm/cache.h>
@@ -43,31 +44,27 @@ static void handle_mapping(
 
     do {
         // Query next range
-        if (R_FAILED(svcQueryMemory(&meminfo, &pageinfo,
-                                    meminfo.addr + meminfo.size))) {
+        if (R_FAILED(svcQueryMemory(&meminfo, &pageinfo, meminfo.addr + meminfo.size))) {
             panic_("mirror: svcQueryMemory failed");
         }
 
         // Calculate offset into the range we are mapping.
         // Force the start to be at least the aligned start if for some reason
         // it is not
-        uintptr_t offset =
-            std::max(meminfo.addr, ro_start_aligned) - ro_start_aligned;
+        uintptr_t offset = std::max(meminfo.addr, ro_start_aligned) - ro_start_aligned;
         // Determine the address we will be working on.
         uintptr_t ro_start = ro_start_aligned + offset;
-        void* rw_start = (void*)(rw_start_aligned + offset);
+        // NOLINTNEXTLINE(performance-no-int-to-ptr)
+        auto* rw_start = reinterpret_cast<void*>(rw_start_aligned + offset);
         /* Determine the size of this range to map/unmap. */
-        uintptr_t size =
-            std::min(end_aligned, meminfo.addr + meminfo.size) - ro_start;
+        uintptr_t size = std::min(end_aligned, meminfo.addr + meminfo.size) - ro_start;
 
         if (map) {
-            if (R_FAILED(
-                    svcMapProcessMemory(rw_start, process, ro_start, size))) {
+            if (R_FAILED(svcMapProcessMemory(rw_start, process, ro_start, size))) {
                 panic_("mirror: svcMapProcessMemory failed");
             }
         } else {
-            if (R_FAILED(
-                    svcUnmapProcessMemory(rw_start, process, ro_start, size))) {
+            if (R_FAILED(svcUnmapProcessMemory(rw_start, process, ro_start, size))) {
                 panic_("mirror: svcUnmapProcessMemory failed");
             }
         }
@@ -81,10 +78,11 @@ Mirror::Mirror(uintptr_t start, size_t size) {
     auto size_aligned = m.size_aligned();
 
     // Find a page for the RW region and reserve it
-    uintptr_t rw_start_aligned = (uintptr_t)virtmemFindAslr(size_aligned, 0);
+    auto rw_start_aligned = reinterpret_cast<uintptr_t>(virtmemFindAslr(size_aligned, 0));
     assert_(rw_start_aligned != 0);
-    auto reserve = virtmemAddReservation((void*)rw_start_aligned, size_aligned);
-    assert_(reserve != NULL);
+    // NOLINTNEXTLINE(performance-no-int-to-ptr) FIXME
+    auto* reserve = virtmemAddReservation(reinterpret_cast<void*>(rw_start_aligned), size_aligned);
+    assert_(reserve != nullptr);
     m.rw_reserve = reserve;
 
     // Get the process handle for mapping memory
@@ -92,33 +90,36 @@ Mirror::Mirror(uintptr_t start, size_t size) {
 
     auto ro_start_aligned = m.ro_start_aligned();
 
-    handle_mapping(ro_start_aligned, rw_start_aligned, size_aligned, process,
-                   true);
+    handle_mapping(ro_start_aligned, rw_start_aligned, size_aligned, process, true);
 
     // Setup RW pointer to match same unaligned location of RO.
     m.rw_start = rw_start_aligned + (start - ro_start_aligned);
 
     // Ensure the mapping worked
-    assert_(memcmp((void*)m.ro_start, (void*)m.rw_start, size) == 0);
+    // NOLINTNEXTLINE(performance-no-int-to-ptr) FIXME
+    assert_(memcmp(reinterpret_cast<void*>(m.ro_start), reinterpret_cast<void*>(m.rw_start),
+                   size) == 0);
 }
 
 void Mirror::flush() {
     auto size_aligned = m.size_aligned();
-    armDCacheFlush((void*)m.rw_start_aligned(), size_aligned);
-    armICacheInvalidate((void*)m.ro_start_aligned(), size_aligned);
+    // NOLINTNEXTLINE(performance-no-int-to-ptr) FIXME
+    armDCacheFlush(reinterpret_cast<void*>(m.rw_start_aligned()), size_aligned);
+    // NOLINTNEXTLINE(performance-no-int-to-ptr) FIXME
+    armICacheInvalidate(reinterpret_cast<void*>(m.ro_start_aligned()), size_aligned);
 }
 
 Mirror::~Mirror() {
     /* Only uninit if this is the owner. */
-    if (!m.rw_reserve)
+    if (m.rw_reserve != nullptr) {
         return;
+    }
 
     flush();
 
     auto process = megaton::__priv::current_process();
 
-    handle_mapping(m.ro_start_aligned(), m.rw_start_aligned(), m.size_aligned(),
-                   process, false);
+    handle_mapping(m.ro_start_aligned(), m.rw_start_aligned(), m.size_aligned(), process, false);
 
     // Free reservation of the read-write region
     virtmemRemoveReservation(m.rw_reserve);

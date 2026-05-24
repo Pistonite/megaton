@@ -5,6 +5,8 @@
 
 #include <concepts>
 
+// NOLINTBEGIN(bugprone-reserved-identifier)
+
 namespace exl::util {
 
 template <std::integral Underlying, Underlying _Low,
@@ -24,44 +26,45 @@ private:
     Underlying m_Data;
 
 public:
-    constexpr inline BitSet() : m_Data() {}
-    constexpr inline BitSet(Underlying data) : m_Data(data) {}
+    constexpr BitSet() : m_Data() {}
+    constexpr BitSet(Underlying data) : m_Data(data) {}
 
-    template <Mask Mask> constexpr Underlying inline BitsOf() const {
+    template <Mask Mask> constexpr Underlying BitsOf() const {
         /* Take out the bits we want. */
         auto value = m_Data & Mask.Value();
         /* Shift down the bits. */
         return value >> Mask.Low;
     }
 
-    template <Mask Mask> constexpr void inline SetBits(Underlying value) {
+    template <Mask Mask> constexpr void SetBits(Underlying value) {
         /* Carve out the bits not in the mask. */
         m_Data &= ~Mask.Value();
 
         /* Prepare value to be written. */
-        auto v = value << Mask.Low;
-        v &= Mask.Value();
+        auto value_shifted = value << Mask.Low;
+        value_shifted &= Mask.Value();
 
         /* OR in the bits. */
-        m_Data |= v;
+        m_Data |= value_shifted;
     }
 
     /* Wrappers to construct masks. */
     template <Underlying Low, Underlying High>
-    constexpr Underlying inline BitsOf() const {
+    constexpr Underlying BitsOf() const {
         return BitsOf<Mask<Underlying, Low, High>>();
     }
     template <Underlying Low, Underlying High>
-    constexpr void inline SetBits(Underlying value) {
+    constexpr void SetBits(Underlying value) {
         SetBits<Mask<Underlying, Low, High>>(value);
     }
 
     /* Conversion operators. */
-    constexpr inline Underlying& operator=(const Underlying& value) {
+    constexpr Underlying& operator=(const Underlying& value) {
         m_Data = value;
         return this;
     }
 
-    constexpr inline Underlying Value() const { return m_Data; }
+    constexpr Underlying Value() const { return m_Data; }
 };
 }; // namespace exl::util
+// NOLINTEND(bugprone-reserved-identifier)

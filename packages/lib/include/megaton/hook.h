@@ -5,10 +5,14 @@
  * Runtime hooking system
  */
 #pragma once
-#include <megaton/prelude.h>
 #include <type_traits>
 #include <utility>
+#include <array>
 
+#include <megaton/attributes.h>
+#include <megaton/types.h>
+
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 namespace megaton::__priv {
 
 void init_hook();
@@ -16,7 +20,7 @@ void init_inline_hook();
 
 uintptr_t do_install_hook(uintptr_t target, uintptr_t callback,
                           bool is_trampoline);
-uintptr_t do_install_hook_at_offset(ptrdiff_t target, uintptr_t callback,
+uintptr_t do_install_hook_at_offset(ptrdiff_t target_main_offset, uintptr_t callback,
                                     bool is_trampoline);
 inline_always_ void install_replace_hook(uintptr_t target, uintptr_t callback) {
     do_install_hook(target, callback, false);
@@ -105,15 +109,15 @@ template <typename TDerived> struct trampoline_hook {
 
 #define hook_inline_(name)                                                     \
     name:                                                                      \
-    public                                                                     \
+public                                                                         \
     ::megaton::__priv::inline_hook<name>
 #define hook_replace_(name)                                                    \
     name:                                                                      \
-    public                                                                     \
+public                                                                         \
     ::megaton::__priv::replace_hook<name>
 #define hook_trampoline_(name)                                                 \
     name:                                                                      \
-    public                                                                     \
+public                                                                         \
     ::megaton::__priv::trampoline_hook<name>
 
 #define target_offset_(main_offset)                                            \
@@ -165,7 +169,7 @@ union Reg {
  * Register context for inline hooks
  */
 struct InlineCtx {
-    Reg reg[31];
+    std::array<Reg,31> reg;
 
     static constexpr int LR_OFFSET = 0xf0;
 
@@ -174,26 +178,26 @@ struct InlineCtx {
     /** Access the link register */
     inline_member_ u64& lr() { return reg[30].x; }
     /** Access the frame pointer */
-    inline_member_ const u64& fp() const { return reg[29].x; }
+    [[nodiscard]] inline_member_ const u64& fp() const { return reg[29].x; }
     /** Access the link register */
-    inline_member_ const u64& lr() const { return reg[30].x; }
+    [[nodiscard]] inline_member_ const u64& lr() const { return reg[30].x; }
     /** Access 64-bit general-purpose registers */
     template <u8 index> inline_member_ u64& x() {
         static_assert(index < 31, "register index out of bounds");
         return reg[index].x;
     }
     /** Access 64-bit general-purpose registers */
-    template <u8 index> inline_member_ const u64& x() const {
+    template <u8 index> [[nodiscard]] inline_member_ const u64& x() const {
         static_assert(index < 31, "register index out of bounds");
         return reg[index].x;
     }
     /** Access 32-bit general-purpose registers */
-    template <u8 index> inline_member_ u32& w() {
+    template <u8 index> [[nodiscard]] inline_member_ u32& w() {
         static_assert(index < 31, "register index out of bounds");
         return reg[index].w;
     }
     /** Access 32-bit general-purpose registers */
-    template <u8 index> inline_member_ const u32& w() const {
+    template <u8 index> [[nodiscard]] inline_member_ const u32& w() const {
         static_assert(index < 31, "register index out of bounds");
         return reg[index].w;
     }

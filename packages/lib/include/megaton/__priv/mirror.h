@@ -9,10 +9,11 @@
 
 #pragma once
 #include <megaton/align.h>
-#include <megaton/prelude.h>
+#include <megaton/types.h>
 
 #include <utility>
 
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 namespace megaton::__priv {
 /**
  * Writable memory mapped to read-only memory,
@@ -32,17 +33,17 @@ private:
         struct VirtmemReservation* rw_reserve = nullptr;
 
         /** Page-aligned start of the read-only region. */
-        constexpr uintptr_t ro_start_aligned() const {
+        [[nodiscard]] constexpr uintptr_t ro_start_aligned() const {
             return align_down_(ro_start, PAGE_SIZE);
         }
 
         /** Page-aligned start of the read-write region. */
-        constexpr uintptr_t rw_start_aligned() const {
+        [[nodiscard]] constexpr uintptr_t rw_start_aligned() const {
             return align_down_(rw_start, PAGE_SIZE);
         }
 
         /** Page-aligned size of the region. */
-        constexpr size_t size_aligned() const {
+        [[nodiscard]] constexpr size_t size_aligned() const {
             return align_up_(size, PAGE_SIZE);
         }
     };
@@ -67,14 +68,14 @@ public:
     void flush();
 
     /** Get the start of the read-only region. */
-    inline uintptr_t ro_start() const { return m.ro_start; }
+    [[nodiscard]] uintptr_t ro_start() const { return m.ro_start; }
     /** Get the start of the read-write region. */
-    inline uintptr_t rw_start() const { return m.rw_start; }
+    [[nodiscard]] uintptr_t rw_start() const { return m.rw_start; }
     /** Get the size of the region. */
-    inline uintptr_t size() const { return m.size; }
+    [[nodiscard]] uintptr_t size() const { return m.size; }
 
 private:
-    inline const Info& info() const { return m; }
+    [[nodiscard]] const Info& info() const { return m; }
 
     Info m;
 };

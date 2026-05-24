@@ -6,15 +6,20 @@
  * for module info.
  */
 #pragma once
-#include <megaton/prelude.h>
+#include <megaton/types.h>
+#include <megaton/attributes.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 extern const char* __megaton_module_name(void);
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 extern usize __megaton_module_name_len(void);
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 extern const char* __megaton_title_id_hex(void);
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 extern u64 __megaton_title_id(void);
 
 #ifdef __cplusplus

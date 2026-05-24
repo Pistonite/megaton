@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Megaton contributors
 
 #pragma once
-#include <megaton/prelude.h>
+#include <megaton/types.h>
 
 namespace exl::armv8::reg {
 
@@ -18,9 +18,9 @@ public:
     constexpr Register(RegisterKind kind, u8 index)
         : m_Kind(kind), m_Index(index) {}
 
-    constexpr inline bool Is32() const { return m_Kind == RegisterKind::W; }
-    constexpr inline bool Is64() const { return m_Kind == RegisterKind::X; }
-    constexpr inline u8 Index() const { return m_Index; }
+    [[nodiscard]] constexpr bool Is32() const { return m_Kind == RegisterKind::W; }
+    [[nodiscard]] constexpr bool Is64() const { return m_Kind == RegisterKind::X; }
+    [[nodiscard]] constexpr u8 Index() const { return m_Index; }
 };
 static_assert(sizeof(Register) == 1, "Register");
 
@@ -28,6 +28,7 @@ static_assert(sizeof(Register) == 1, "Register");
     constexpr inline Register W##I(RegisterKind::W, I);                        \
     constexpr inline Register X##I(RegisterKind::X, I);
 
+// NOLINTBEGIN
 REG(0);
 REG(1);
 REG(2);
@@ -38,6 +39,7 @@ REG(6);
 REG(7);
 REG(8);
 REG(9);
+// NOLINTEND
 REG(10);
 REG(11);
 REG(12);
@@ -60,7 +62,9 @@ REG(28);
 REG(29);
 REG(30);
 
+// NOLINTNEXTLINE(readability-identifier-length)
 constexpr inline auto LR = X30;
+// NOLINTNEXTLINE(readability-identifier-length)
 constexpr inline auto SP = Register(RegisterKind::X, 31);
 constexpr inline auto None32 = Register(RegisterKind::W, -1);
 constexpr inline auto None64 = Register(RegisterKind::X, -1);

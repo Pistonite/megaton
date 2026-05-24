@@ -7,9 +7,14 @@ members = [
     "packages/test-mod"
 ]
 
-[workspace.dependencies]
 
 [workspace.dependencies.cu]
 package = "pistonite-cu"
 version = "0.7.3"
 # path = "../../../cu/packages/copper"
+
+[workspace.dependencies]
+ignore = "0.4.25"
+flate2 = "1.1.2"
+tar = "0.4.44"
+sha2 = "0.11.0"

@@ -7,10 +7,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) shadowninja
 
-#include <megaton/align.h>
-#include <megaton/prelude.h>
-
+#include <array>
 #include <cstring>
+
+#include <megaton/align.h>
+#include <megaton/panic_abort.h>
+#include <megaton/types.h>
 
 extern "C" {
 #include <switch/arm/tls.h>
@@ -22,25 +24,24 @@ extern "C" {
 
 namespace megaton::__priv {
 
-static const u32 s_send_handle_msg[4] = {0x00000000, 0x80000000, 0x00000002,
-                                         CUR_PROCESS_HANDLE};
+static const std::array<u32, 4> s_send_handle_msg = {0x00000000, 0x80000000, 0x00000002,
+                                                     CUR_PROCESS_HANDLE};
 static Handle s_handle = INVALID_HANDLE;
 
 /** thread that will receive the proc handle */
 static noreturn_ recv_handle_thread_main(void* session_handle_ptr) {
     // Convert the argument to a handle we can use.
-    Handle session_handle = (Handle)(uintptr_t)session_handle_ptr;
+    auto session_handle = static_cast<Handle>(reinterpret_cast<uintptr_t>(session_handle_ptr));
 
     // Receive the request from the client thread.
     memset(armGetTls(), 0, 0x10);
     s32 idx = 0;
-    if (R_FAILED(svcReplyAndReceive(&idx, &session_handle, 1, INVALID_HANDLE,
-                                    UINT64_MAX))) {
+    if (R_FAILED(svcReplyAndReceive(&idx, &session_handle, 1, INVALID_HANDLE, UINT64_MAX))) {
         panic_("svcReplyAndReceive failed.");
     }
 
     // Set the process handle.
-    s_handle = ((u32*)armGetTls())[3];
+    s_handle = (static_cast<u32*>(armGetTls()))[3];
 
     // Close the session.
     svcCloseHandle(session_handle);
@@ -49,25 +50,27 @@ static noreturn_ recv_handle_thread_main(void* session_handle_ptr) {
     svcExitThread();
 
     // This code will never execute.
-    while (true)
-        ;
+    while (true) {
+    }
 }
 
-static void get_via_ipc_trick(void) {
+static void get_via_ipc_trick() {
+    // NOLINTNEXTLINE(modernize-avoid-c-arrays)
     alignas(PAGE_SIZE) u8 temp_thread_stack[0x1000];
 
     // Create a new session to transfer our process handle to ourself
-    Handle server_handle, client_handle;
+    Handle server_handle;
+    Handle client_handle;
     if (R_FAILED(svcCreateSession(&server_handle, &client_handle, 0, 0))) {
         panic_("svcCreateSession failed.");
     }
 
     // Create a new thread to receive our handle.
     Handle thread_handle;
-    if (R_FAILED(svcCreateThread(
-            &thread_handle, (void*)&recv_handle_thread_main,
-            (void*)(uintptr_t)server_handle,
-            temp_thread_stack + sizeof(temp_thread_stack), 0x20, 2))) {
+    if (R_FAILED(svcCreateThread(&thread_handle, (void*)&recv_handle_thread_main,
+                                 // NOLINTNEXTLINE(performance-no-int-to-ptr)
+                                 (void*)(uintptr_t)server_handle,
+                                 temp_thread_stack + sizeof(temp_thread_stack), 0x20, 2))) {
         panic_("svcCreateThread failed.");
     }
 
@@ -77,7 +80,7 @@ static void get_via_ipc_trick(void) {
     }
 
     // Send the message.
-    memcpy(armGetTls(), s_send_handle_msg, sizeof(s_send_handle_msg));
+    memcpy(armGetTls(), s_send_handle_msg.data(), s_send_handle_msg.size());
     svcSendSyncRequest(client_handle);
 
     // Close the session handle.
@@ -94,10 +97,10 @@ static void get_via_ipc_trick(void) {
 
 static Result get_via_mesosphere() {
     u64 handle;
-    Result r = svcGetInfo(&handle, 65001 /*InfoType_MesosphereCurrentProcess*/,
-                          INVALID_HANDLE, 0);
-    if (R_FAILED(r)) {
-        return r;
+    Result result =
+        svcGetInfo(&handle, 65001 /*InfoType_MesosphereCurrentProcess*/, INVALID_HANDLE, 0);
+    if (R_FAILED(result)) {
+        return result;
     }
     s_handle = handle;
 
@@ -107,10 +110,10 @@ static Result get_via_mesosphere() {
 Handle current_process() {
     if (s_handle == INVALID_HANDLE) {
         /* Try to ask mesosphere for our process handle. */
-        Result r = get_via_mesosphere();
+        Result result = get_via_mesosphere();
 
         /* Fallback to an IPC trick if mesosphere is old/not present. */
-        if (R_FAILED(r)) {
+        if (R_FAILED(result)) {
             get_via_ipc_trick();
         }
     }

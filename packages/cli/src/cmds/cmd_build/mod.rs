@@ -251,7 +251,6 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
 }
 
 static LIBRARY_TARGZ: &[u8] = include_bytes!("../../../libmegaton.tar.gz");
-static LIBRARY_HASH: &[u8] = include_bytes!("../../../libmegaton_sha256sum");
 
 fn install_lib_if_needed(lib_path: &Path) -> cu::Result<()> {
     if lib_needs_unpacked(lib_path) {
@@ -263,15 +262,15 @@ fn install_lib_if_needed(lib_path: &Path) -> cu::Result<()> {
 
 /// True if version hash doesn't exist or doesn't match the stored tarball
 fn lib_needs_unpacked(lib_path: &Path) -> bool {
-    let lib_hash_file = lib_path.join("libmegaton_sha256sum");
-    if !&lib_hash_file.exists() {
+    let lib_hash_file = lib_path.join(".hash");
+    if !lib_hash_file.exists() {
         return true;
     }
     let Ok(existing_lib_hash) = cu::fs::read(lib_hash_file) else {
         return true;
     };
 
-    LIBRARY_HASH != existing_lib_hash
+    env!("MEGATON_LIB_SHA256").as_bytes() != existing_lib_hash
 }
 
 /// Deletes contents of dir and unpacks the library from the stored tarball
@@ -282,8 +281,8 @@ fn unpack_lib(lib_path: &Path) -> cu::Result<()> {
         cu::fs::remove_contents(lib_path)?;
     }
     library_archive.unpack(lib_path)?;
-    let lib_hash_file = lib_path.join("libmegaton_sha256sum");
-    cu::fs::write(lib_hash_file, LIBRARY_HASH)?;
+    let lib_hash_file = lib_path.join(".hash");
+    cu::fs::write(lib_hash_file, env!("MEGATON_LIB_SHA256").as_bytes())?;
 
     Ok(())
 }

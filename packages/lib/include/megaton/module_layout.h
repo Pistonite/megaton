@@ -8,7 +8,8 @@
 // Copyright (c) shadowninja
 
 #pragma once
-#include <megaton/prelude.h>
+#include <megaton/attributes.h>
+#include <megaton/types.h>
 
 namespace megaton::module {
 
@@ -35,11 +36,11 @@ public:
         friend class Info;
 
     public:
-        inline_member_ constexpr uintptr_t end() const {
+        [[nodiscard]] inline_member_ constexpr uintptr_t end() const {
             return _start + _size;
         }
-        inline_member_ constexpr uintptr_t start() const { return _start; }
-        inline_member_ constexpr size_t size() const { return _size; }
+        [[nodiscard]] inline_member_ constexpr uintptr_t start() const { return _start; }
+        [[nodiscard]] inline_member_ constexpr size_t size() const { return _size; }
         inline_member_ void set(uintptr_t start, size_t size) {
             _start = start;
             _size = size;
@@ -50,14 +51,14 @@ public:
         size_t _size;
     };
 
-    inline_member_ constexpr uintptr_t start() const { return _text.start(); }
-    inline_member_ constexpr uintptr_t end() const { return _data.end(); }
-    inline_member_ constexpr size_t size() const {
+    [[nodiscard]] inline_member_ constexpr uintptr_t start() const { return _text.start(); }
+    [[nodiscard]] inline_member_ constexpr uintptr_t end() const { return _data.end(); }
+    [[nodiscard]] inline_member_ constexpr size_t size() const {
         return _text.size() + _rodata.size() + _data.size();
     }
-    inline_member_ constexpr const Range& text() const { return _text; }
-    inline_member_ constexpr const Range& rodata() const { return _rodata; }
-    inline_member_ constexpr const Range& data() const { return _data; }
+    [[nodiscard]] inline_member_ constexpr const Range& text() const { return _text; }
+    [[nodiscard]] inline_member_ constexpr const Range& rodata() const { return _rodata; }
+    [[nodiscard]] inline_member_ constexpr const Range& data() const { return _data; }
 
     inline_member_ constexpr Range& text() { return _text; }
     inline_member_ constexpr Range& rodata() { return _rodata; }

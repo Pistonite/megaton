@@ -162,11 +162,11 @@ impl SourceFile {
     }
 
     fn get_o_path(&self, output_path: &Path) -> PathBuf {
-        output_path.join(format!("{}-{}.o", self.basename, self.pathhash))
+        output_path.join(format!("{}-{:016x}.o", self.basename, self.pathhash))
     }
 
     fn get_d_path(&self, output_path: &Path) -> PathBuf {
-        output_path.join(format!("{}-{}.d", self.basename, self.pathhash))
+        output_path.join(format!("{}-{:016x}.d", self.basename, self.pathhash))
     }
 }
 
