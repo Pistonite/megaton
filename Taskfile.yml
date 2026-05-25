@@ -33,6 +33,7 @@ tasks:
   check-non-dkp:
     - task: cli:check
     - lisensor
+    - task: lib:check-rs
   check-dkp:
     - task: lib:configure
     - task: lib:check-c
@@ -43,9 +44,10 @@ tasks:
   build-non-dkp:
     - task: cli:build
     - task: docs:build
+    - task: lib:build-rs
   build-dkp:
     - task: lib:configure
-    - task: lib:build
+    - task: lib:build-c
 
   license:
     desc: check or fix license notices (-- -f to fix)

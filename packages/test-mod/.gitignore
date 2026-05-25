@@ -1,5 +1,4 @@
-target/
-target/**
+/target
+/.cache
 debug-font
 compile_commands.json
-Cargo.lock

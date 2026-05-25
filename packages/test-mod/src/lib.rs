@@ -203,7 +203,7 @@ fn run_megaton_tests() {
     );
 }
 
-#[unsafe(no_mangle)]
-extern "C" fn __megaton_rs_main() {
+#[megaton::main]
+fn main() {
     ffi::init_function_in_c();
 }

@@ -158,11 +158,7 @@ extern "C" ReadResult __megaton_lib_fs_read_file(uint64_t nn_fd, uint64_t seek_p
     uint64_t bytes_read;
     //                                  u64 *outSize, nn::fs::FileHandle handle,
     //                                  s64 offset, void *buffer, u64 bufferSize
-    nn::Result result = nn::fs::ReadFile(&bytes_read,
-                                         {
-                                             ._internal = nn_fd,
-                                         },
-                                         s64(seek_pos), buf, len);
+    nn::Result result = nn::fs::ReadFile(&bytes_read, {nn_fd}, s64(seek_pos), buf, len);
     ReadResult read_result = {.result = build_simple_result(result), .bytes_read = bytes_read};
     return read_result;
 }

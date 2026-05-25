@@ -85,6 +85,59 @@ resolver = 2
 members = [ "macros" ]
         "##,
         );
+        let mut cargo_toml = toml::parse::<toml::Table>(&cargo_toml)?;
+        // patch [dependencies] .workspace = true to be .version = <version spec in workspace>
+        let workspace = cu::fs::read_string(packages_path.parent_abs()?.join("Cargo.toml"))?;
+        let workspace = toml::parse::<toml::Table>(&workspace)?;
+
+        // collect deps to inherit
+        let mut workspace_dep_names = vec![];
+        let deps = cu::check!(
+            cargo_toml.get("dependencies").and_then(|x| x.as_table()),
+            "didn't find megaton lib dependencies or is not table"
+        )?;
+        for (dep_name, dep_data) in deps {
+            let Some(dep_data) = dep_data.as_table() else {
+                continue;
+            };
+            let is_workspace = dep_data
+                .get("workspace")
+                .and_then(|x| x.as_bool())
+                .unwrap_or(false);
+            if is_workspace {
+                workspace_dep_names.push(dep_name.clone());
+            }
+        }
+
+        // copy from workspace toml
+        let workspace_deps = cu::check!(
+            workspace
+                .get("workspace")
+                .and_then(|x| x.as_table())
+                .and_then(|x| x.get("dependencies"))
+                .and_then(|x| x.as_table()),
+            "didn't find workspace dependencies or is not table"
+        )?;
+        let mut new_workspace_deps = toml::Table::new();
+        for dep_name in workspace_dep_names {
+            let workspace_dep_data = cu::check!(
+                workspace_deps.get(&dep_name),
+                "did not find dependency '{dep_name}' in workspace"
+            )?;
+            if let Some(data) = workspace_dep_data.as_table() {
+                if data.get("path").is_some() {
+                    cu::bail!("workspace dep cannot have path when packing library: {dep_name}");
+                }
+            }
+            new_workspace_deps.insert(dep_name, workspace_dep_data.clone());
+        }
+        // unwrap: we added it as string above
+        cargo_toml["workspace"]
+            .as_table_mut()
+            .unwrap()
+            .insert("dependencies".to_string(), new_workspace_deps.into());
+
+        let cargo_toml = toml::stringify_pretty(&cargo_toml)?;
         let bytes = cargo_toml.as_bytes();
         let mut header = tar::Header::new_gnu();
         header.set_path("Cargo.toml")?;

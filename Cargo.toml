@@ -13,7 +13,13 @@ package = "pistonite-cu"
 version = "0.7.3"
 # path = "../../../cu/packages/copper"
 
+[workspace.dependencies.pm]
+package = "pistonite-pm"
+version = "0.2.6"
+
 [workspace.dependencies]
+static_assertions = "1.1.0"
+hermit-abi = "0.5.2"
 ignore = "0.4.25"
 flate2 = "1.1.2"
 tar = "0.4.44"

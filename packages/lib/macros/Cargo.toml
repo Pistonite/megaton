@@ -3,10 +3,8 @@ name = "megaton-macros"
 version = "0.0.0"
 edition = "2024"
 
-[dependencies.pm]
-package = "pistonite-pm"
-version = "0.2.6"
-features = ["full"]
+[dependencies]
+pm = { workspace = true, features = ["full"] }
 
 [lib]
 proc-macro = true

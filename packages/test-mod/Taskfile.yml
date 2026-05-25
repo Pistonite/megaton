@@ -9,3 +9,10 @@ tasks:
   upload:
     cmds:
       - lftp 192.168.0.170:5000 < scripts/lftp-upload.sh
+
+  download:
+    desc: Download logs and crash reports from console
+    cmds:
+    - mkdir -p target/crash_reports/dumps
+    - mkdir -p target/logs
+    - lftp 192.168.0.170:5000 < scripts/lftp-download.sh

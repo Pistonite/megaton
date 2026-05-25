@@ -6,7 +6,9 @@ const MIN_FD: usize = 100; // fds other than stdio will be returned as their ind
 const NUM_FDS: usize = 1000;
 const GENERIC_ERRNO: i32 = -1;
 
-use crate::fs::fs_helpers::{
+use hermit_abi::EINVAL;
+
+use crate::fs::binding::{
     self, FileDescriptor, FileDescriptorType, GetEntryTypeResult, NNResult, O_RDONLY,
     STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO, write_stderr, write_stdout,
 };
@@ -58,9 +60,9 @@ fn set_fd_entry(fd: usize, fd_entry: Option<FileDescriptor>) {
 }
 
 fn megaton_log(msg: &str) {
-    let len = (&msg).len();
+    let len = msg.len();
     let msg = CString::new(msg).unwrap();
-    unsafe { fs_helpers::megaton_log(msg.as_c_str().as_ptr() as *const u8, len as u64) };
+    unsafe { binding::megaton_log(msg.as_c_str().as_ptr() as *const u8, len as u64) };
 }
 
 fn log_error(msg: &str, result: &NNResult) {
@@ -84,7 +86,7 @@ pub extern "C" fn sys_open(name: *const i8, flags: i32, mode: i32) -> i32 {
         )
         .as_str(),
     );
-    let open_result = unsafe { fs_helpers::open(name, flags, mode) };
+    let open_result = unsafe { binding::open(name, flags, mode) };
     if open_result.result.success {
         match insert_into_fd_list(open_result.fd) {
             Some(fd_index) => fd_index as i32,
@@ -117,15 +119,18 @@ pub fn sys_write(fd: i32, buf: *const u8, len: usize) -> isize {
     match fd_entry {
         None => GENERIC_ERRNO as isize,
         Some(fd) => match fd.kind {
-            FileDescriptorType::FILE => try_write_file(fd, fd_index, buf, len),
-            FileDescriptorType::DIR => GENERIC_ERRNO as isize,
-            FileDescriptorType::TCP => todo!(),
+            FileDescriptorType::File => try_write_file(fd, fd_index, buf, len),
+            FileDescriptorType::Directory => GENERIC_ERRNO as isize,
+            FileDescriptorType::Tcp => {
+                // FIXME
+                panic!("todo: tcp not implemented");
+            }
         },
     }
 }
 
 fn try_write_file(mut fd: FileDescriptor, fd_index: usize, buf: *const u8, len: usize) -> isize {
-    let write_result = unsafe { fs_helpers::write_file(fd.inner, buf, len, fd.seek_offset) };
+    let write_result = unsafe { binding::write_file(fd.inner, buf, len, fd.seek_offset) };
 
     if write_result.success {
         fd.seek_offset += len as u64;
@@ -133,9 +138,8 @@ fn try_write_file(mut fd: FileDescriptor, fd_index: usize, buf: *const u8, len: 
         len as isize
     } else {
         log_error("Megaton: sys_write failed!", &write_result);
-        match write_result.description {
-            _ => GENERIC_ERRNO as isize, // TODO: Map nn error to errno
-        }
+        // TODO: Map nn error to errno
+        GENERIC_ERRNO as isize
     }
 }
 
@@ -147,7 +151,7 @@ pub extern "C" fn sys_read(fd_index: i32, buf: *mut u8, len: usize) -> isize {
     match fd_index as usize {
         STDIN_FILENO => return GENERIC_ERRNO as isize,
         STDOUT_FILENO | STDERR_FILENO => {
-            todo!()
+            return -EINVAL as isize;
         }
         _ => {}
     };
@@ -156,16 +160,22 @@ pub extern "C" fn sys_read(fd_index: i32, buf: *mut u8, len: usize) -> isize {
     match fd_entry {
         None => -1,
         Some(fd) => match fd.kind {
-            FileDescriptorType::FILE => try_read_file(fd, fd_index as usize, buf, len),
-            FileDescriptorType::DIR => todo!(),
-            FileDescriptorType::TCP => todo!(),
+            FileDescriptorType::File => try_read_file(fd, fd_index as usize, buf, len),
+            FileDescriptorType::Directory => {
+                // FIXME
+                panic!("todo: read directory not implemented")
+            }
+            FileDescriptorType::Tcp => {
+                // FIXME
+                panic!("todo: read tcp not implemented")
+            }
         },
     }
 }
 
 fn try_read_file(mut fd_entry: FileDescriptor, fd_index: usize, buf: *mut u8, len: usize) -> isize {
     let read_result =
-        unsafe { fs_helpers::read_file(fd_entry.inner, fd_entry.seek_offset, buf, len as u64) };
+        unsafe { binding::read_file(fd_entry.inner, fd_entry.seek_offset, buf, len as u64) };
     if !read_result.result.success {
         log_error("Failed to read file", &read_result.result);
         return GENERIC_ERRNO as isize;
@@ -177,7 +187,7 @@ fn try_read_file(mut fd_entry: FileDescriptor, fd_index: usize, buf: *mut u8, le
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn sys_fstat(fd: i32, stat: *mut fs_helpers::stat) -> i32 {
+pub extern "C" fn sys_fstat(fd: i32, stat: *mut hermit_abi::stat) -> i32 {
     megaton_log(format!("sys_fstat called for fd={}\n", fd).as_str());
     match fd as usize {
         STDIN_FILENO | STDOUT_FILENO | STDERR_FILENO => {
@@ -186,26 +196,25 @@ pub extern "C" fn sys_fstat(fd: i32, stat: *mut fs_helpers::stat) -> i32 {
         _ => {}
     };
 
-    if let Some(fd) = get_fd_entry(fd as usize) {
-        stat_file(&fd, stat)
-    } else {
+    let Some(fd) = get_fd_entry(fd as usize) else {
         return GENERIC_ERRNO;
-    }
+    };
+    stat_file(&fd, stat)
 }
 
 // https://github.com/hermit-os/hermit-rs/blob/111a7b480a18ce1b6c576d9dac02a688203432ee/hermit/src/syscall/mod.rs#L187
 #[unsafe(no_mangle)]
-pub extern "C" fn sys_stat(name: *const i8, stat: *mut fs_helpers::stat) -> i32 {
+pub extern "C" fn sys_stat(name: *const i8, stat: *mut hermit_abi::stat) -> i32 {
     megaton_log(
         format!("sys_stat called with name={:?}\n", unsafe {
             std::ffi::CStr::from_ptr(name as *const std::ffi::c_char)
         })
         .as_str(),
     );
-    let entry_type: GetEntryTypeResult = unsafe { fs_helpers::get_entry_type(name) };
+    let entry_type: GetEntryTypeResult = unsafe { binding::get_entry_type(name) };
     if !entry_type.result.success {
         match entry_type.result.description {
-            fs_helpers::PATH_NOT_FOUND => {
+            binding::PATH_NOT_FOUND => {
                 return GENERIC_ERRNO; // TODO: get err code for this
             }
 
@@ -217,10 +226,10 @@ pub extern "C" fn sys_stat(name: *const i8, stat: *mut fs_helpers::stat) -> i32 
     }
 
     let mut already_open = false;
-    let open_result = unsafe { fs_helpers::open(name, 0, O_RDONLY) };
+    let open_result = unsafe { binding::open(name, 0, O_RDONLY) };
     if !open_result.result.success {
         match open_result.result.description {
-            fs_helpers::TARGET_LOCKED => {
+            binding::TARGET_LOCKED => {
                 already_open = true;
             }
             _ => {
@@ -232,7 +241,8 @@ pub extern "C" fn sys_stat(name: *const i8, stat: *mut fs_helpers::stat) -> i32 
 
     let handle: FileDescriptor = if already_open {
         megaton_log("sys_stat failed! TODO: Get fd entry with matching name");
-        todo!() // get fd entry with matching name
+        // FIXME
+        panic!("todo: sys_stat for opened file not implemented");
     } else {
         open_result.fd
     };
@@ -242,8 +252,9 @@ pub extern "C" fn sys_stat(name: *const i8, stat: *mut fs_helpers::stat) -> i32 
     result
 }
 
-fn stat_file(fd: &FileDescriptor, stat: *mut fs_helpers::stat) -> i32 {
-    let mut stat = unsafe { *stat };
+fn stat_file(fd: &FileDescriptor, stat: *mut hermit_abi::stat) -> i32 {
+    // FIXME: unsafe note
+    let stat = unsafe { &mut *stat };
     stat.st_uid = 0; // owner user id 
     stat.st_gid = 0; // owner group id
     stat.st_dev = 0; // device number
@@ -254,25 +265,24 @@ fn stat_file(fd: &FileDescriptor, stat: *mut fs_helpers::stat) -> i32 {
     const S_IWUSR: u32 = 0o200; // write
     const S_ISREG: u32 = 0o100000; // regular file
     const S_ISDIR: u32 = 0o040000; // directory
-    const S_ISSOCK: u32 = 0140000; // socket
+    const S_ISSOCK: u32 = 0o140000; // socket
 
     let mut st_mode: u32 = S_IRUSR | S_IWUSR;
     match fd.kind {
-        FileDescriptorType::FILE => st_mode |= S_ISREG,
-        FileDescriptorType::DIR => st_mode |= S_ISDIR,
-        FileDescriptorType::TCP => st_mode |= S_ISSOCK,
+        FileDescriptorType::File => st_mode |= S_ISREG,
+        FileDescriptorType::Directory => st_mode |= S_ISDIR,
+        FileDescriptorType::Tcp => st_mode |= S_ISSOCK,
     };
     stat.st_mode = st_mode;
 
-    let size_result = unsafe { fs_helpers::get_file_size(fd.inner) };
+    let size_result = unsafe { binding::get_file_size(fd.inner) };
     if !size_result.result.success {
         return GENERIC_ERRNO;
-    } else {
-        stat.st_size = size_result.size;
-        stat.st_blksize = 1000;
-        stat.st_blocks = ((size_result.size as f64) / 1000.0f64).ceil() as i64;
-        return 0;
     }
+    stat.st_size = size_result.size;
+    stat.st_blksize = 1000;
+    stat.st_blocks = ((size_result.size as f64) / 1000.0f64).ceil() as i64;
+    0
 }
 
 #[unsafe(no_mangle)]
@@ -282,7 +292,7 @@ pub fn sys_close(fd: i32) -> i32 {
 
     match fd as usize {
         STDIN_FILENO | STDOUT_FILENO | STDERR_FILENO => {
-            todo!();
+            return -EINVAL;
         }
         _ => {}
     };
@@ -294,11 +304,14 @@ pub fn sys_close(fd: i32) -> i32 {
         }
         Some(fd) => {
             match fd.kind {
-                FileDescriptorType::FILE => try_close_file(fd.inner),
-                FileDescriptorType::DIR => unsafe {
-                    fs_helpers::close_directory(fd.inner);
+                FileDescriptorType::File => try_close_file(fd.inner),
+                FileDescriptorType::Directory => unsafe {
+                    binding::close_directory(fd.inner);
                 },
-                FileDescriptorType::TCP => todo!(),
+                FileDescriptorType::Tcp => {
+                    //FIXME
+                    panic!("todo: close tcp not implemented")
+                }
             };
         }
     };
@@ -309,11 +322,12 @@ pub fn sys_close(fd: i32) -> i32 {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn sys_writev(_fd: i32, _iov: *const u8, _iovcnt: usize) -> isize {
-    todo!()
+    //FIXME
+    panic!("todo: sys_writev not implemented")
 }
 
 fn try_close_file(fd: u64) {
-    unsafe { fs_helpers::close_file(fd) };
+    unsafe { binding::close_file(fd) };
 }
 
 #[unsafe(no_mangle)]
@@ -324,6 +338,6 @@ pub extern "C" fn sys_unlink(name: *const i8) -> i32 {
         })
         .as_str(),
     );
-    let result = unsafe { fs_helpers::unlink(name) };
+    let result = unsafe { binding::unlink(name) };
     if result.success { 0 } else { GENERIC_ERRNO }
 }

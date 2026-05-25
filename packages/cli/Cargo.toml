@@ -25,11 +25,8 @@ regex = "1.12.2"
 cargo_metadata = "0.23.1"
 semver = { version = "1.0.28", features = ["serde"] }
 
-[build-dependencies.cu]
-workspace = true
-features = ["process"]
-
 [build-dependencies]
+cu = { workspace = true, features = ["process", "toml"] }
 ignore.workspace = true
 flate2.workspace = true
 tar.workspace = true

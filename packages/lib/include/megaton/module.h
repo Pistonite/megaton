@@ -13,13 +13,13 @@
 extern "C" {
 #endif
 
-// NOLINTNEXTLINE(bugprone-reserved-identifier)
+// NOLINTNEXTLINE(bugprone-reserved-identifier) FIXME
 extern const char* __megaton_module_name(void);
-// NOLINTNEXTLINE(bugprone-reserved-identifier)
+// NOLINTNEXTLINE(bugprone-reserved-identifier) FIXME
 extern usize __megaton_module_name_len(void);
-// NOLINTNEXTLINE(bugprone-reserved-identifier)
+// NOLINTNEXTLINE(bugprone-reserved-identifier) FIXME
 extern const char* __megaton_title_id_hex(void);
-// NOLINTNEXTLINE(bugprone-reserved-identifier)
+// NOLINTNEXTLINE(bugprone-reserved-identifier) FIXME
 extern u64 __megaton_title_id(void);
 
 #ifdef __cplusplus
@@ -29,24 +29,16 @@ extern u64 __megaton_title_id(void);
 #ifdef __cplusplus
 namespace megaton {
 
-/**
- * Get the module name.
- */
+/** Get the module name. */
 inline_always_ const char* module_name() { return __megaton_module_name(); }
 
-/**
- * Get the module name length.
- */
+/** Get the module name length. */
 inline_always_ usize module_name_len() { return __megaton_module_name_len(); }
 
-/**
- * Get the title ID in hexadecimal, without the 0x prefix
- */
+/** Get the title ID in hexadecimal, without the 0x prefix */
 inline_always_ const char* title_id_hex() { return __megaton_title_id_hex(); }
 
-/**
- * Get the title ID as a 64-bit integer.
- */
+/** Get the title ID as a 64-bit integer. */
 inline_always_ u64 title_id() { return __megaton_title_id(); }
 
 } // namespace megaton
