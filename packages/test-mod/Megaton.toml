@@ -1,14 +1,11 @@
 [module]
-name = "TestMod"
+name = "test-mod"
 title-id = 0x01007ef00011e000
 
 [megaton]
 version = "0.1.0"
 
-[cargo]
-enabled = true
-
-[build] # *profile enabled*
+[build]
 sources = [
     "src",
 ]
@@ -35,26 +32,10 @@ c = [
     "-DNN_WARE_MAJOR=4",
     "-DNN_WARE_MINOR=4",
     "-DNN_WARE_PATCH=0",
-]
-cxx = [
-    "<default>",
-    "-Wno-invalid-offsetof",
+    "-DTest"
 ]
 
-ld = [
-    "<default>",
-]
-
-rust = [
-]
-
-cargo = [
-    "<default>",
-]
-
-[check] # *profile enabled*
-ignore = []
+[check]
 symbols = [
     "sdk.syms"
 ]
-disallowed-instructions = []

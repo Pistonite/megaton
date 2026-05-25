@@ -2,6 +2,11 @@
 name = "megaton"
 version = "0.0.0"
 edition = "2024"
+license = "GPL-3.0-or-later"
+description = "Megaton Library that works with the build tool. Automatically unpacked by the build tool" # for the library unpacked by build tool
+publish = false
 
 [dependencies]
+static_assertions.workspace = true
+hermit-abi.workspace = true
 megaton-macros.path = "macros"

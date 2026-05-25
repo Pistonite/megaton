@@ -5,6 +5,11 @@
 #include <cerrno>
 #include <megaton/__internal/futex.h>
 #include <optional>
+#include <type_traits>
+
+// see lib.rs
+static_assert(std::is_same_v<time_t, int64_t>, "time_t is i64 in hermit-abi");
+static_assert(sizeof(timespec) == 0x10, "timespec size is 0x10 in hermit-abi");
 
 extern "C" {
 #include <switch/kernel/svc.h>

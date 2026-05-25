@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 cxx = "1.0.194"
-megaton = { version = "0.0.0", path = "../lib/" }
+megaton.path = "../lib/" # usually we should point to target/megaton/lib
 
 [lib]
 crate-type = ["staticlib"]

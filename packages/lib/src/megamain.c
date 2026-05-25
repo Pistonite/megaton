@@ -34,7 +34,7 @@ const char* __megaton_title_id_hex() { return MEGART_TITLE_ID_HEX; }
 void __megaton_lib_init();
 // NOLINTNEXTLINE(bugprone-reserved-identifier)
 void __megaton_librs_init();
-void megaton_main();
+void megaton_main(); // defined by user
 
 // real module entry point
 // NOLINTNEXTLINE(bugprone-reserved-identifier)
