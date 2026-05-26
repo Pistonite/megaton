@@ -1,0 +1,15 @@
+[package]
+name = "megaton-cli-build"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT"
+
+[dependencies]
+cu = { workspace = true, features = ["process", "toml"] }
+ignore.workspace = true
+flate2.workspace = true
+tar.workspace = true
+sha2.workspace = true
+
+megaton-toolchain-build.path = "../toolchain-build"

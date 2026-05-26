@@ -2,15 +2,18 @@
 resolver = "2"
 members = [
     "packages/cli",
+    "packages/cli-build",
+    "packages/docker-build",
     "packages/lib",
     "packages/lib/macros",
-    "packages/test-mod"
+    "packages/toolchain-build",
+    "packages/test-mod",
 ]
 
 
 [workspace.dependencies.cu]
 package = "pistonite-cu"
-version = "0.7.3"
+version = "0.8.2"
 # path = "../../../cu/packages/copper"
 
 [workspace.dependencies.pm]

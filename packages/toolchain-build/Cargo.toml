@@ -1,0 +1,13 @@
+[package]
+name = "megaton-toolchain-build"
+description = "megaton toolchain manager and build utils - build and installs custom rust toolchain along with tools"
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[dependencies]
+cu = { workspace = true, features = ["process", "print", "prompt", "toml", "json", "cli"] }
+
+[[example]]
+name = "docker_install"

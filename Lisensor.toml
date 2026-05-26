@@ -1,4 +1,8 @@
 ["Megaton contributors"]
+
+"packages/cli/**/*.rs" = "MIT"
+"packages/cli-build/**/*.rs" = "MIT"
+
 # C files
 "packages/lib/src/megaton/*.s" = "GPL-3.0-or-later"
 "packages/lib/src/megaton/*.c" = "GPL-3.0-or-later"
@@ -21,8 +25,8 @@
 
 # Rust files
 "packages/lib/**/*.rs" = "GPL-3.0-or-later"
-"packages/cli/**/*.rs" = "MIT"
 "packages/test-mod/**/*.rs" = "GPL-3.0-or-later"
+"packages/toolchain-build/*.rs" = "MIT"
 
 # Unmodified files
 # ["libnx Authors"]

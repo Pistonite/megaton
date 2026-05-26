@@ -1,6 +1,6 @@
 [package]
 name = "megaton-cmd"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "MIT"
 description = "The `megaton` CLI command"
@@ -26,11 +26,9 @@ cargo_metadata = "0.23.1"
 semver = { version = "1.0.28", features = ["serde"] }
 
 [build-dependencies]
-cu = { workspace = true, features = ["process", "toml"] }
-ignore.workspace = true
-flate2.workspace = true
-tar.workspace = true
-sha2.workspace = true
+cu = { workspace = true, features = ["fs", "toml"] }
+
+megaton-cli-build.path = "../cli-build"
 
 [[bin]]
 name = "megaton"

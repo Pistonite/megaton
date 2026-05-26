@@ -1,0 +1,54 @@
+version: '3'
+
+includes:
+  docker:
+    taskfile: ../../mono-dev/task/docker.yaml
+    internal: true
+    optional: true
+
+vars:
+  DOCKER_IMAGE: ghcr.io/pistonite/megaton-build
+
+tasks:
+  build:
+    - task: prep-dockerfile
+    - task: clean
+    - task: curl-rustup-init
+    - task: copy-toolchain-build
+    - task: copy-megaton-cmd
+    - task: docker:build
+
+  prep-dockerfile:
+    vars:
+      RUST_VERSION:
+        sh: rustc -V | sed -E 's/rustc ([^ ]+) .*$/\1/'
+    cmds:
+      - cmd: >
+          if ! grep {{.RUST_VERSION}} Dockerfile; then
+            echo "Rust version in Dockerfile mismatch with current Rust version" && exit 2
+          fi
+        silent: true
+
+  copy-toolchain-build:
+    - rm -rf temp/toolchain-build
+    - cp -R ../toolchain-build temp
+    - cargo run --example prep_toolchain_build
+    - cp ../../Cargo.lock temp/toolchain-build/Cargo.lock
+    - cd temp/toolchain-build && cargo check
+    - cd temp/toolchain-build && cargo clean
+
+  copy-megaton-cmd:
+    - rm -rf temp/megaton-cmd
+    - cp -R ../cli temp && mv temp/cli temp/megaton-cmd
+    - rm -f temp/megaton-cmd/*.tar.gz
+    - cargo run --example prep_megaton_cmd
+    - cp ../../Cargo.lock temp/megaton-cmd/Cargo.lock
+    - cd temp/megaton-cmd && cargo check
+    - cd temp/megaton-cmd && cargo clean
+
+  curl-rustup-init:
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > temp/rustup-init.sh
+
+  clean:
+    - rm -rf temp/*
+    - mkdir -p temp
