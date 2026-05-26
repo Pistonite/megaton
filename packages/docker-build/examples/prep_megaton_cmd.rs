@@ -14,7 +14,7 @@ fn main() -> cu::Result<()> {
     let isolated_manifest =
     cu::check!(
     megaton_toolchain_build::create_isolated_cargo_manifest_with_deps_removed(&manifest_path, None, [
-            "megaton-cli-build"
+            "megaton-cli-build",
         ]),
         "failed to create isolated manifest for megaton-cmd"
     )?;

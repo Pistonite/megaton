@@ -1,4 +1,5 @@
 FROM devkitpro/devkita64
+
 # Install Rust (host)
 RUN mkdir /opt/rustup
 COPY temp/rustup-init.sh /opt/rustup/rustup-init.sh
@@ -23,7 +24,14 @@ RUN cargo run \
 # Install megaton-cmd
 COPY temp/megaton-cmd /opt/megaton/megaton-cmd
 RUN cargo install \
-    --path /opt/megaton/megaton-cmd/Cargo.toml \
+    --path /opt/megaton/megaton-cmd \
     --locked && \
+    rm -rf /opt/megaton/megaton-cmd/target && \
+    echo '==> $ megaton --version' && \
     megaton --version && \
-    megaton toolchain check
+    echo '==> $ megaton toolchain check' && \
+    megaton toolchain check && \
+    echo '==> $ rustup toolchain list' && \
+    rustup toolchain list && \
+    echo '==> $ rustup +megaton target list --installed' && \
+    rustup +megaton target list --installed

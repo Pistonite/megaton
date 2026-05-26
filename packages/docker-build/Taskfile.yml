@@ -34,8 +34,7 @@ tasks:
     - cp -R ../toolchain-build temp
     - cargo run --example prep_toolchain_build
     - cp ../../Cargo.lock temp/toolchain-build/Cargo.lock
-    - cd temp/toolchain-build && cargo check
-    - cd temp/toolchain-build && cargo clean
+    - cd temp/toolchain-build && cargo metadata
 
   copy-megaton-cmd:
     - rm -rf temp/megaton-cmd
@@ -43,8 +42,7 @@ tasks:
     - rm -f temp/megaton-cmd/*.tar.gz
     - cargo run --example prep_megaton_cmd
     - cp ../../Cargo.lock temp/megaton-cmd/Cargo.lock
-    - cd temp/megaton-cmd && cargo check
-    - cd temp/megaton-cmd && cargo clean
+    - cd temp/megaton-cmd && cargo metadata
 
   curl-rustup-init:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > temp/rustup-init.sh
@@ -52,3 +50,5 @@ tasks:
   clean:
     - rm -rf temp/*
     - mkdir -p temp
+  docker-clean:
+    - task: docker:clean

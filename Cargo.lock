@@ -709,6 +709,7 @@ dependencies = [
  "flate2",
  "fxhash",
  "megaton-cli-build",
+ "megaton-toolchain-build",
  "pistonite-cu",
  "regex",
  "semver",

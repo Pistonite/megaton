@@ -3,7 +3,7 @@
 
 use megaton_cmd::cmds;
 
-#[cu::cli]
+#[cu::cli(preprocess=cmds::CmdMegaton::preprocess)]
 fn main(cmd: cmds::CmdMegaton) -> cu::Result<()> {
     cmds::main(cmd)
 }
