@@ -5,11 +5,20 @@ includes:
     taskfile: ../../mono-dev/task/docker.yaml
     internal: true
     optional: true
+  cargo: 
+    taskfile: ../../mono-dev/task/cargo.yaml
+    internal: true
+    optional: true
 
 vars:
   DOCKER_IMAGE: ghcr.io/pistonite/megaton-build
 
 tasks:
+  check:
+    - task: cargo:clippy-all
+    - task: cargo:fmt-check
+  fix:
+    - task: cargo:fmt-fix
   build:
     - task: prep-dockerfile
     - task: clean
@@ -17,6 +26,7 @@ tasks:
     - task: copy-toolchain-build
     - task: copy-megaton-cmd
     - task: docker:build
+    - docker run --rm {{.DOCKER_IMAGE}} sh /root/print-info.sh
 
   prep-dockerfile:
     vars:
@@ -50,5 +60,21 @@ tasks:
   clean:
     - rm -rf temp/*
     - mkdir -p temp
-  docker-clean:
+
+  nuke:
+    # this doesn't remove dangling images, which contain cache for building
+    # the rust toolchain. When removed building will take very long!
     - task: docker:clean
+
+  publish:
+    vars:
+      TAG_VERSION:
+        sh: grep -E ^version ../cli/Cargo.toml | head -n1 | sed -E 's/^version\s*=\s"([^"]+)"$/v\1/'
+      TAG_COMMIT:
+        sh: echo "sha-$(git rev-parse --short=7 HEAD)"
+    cmds:
+      - docker tag {{.DOCKER_IMAGE}}:latest {{.DOCKER_IMAGE}}:{{.TAG_VERSION}}
+      - docker tag {{.DOCKER_IMAGE}}:latest {{.DOCKER_IMAGE}}:{{.TAG_COMMIT}}
+      - docker push {{.DOCKER_IMAGE}}:latest
+      - docker push {{.DOCKER_IMAGE}}:{{.TAG_VERSION}}
+      - docker push {{.DOCKER_IMAGE}}:{{.TAG_COMMIT}}

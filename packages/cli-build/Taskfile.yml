@@ -12,5 +12,3 @@ tasks:
     - task: cargo:fmt-check
   fix:
     - task: cargo:fmt-fix
-  build:
-    - cargo build
