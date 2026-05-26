@@ -1,4 +1,5 @@
 FROM devkitpro/devkita64
+LABEL org.opencontainers.image.source=https://github.com/Pistonite/megaton
 
 # Install Rust (host)
 RUN mkdir /opt/rustup
@@ -13,7 +14,9 @@ ENV PATH=/root/.cargo/bin:$PATH
 # not the main build tool package or the library
 ENV MEGATON_HOME=/opt/megaton
 COPY temp/toolchain-build /opt/megaton/toolchain-build
-RUN cargo run \
+# Also cache the rust build
+RUN --mount=type=cache,target=/opt/megaton/rust,id=megaton-docker-build-rust \
+  cargo run \
   --manifest-path /opt/megaton/toolchain-build/Cargo.toml \
   --example docker_install \
   --release \
@@ -27,4 +30,3 @@ RUN cargo install \
   rm -rf /opt/megaton/megaton-cmd/target
 
 COPY print-info.sh /root/print-info.sh
-LABEL org.opencontainers.image.source https://github.com/Pistonite/megaton

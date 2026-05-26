@@ -2,8 +2,8 @@
 
 "packages/cli/**/*.rs" = "MIT"
 "packages/cli-build/**/*.rs" = "MIT"
+"packages/docker-build/**/*.rs" = "MIT"
 
-# C files
 "packages/lib/src/megaton/*.s" = "GPL-3.0-or-later"
 "packages/lib/src/megaton/*.c" = "GPL-3.0-or-later"
 "packages/lib/src/megaton/*.cpp" = "GPL-3.0-or-later"
@@ -18,14 +18,14 @@
 "packages/lib/include/megaton/__internal/*.hpp" = "GPL-3.0-or-later"
 "packages/lib/include/megaton/__priv/*.h" = "GPL-3.0-or-later"
 "packages/lib/include/megaton/__priv/*.hpp" = "GPL-3.0-or-later"
+"packages/lib/**/*.rs" = "GPL-3.0-or-later"
+
 "packages/test-mod/src/*.cpp" = "GPL-3.0-or-later"
 "packages/test-mod/src/*.c" = "GPL-3.0-or-later"
 "packages/test-mod/include/*.h" = "GPL-3.0-or-later"
 "packages/test-mod/include/*.hpp" = "GPL-3.0-or-later"
-
-# Rust files
-"packages/lib/**/*.rs" = "GPL-3.0-or-later"
 "packages/test-mod/**/*.rs" = "GPL-3.0-or-later"
+
 "packages/toolchain-build/*.rs" = "MIT"
 
 # Unmodified files

@@ -73,7 +73,10 @@ pub fn install(home: &Path) -> cu::Result<()> {
             }
         }
     }
-    let cargo = cu::check!(cu::which("cargo"), "cargo is required to build cxxbridge; please install Rust")?;
+    let cargo = cu::check!(
+        cu::which("cargo"),
+        "cargo is required to build cxxbridge; please install Rust"
+    )?;
     // using home as root so the bin is installed to <home>/bin
     let command = cargo
         .command()

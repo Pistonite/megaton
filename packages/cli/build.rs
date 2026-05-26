@@ -24,8 +24,11 @@ fn main_internal() -> cu::Result<()> {
     let commit_hash = megaton_cli_build::get_commit()?;
     println!("cargo::rustc-env=MEGATON_COMMIT={commit_hash}");
     let packages_path = crate_path.parent_abs()?;
-    let info = cu::check!(megaton_cli_build::pack_library(&packages_path, &lib_output_path), "failed to pack library")?;
-    println!("cargo::rustc-env=MEGATON_LIB_SHA256={}",info.sha256);
+    let info = cu::check!(
+        megaton_cli_build::pack_library(&packages_path, &lib_output_path),
+        "failed to pack library"
+    )?;
+    println!("cargo::rustc-env=MEGATON_LIB_SHA256={}", info.sha256);
 
     Ok(())
 }

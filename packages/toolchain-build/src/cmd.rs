@@ -1,10 +1,15 @@
 use cu::pre::*;
 
-
 pub fn install(keep: bool, clean: bool) -> cu::Result<()> {
     let home = crate::home::get_megaton_home()?;
-    cu::check!(crate::cxxbridge::install(&home), "failed to install cxxbridge")?;
-    cu::check!(crate::rust_toolchain::install(&home, keep, clean), "failed to install rust toolchain")?;
+    cu::check!(
+        crate::cxxbridge::install(&home),
+        "failed to install cxxbridge"
+    )?;
+    cu::check!(
+        crate::rust_toolchain::install(&home, keep, clean),
+        "failed to install rust toolchain"
+    )?;
     Ok(())
 }
 
@@ -26,7 +31,10 @@ pub fn check() -> cu::Result<()> {
         }
         Ok(Some(info)) => {
             if info.version != crate::cxxbridge::BLESSED_VERSION {
-                cu::warn!("blessed version is newer: {}", crate::cxxbridge::BLESSED_VERSION);
+                cu::warn!(
+                    "blessed version is newer: {}",
+                    crate::cxxbridge::BLESSED_VERSION
+                );
                 needs_install = true;
             }
         }
@@ -44,8 +52,12 @@ pub fn check() -> cu::Result<()> {
             needs_install = true;
         }
         Ok(Some(info)) => {
-            if info.commit_hash.is_none_or(|x| x != crate::rust_toolchain::BLESSED_COMMIT) {
-                cu::warn!("blessed version is newer: {} ({})",
+            if info
+                .commit_hash
+                .is_none_or(|x| x != crate::rust_toolchain::BLESSED_COMMIT)
+            {
+                cu::warn!(
+                    "blessed version is newer: {} ({})",
                     crate::rust_toolchain::BLESSED_VERSION,
                     crate::rust_toolchain::BLESSED_COMMIT,
                 );
@@ -67,13 +79,19 @@ pub fn check() -> cu::Result<()> {
 
 pub fn remove() -> cu::Result<()> {
     let home = crate::home::get_megaton_home()?;
-    cu::check!(crate::cxxbridge::remove(&home), "failed to uninstall cxxbridge")?;
+    cu::check!(
+        crate::cxxbridge::remove(&home),
+        "failed to uninstall cxxbridge"
+    )?;
     cu::info!("uninstalled cxxbridge");
 
     if let Ok(None) = crate::rust_toolchain::check(false) {
         cu::info!("megaton rust toolchain is not installed.");
     } else {
-        cu::check!(crate::rust_toolchain::remove(&home), "failed to uninstall megaton rust toolchain")?;
+        cu::check!(
+            crate::rust_toolchain::remove(&home),
+            "failed to uninstall megaton rust toolchain"
+        )?;
         cu::info!("uninstalledk megaton rust toolchain");
     }
 
@@ -82,6 +100,9 @@ pub fn remove() -> cu::Result<()> {
 
 pub fn clean() -> cu::Result<()> {
     let home = crate::home::get_megaton_home()?;
-    cu::check!(crate::rust_toolchain::clean(&home), "failed to clean megaton rust toolchain")?;
+    cu::check!(
+        crate::rust_toolchain::clean(&home),
+        "failed to clean megaton rust toolchain"
+    )?;
     Ok(())
 }

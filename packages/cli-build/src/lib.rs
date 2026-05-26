@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Megaton contributors
+
 use std::fs::File;
 use std::path::Path;
 
@@ -56,7 +59,11 @@ pub fn pack_library(packages_path: &Path, output: &Path) -> cu::Result<PackLibra
         let manifest_path = packages_path.join("lib").join("Cargo.toml");
         let isolated_manifest = cu::check!(
             megaton_toolchain_build::create_isolated_cargo_manifest(
-            &manifest_path, Some(r#"["macros"]"#)), "failed to create isolated manifest for megaton library")?;
+                &manifest_path,
+                Some(r#"["macros"]"#)
+            ),
+            "failed to create isolated manifest for megaton library"
+        )?;
 
         let bytes = isolated_manifest.as_bytes();
         let mut header = tar::Header::new_gnu();

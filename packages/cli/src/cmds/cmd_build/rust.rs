@@ -82,7 +82,9 @@ impl RustCtx {
         };
 
         let blessed_version = cu::check!(
-Version::parse(megaton_toolchain_build::cxxbridge::BLESSED_VERSION),"unexpected: failed to parse blessed cxx version")?;
+            Version::parse(megaton_toolchain_build::cxxbridge::BLESSED_VERSION),
+            "unexpected: failed to parse blessed cxx version"
+        )?;
         if cxx.version < blessed_version {
             cu::bail!(
                 "cxx version is older than the supported version; supported: {}, found: {} ",

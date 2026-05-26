@@ -25,7 +25,7 @@ pub struct CmdMegaton {
     sub: Option<CmdMegatonSub>,
 
     /// Print the version
-    #[clap(short='V', long)]
+    #[clap(short = 'V', long)]
     version: bool,
 
     #[clap(flatten)]

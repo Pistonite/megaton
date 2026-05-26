@@ -48,8 +48,7 @@ impl CmdToolchain {
                 megaton_toolchain_build::cmd::check()
             }
             Self::Remove(_) => megaton_toolchain_build::cmd::remove(),
-            Self::Clean(_) => 
-            megaton_toolchain_build::cmd::clean(),
+            Self::Clean(_) => megaton_toolchain_build::cmd::clean(),
         }
     }
 }

@@ -18,7 +18,7 @@ pub fn get_megaton_home() -> cu::Result<PathBuf> {
 }
 
 pub fn get_bin_path(home: &Path, bin_name: &str) -> PathBuf {
-    let mut p =home.join("bin");
+    let mut p = home.join("bin");
     if cfg!(windows) {
         p.push(format!("{bin_name}.exe"));
     } else {

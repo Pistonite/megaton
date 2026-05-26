@@ -1,4 +1,3 @@
-
 use std::path::{Path, PathBuf};
 
 use cu::pre::*;
@@ -49,10 +48,14 @@ pub fn check(print: bool) -> cu::Result<Option<RustToolchainInfo>> {
 }
 
 pub fn install(home: &Path, keep: bool, mut clean: bool) -> cu::Result<()> {
-    cu::check!(cu::which("rustup")
-        ,"rustup is required to manage Rust toolchains. Please install Rust")?;
-    cu::check!(cu::which("rustc"),
-        "rustc is required to manage Rust toolchains. Please install Rust")?;
+    cu::check!(
+        cu::which("rustup"),
+        "rustup is required to manage Rust toolchains. Please install Rust"
+    )?;
+    cu::check!(
+        cu::which("rustc"),
+        "rustc is required to manage Rust toolchains. Please install Rust"
+    )?;
 
     // check current status
     match check(false) {
@@ -172,13 +175,11 @@ pub fn install(home: &Path, keep: bool, mut clean: bool) -> cu::Result<()> {
     let install_location = install_location(home);
     cu::fs::make_dir_empty(&install_location)?;
     let install_location = install_location.normalize_exists()?;
-    bootstrap_toml += &format!(
-        "install.prefix = '{}'\n",
-        install_location.as_utf8()?
-    );
+    bootstrap_toml += &format!("install.prefix = '{}'\n", install_location.as_utf8()?);
     bootstrap_toml += &format!(
         "install.sysconfdir = '{}'\n",
-        install_location .join("etc") .into_utf8()?);
+        install_location.join("etc").into_utf8()?
+    );
 
     // rust build configs
     bootstrap_toml += "rust.debug-logging = false\n";
@@ -241,8 +242,10 @@ pub fn install(home: &Path, keep: bool, mut clean: bool) -> cu::Result<()> {
         .wait_nz()
         .context("failed to link built toolchain")?;
 
-    let toolchain_info = cu::check!(check(true)
-        ,"failed to get toolchain, installation might have failed.")?;
+    let toolchain_info = cu::check!(
+        check(true),
+        "failed to get toolchain, installation might have failed."
+    )?;
     let toolchain_info = cu::check!(
         toolchain_info,
         "failed to get toolchain, installation might have failed."
@@ -301,7 +304,7 @@ pub fn clean(home: &Path) -> cu::Result<()> {
     let rust_path = source_location(home);
     if !rust_path.exists() {
         cu::info!("rust repo is already removed");
-        return Ok(())
+        return Ok(());
     }
     let _bar = cu::progress("removing rust repo");
     if let Err(e) = cu::fs::rec_remove(rust_path) {
