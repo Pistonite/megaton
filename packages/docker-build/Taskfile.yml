@@ -1,6 +1,10 @@
 version: '3'
 
 includes:
+  builder:
+    taskfile: ./builder
+    dir: ./builder
+    internal: true
   docker:
     taskfile: ../../mono-dev/task/docker.yaml
     internal: true
@@ -19,52 +23,57 @@ tasks:
     - task: cargo:fmt-check
   fix:
     - task: cargo:fmt-fix
-  build:
-    - task: prep-dockerfile
-    - task: clean
-    - task: curl-rustup-init
-    - task: copy-toolchain-build
-    - task: copy-megaton-cmd
-    - task: docker:build
-    - docker run --rm {{.DOCKER_IMAGE}} sh /root/print-info.sh
 
-  prep-dockerfile:
+  build:
+    cmds:
+      - task: clean
+      - task: copy-toolchain-build
+      - task: copy-megaton-cmd
+      - task: builder:build
+      - task: build-w-builder
+
+  build-w-builder:
     vars:
+      GCC_VERSION:
+        sh: head builder/temp/gcc-version.txt -n1 | sed -E 's/^gcc[^)]+\) ([0-9]+\.[0-9]+\.[0-9]+).*$/\1/'
       RUST_VERSION:
         sh: rustc -V | sed -E 's/rustc ([^ ]+) .*$/\1/'
     cmds:
-      - cmd: >
-          if ! grep {{.RUST_VERSION}} Dockerfile; then
-            echo "Rust version in Dockerfile mismatch with current Rust version" && exit 2
-          fi
-        silent: true
+      - task: docker:build
+        vars:
+          ARGS: --build-arg GCC_VERSION={{.GCC_VERSION}} --build-arg RUST_VERSION={{.RUST_VERSION}}
+      - task: build-info
+  
+  build-info:
+    # task bug that doesn't read the DOCKER_IMAGE var correctly?
+    - docker run --rm ghcr.io/pistonite/megaton-build sh /root/print-info.sh > temp/info.txt
+    - cat temp/info.txt
+    - cat readme-header.md > README.md
+    - cat temp/info.txt >> README.md
+    - echo '```' >> README.md
 
   copy-toolchain-build:
     - rm -rf temp/toolchain-build
     - cp -R ../toolchain-build temp
-    - cargo run --example prep_toolchain_build
+    - cargo run --example prep_toolchain_build --quiet
     - cp ../../Cargo.lock temp/toolchain-build/Cargo.lock
-    - cd temp/toolchain-build && cargo metadata
+    - cd temp/toolchain-build && cargo metadata --quiet > ../toolchain-build.metadata.json
 
   copy-megaton-cmd:
     - rm -rf temp/megaton-cmd
     - cp -R ../cli temp && mv temp/cli temp/megaton-cmd
     - rm -f temp/megaton-cmd/*.tar.gz
-    - cargo run --example prep_megaton_cmd
+    - cargo run --example prep_megaton_cmd --quiet > temp/megaton-cmd.out # too noisy
     - cp ../../Cargo.lock temp/megaton-cmd/Cargo.lock
-    - cd temp/megaton-cmd && cargo metadata
-
-  curl-rustup-init:
-    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > temp/rustup-init.sh
+    - cd temp/megaton-cmd && cargo metadata --quiet > ../megaton-cmd.metadata.json
 
   clean:
     - rm -rf temp/*
     - mkdir -p temp
 
   nuke:
-    # this doesn't remove dangling images, which contain cache for building
-    # the rust toolchain. When removed building will take very long!
-    - task: docker:clean
+    - task: clean
+    - task: docker:nuke
 
   publish:
     vars:

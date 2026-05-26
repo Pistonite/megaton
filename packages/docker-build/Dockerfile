@@ -1,12 +1,8 @@
-FROM devkitpro/devkita64
+FROM local.sh/megaton-docker/builder
 LABEL org.opencontainers.image.source=https://github.com/Pistonite/megaton
 
-# Install Rust (host)
-RUN mkdir /opt/rustup
-COPY temp/rustup-init.sh /opt/rustup/rustup-init.sh
-RUN chmod +x /opt/rustup/rustup-init.sh && \
-  /opt/rustup/rustup-init.sh -y --default-toolchain 1.95.0 --no-modify-path
-ENV PATH=/root/.cargo/bin:$PATH
+ARG GCC_VERSION
+ARG RUST_VERSION
 
 # Install toolchain with megaton-toolchain-build
 # We are not using the main megaton command directly to install the toolchain
@@ -14,13 +10,16 @@ ENV PATH=/root/.cargo/bin:$PATH
 # not the main build tool package or the library
 ENV MEGATON_HOME=/opt/megaton
 COPY temp/toolchain-build /opt/megaton/toolchain-build
-# Also cache the rust build
-RUN --mount=type=cache,target=/opt/megaton/rust,id=megaton-docker-build-rust \
-  cargo run \
-  --manifest-path /opt/megaton/toolchain-build/Cargo.toml \
-  --example docker_install \
-  --release \
-  -- -v
+# Caching the rust directory for LLVM build
+# Caching cargo directory for cargo build
+RUN \
+--mount=type=cache,target=/opt/megaton/rust,id=megaton-docker-build-llvm-${GCC_VERSION} \
+--mount=type=cache,target=/root/.cargo/registry,id=megaton-docker-build-cargo-${RUST_VERSION} \
+cargo run \
+--manifest-path /opt/megaton/toolchain-build/Cargo.toml \
+--example docker_install \
+--release \
+-- -v
 
 # Install megaton-cmd
 COPY temp/megaton-cmd /opt/megaton/megaton-cmd
