@@ -17,7 +17,7 @@ This is free software; see the source for copying conditions.  There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 ==> $ megaton --version
-megaton v0.1.1 (128e302e)
+megaton v0.1.1 (3d002cb7)
 
 ==> $ megaton toolchain check
 I] checking cxxbridge installation...
