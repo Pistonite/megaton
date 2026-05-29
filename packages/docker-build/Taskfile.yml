@@ -88,6 +88,6 @@ tasks:
     cmds:
       - docker tag {{.DOCKER_IMAGE}}:latest {{.DOCKER_IMAGE}}:{{.TAG_VERSION}}
       - docker tag {{.DOCKER_IMAGE}}:latest {{.DOCKER_IMAGE}}:{{.TAG_COMMIT}}
-      - docker push {{.DOCKER_IMAGE}}:latest --all-tags
+      - docker push {{.DOCKER_IMAGE}} --all-tags
       - cmd: echo 'https://github.com/orgs/Pistonite/packages/container/package/megaton-build'
         silent: true
