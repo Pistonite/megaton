@@ -72,8 +72,11 @@ tasks:
     - mkdir -p temp
 
   nuke:
+    - task: builder:nuke
     - task: clean
     - task: docker:nuke
+      vars:
+        DOCKER_IMAGE: ghcr.io/pistonite/megaton-build
 
   publish:
     vars:
@@ -81,11 +84,10 @@ tasks:
         sh: grep -E ^version ../cli/Cargo.toml | head -n1 | sed -E 's/^version\s*=\s"([^"]+)"$/v\1/'
       TAG_COMMIT:
         sh: echo "sha-$(git rev-parse --short=7 HEAD)"
+      DOCKER_IMAGE: ghcr.io/pistonite/megaton-build
     cmds:
       - docker tag {{.DOCKER_IMAGE}}:latest {{.DOCKER_IMAGE}}:{{.TAG_VERSION}}
       - docker tag {{.DOCKER_IMAGE}}:latest {{.DOCKER_IMAGE}}:{{.TAG_COMMIT}}
-      - docker push {{.DOCKER_IMAGE}}:latest
-      - docker push {{.DOCKER_IMAGE}}:{{.TAG_VERSION}}
-      - docker push {{.DOCKER_IMAGE}}:{{.TAG_COMMIT}}
+      - docker push {{.DOCKER_IMAGE}}:latest --all-tags
       - cmd: echo 'https://github.com/orgs/Pistonite/packages/container/package/megaton-build'
         silent: true
