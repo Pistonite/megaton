@@ -42,13 +42,9 @@ impl Cmd {
             return Ok(());
         };
         match command {
-            CmdSubcommand::Build(cmd) => {
-                cu::co::run(async move { cmd.run().await })?;
-            }
+            CmdSubcommand::Build(cmd) => cmd.run()?,
+            CmdSubcommand::Toolchain(cmd) => cmd.run()?,
             CmdSubcommand::Version(_) => {},
-            CmdSubcommand::Toolchain(cmd) => {
-                cmd.run()?
-            }
         }
 
         Ok(())

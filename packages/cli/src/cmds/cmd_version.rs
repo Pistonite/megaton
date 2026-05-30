@@ -32,7 +32,7 @@ impl CmdVersion {
         // verbose mode, run env init which prints debugging info
         // for the environment
         cu::hint!("--- environment ---");
-        if let Err(e) = env::init_env() {
+        if let Err(e) = env::init() {
             cu::warn!("error while initializing environment: {e:?}");
         };
         cu::hint!("--- toolchain ---");

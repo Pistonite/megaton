@@ -17,7 +17,7 @@ pub fn get() -> &'static Environment {
 }
 
 /// Initialize the environment
-pub fn init_env() -> cu::Result<()> {
+pub fn init() -> cu::Result<()> {
     let megaton_home = megaton_toolchain_build::get_megaton_home()?;
 
     let devkitpro = cu::check!(cu::env_var("DEVKITPRO"), "DEVKITPRO environment variable not set; please ensure devkitpro is installed.")?;

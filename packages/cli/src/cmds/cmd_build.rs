@@ -1,7 +1,7 @@
 
 use cu::pre::*;
 
-use crate::buildsys::{self, BuildArgs};
+use crate::{buildsys::{self, BuildArgs}, env};
 
 /// The `build` subcommand
 #[derive(Debug, AsRef, clap::Parser)]
@@ -15,7 +15,8 @@ pub struct CmdBuild {
 }
 
 impl CmdBuild {
-    pub async fn run(self) -> cu::Result<()> {
-        buildsys::run(self.args).await
+    pub fn run(self) -> cu::Result<()> {
+        env::init()?;
+        cu::co::run(async move { buildsys::run(self.args).await })
     }
 }
