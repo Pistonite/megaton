@@ -22,7 +22,7 @@ tasks:
     - task: cargo:fmt-fix
 
   build:
-    - task: clean
+    - task: clean-temp
     - mkdir -p temp
     - mkdir -p builder/temp
     - task: curl-rustup-init
@@ -93,14 +93,17 @@ tasks:
     - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > builder/temp/rustup-init.sh
 
   clean:
-    - rm -rf temp/*
-    - rm -rf builder/temp/*
+    - task: clean-temp
     - task: docker:clean
       vars:
         DOCKER_IMAGE: '{{.MAIN_DOCKER_IMAGE}}'
     - task: docker:clean-image
       vars:
         DOCKER_IMAGE: '{{.BUILDER_DOCKER_IMAGE}}'
+
+  clean-temp:
+    - rm -rf temp/*
+    - rm -rf builder/temp/*
 
   publish:
     vars:
