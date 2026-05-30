@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Megaton contributors
+
 use cu::pre::*;
 
 pub fn install(keep: bool, clean: bool) -> cu::Result<()> {

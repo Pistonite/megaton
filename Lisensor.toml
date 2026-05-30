@@ -26,7 +26,7 @@
 "packages/test-mod/include/*.hpp" = "GPL-3.0-or-later"
 "packages/test-mod/**/*.rs" = "GPL-3.0-or-later"
 
-"packages/toolchain-build/*.rs" = "MIT"
+"packages/toolchain-build/**/*.rs" = "MIT"
 
 # Unmodified files
 # ["libnx Authors"]
