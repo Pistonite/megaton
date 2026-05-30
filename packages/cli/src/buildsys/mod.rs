@@ -15,9 +15,8 @@ mod config;
 mod link;
 mod rust;
 
-/// Compile and link the megaton project
-#[derive(Debug, Clone, AsRef, clap::Parser)]
-pub struct CmdBuild {
+#[derive(Debug, clap::Parser)]
+pub struct BuildArgs {
     /// Select profile to build
     ///
     /// See https://megaton-new.pistonite.dev/tutorial/profiles
@@ -32,19 +31,11 @@ pub struct CmdBuild {
     /// Specify the location of the config file
     #[clap(short = 'c', long, default_value = "Megaton.toml")]
     pub config: String,
-
-    #[clap(flatten)]
-    #[as_ref]
-    common: cu::cli::Flags,
 }
 
-impl CmdBuild {
-    pub async fn run(self) -> cu::Result<()> {
-        run_build(self).await
-    }
-}
 
-async fn run_build(args: CmdBuild) -> cu::Result<()> {
+
+pub async fn run(args: BuildArgs) -> cu::Result<()> {
     let env = env::get();
 
     ////////// Load config //////////
@@ -251,7 +242,7 @@ async fn run_build(args: CmdBuild) -> cu::Result<()> {
     Ok(())
 }
 
-static LIBRARY_TARGZ: &[u8] = include_bytes!("../../../libmegaton.tar.gz");
+static LIBRARY_TARGZ: &[u8] = include_bytes!("../../libmegaton.tar.gz");
 
 fn install_lib_if_needed(lib_path: &Path) -> cu::Result<()> {
     if lib_needs_unpacked(lib_path) {
@@ -289,7 +280,8 @@ fn unpack_lib(lib_path: &Path) -> cu::Result<()> {
 }
 
 async fn make_npdm_json(output_dir: &Path, title_id_hex: &str) -> cu::Result<()> {
-    let mut npdm_data: json::Value = json::parse(include_str!("../../../template.npdm.json"))?;
+    // FIXME TODO: can be inlined JSON object to eliminate a parse
+    let mut npdm_data: json::Value = json::parse(include_str!("../../template.npdm.json"))?;
     npdm_data["title_id"] = json!(format!("0x{}", title_id_hex));
 
     let main_npdm_json = output_dir.join("main.npdm.json");

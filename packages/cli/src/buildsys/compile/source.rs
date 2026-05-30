@@ -9,7 +9,8 @@ use std::{
 use cu::pre::*;
 
 use super::compile_db::CompileRecord;
-use crate::{cmds::cmd_build::config::Flags, env};
+use crate::buildsys::config::Flags;
+use crate::env;
 
 /// A source file and its corresponding artifacts
 #[derive(Debug, Clone)]
