@@ -1,9 +1,13 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Megaton contributors
 
 use cu::pre::*;
 
 use crate::env;
 use crate::config::{self, BASE_PROFILE, Flags};
-use crate::buildsys::{self, BuildArgs, rust, compile, link, check, miscfile};
+use crate::buildsys::{self, BuildArgs, compile, link, check, miscfile};
+use crate::buildsys::compile::CompileCtx;
+use crate::buildsys::rust::RustCtx;
 
 pub async fn run(args: BuildArgs) -> cu::Result<()> {
     let env = env::get();
@@ -66,7 +70,7 @@ pub async fn run(args: BuildArgs) -> cu::Result<()> {
 
 
     ////////// Build rust //////////
-    let rust_ctx = rust::RustCtx::from_config(config.cargo);
+    let rust_ctx = RustCtx::from_config(config.cargo);
     let rust_enabled = rust_ctx.is_some();
     if lib_enabled && let Some(rust_ctx) = rust_ctx {
         let rust_ctx =
@@ -125,7 +129,7 @@ pub async fn run(args: BuildArgs) -> cu::Result<()> {
         if rust_enabled {
             lib_flags.add_defines(["MEGART_RUST"]);
         }
-        let lib_ctx = compile::CompileCtx::new(
+        let lib_ctx = CompileCtx::new(
             vec![lib_unpack_path.join("src")],
             target_mod_o.clone(),
             lib_flags,
