@@ -10,8 +10,6 @@ cu = { workspace = true, features = ["fs"] }
 megaton-toolchain-build.path = "../toolchain-build"
 megaton-cli-build.path = "../cli-build"
 
-[[example]]
-name = "prep_toolchain_build"
-[[example]]
-name = "prep_megaton_cmd"
-
+[[bin]]
+name = "megaton-docker-build-preprocess"
+path = "preprocess.rs"

@@ -1,8 +1,10 @@
-FROM local.sh/megaton-docker/builder
+FROM megaton-docker/builder
 LABEL org.opencontainers.image.source=https://github.com/Pistonite/megaton
 
 ARG GCC_VERSION
 ARG RUST_VERSION
+
+COPY print-info.sh /root/print-info.sh
 
 # Install toolchain with megaton-toolchain-build
 # We are not using the main megaton command directly to install the toolchain
@@ -28,4 +30,3 @@ RUN cargo install \
   --locked && \
   rm -rf /opt/megaton/megaton-cmd/target
 
-COPY print-info.sh /root/print-info.sh
