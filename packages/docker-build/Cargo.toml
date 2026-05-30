@@ -1,0 +1,15 @@
+[package]
+name = "megaton-docker-build"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+cu = { workspace = true, features = ["fs"] }
+
+megaton-toolchain-build.path = "../toolchain-build"
+megaton-cli-build.path = "../cli-build"
+
+[[bin]]
+name = "megaton-docker-build-preprocess"
+path = "preprocess.rs"

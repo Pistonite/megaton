@@ -22,16 +22,26 @@ static LOGO: &str = r#"
 #[clap(before_help(LOGO))]
 pub struct CmdMegaton {
     #[clap(subcommand)]
-    sub: CmdMegatonSub,
+    sub: Option<CmdMegatonSub>,
 
     /// Print the version
-    #[clap(short, long)]
+    #[clap(short = 'V', long)]
     version: bool,
+
+    #[clap(flatten)]
+    flags: cu::cli::Flags,
 }
 
 impl AsRef<cu::cli::Flags> for CmdMegaton {
     fn as_ref(&self) -> &cu::cli::Flags {
-        self.sub.as_ref()
+        &self.flags
+    }
+}
+impl CmdMegaton {
+    pub fn preprocess(&mut self) {
+        if let Some(command) = &self.sub {
+            self.flags.merge(command.as_ref());
+        }
     }
 }
 
@@ -58,14 +68,19 @@ impl AsRef<cu::cli::Flags> for CmdMegatonSub {
 
 /// Main entry point to running the `megaton` command
 pub fn main(cmd: CmdMegaton) -> cu::Result<()> {
-    if cmd.version || matches!(cmd.sub, CmdMegatonSub::Version(_)) {
+    if cmd.version || matches!(cmd.sub, Some(CmdMegatonSub::Version(_))) {
         print_version();
         return Ok(());
     }
+    let Some(sub) = cmd.sub else {
+        cu::cli::print_help::<CmdMegaton>(false);
+        cu::lv::disable_print_time();
+        return Ok(());
+    };
     // safety: program is single threaded at this point
     unsafe { env::init_env()? };
 
-    match cmd.sub {
+    match sub {
         CmdMegatonSub::Version(_) => unreachable!(),
         // Start of async
         CmdMegatonSub::Build(cmd) => cu::co::run(async move { cmd.run().await }),

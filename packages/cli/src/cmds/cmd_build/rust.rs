@@ -9,7 +9,7 @@ use std::{
 use cargo_metadata::{MetadataCommand, semver::Version};
 use cu::pre::*;
 
-use crate::{BLESSED_CXX_VERSION, env::environment};
+use crate::env::environment;
 
 use super::config::CargoConfig;
 
@@ -81,7 +81,10 @@ impl RustCtx {
             }
         };
 
-        let blessed_version = Version::parse(BLESSED_CXX_VERSION).unwrap();
+        let blessed_version = cu::check!(
+            Version::parse(megaton_toolchain_build::cxxbridge::BLESSED_VERSION),
+            "unexpected: failed to parse blessed cxx version"
+        )?;
         if cxx.version < blessed_version {
             cu::bail!(
                 "cxx version is older than the supported version; supported: {}, found: {} ",

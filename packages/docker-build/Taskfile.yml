@@ -1,0 +1,122 @@
+version: '3'
+
+includes:
+  docker:
+    taskfile: ../../mono-dev/task/docker.yaml
+    internal: true
+    optional: true
+  cargo: 
+    taskfile: ../../mono-dev/task/cargo.yaml
+    internal: true
+    optional: true
+
+vars:
+  MAIN_DOCKER_IMAGE: ghcr.io/pistonite/megaton-build
+  BUILDER_DOCKER_IMAGE: megaton-docker/builder
+
+tasks:
+  check:
+    - task: cargo:clippy-all
+    - task: cargo:fmt-check
+  fix:
+    - task: cargo:fmt-fix
+
+  build:
+    - task: clean-temp
+    - mkdir -p temp
+    - mkdir -p builder/temp
+    - task: curl-rustup-init
+    - task: prep-crates
+    - task: build-builder
+    - task: build-main-image
+    - task: build-info
+
+  build-builder:
+    internal: true
+    vars:
+      RUST_VERSION:
+        sh: rustc -V | sed -E 's/rustc ([^ ]+) .*$/\1/'
+    cmds:
+      - task: docker:build
+        vars:
+          DOCKER_IMAGE: '{{.BUILDER_DOCKER_IMAGE}}'
+          ARGS: --build-arg RUST_VERSION={{.RUST_VERSION}}
+          DIR: builder
+      - task: docker:run-rm
+        vars:
+          DOCKER_IMAGE: '{{.BUILDER_DOCKER_IMAGE}}'
+          COMMAND: sh /root/builder-info.sh > temp/gcc-version.txt
+
+
+  build-main-image:
+    internal: true
+    vars:
+      GCC_VERSION:
+        sh: head temp/gcc-version.txt -n1 | sed -E 's/^gcc[^)]+\) ([0-9]+\.[0-9]+\.[0-9]+).*$/\1/'
+      RUST_VERSION:
+        sh: rustc -V | sed -E 's/rustc ([^ ]+) .*$/\1/'
+    cmds:
+      - task: docker:build
+        vars:
+          DOCKER_IMAGE: '{{.MAIN_DOCKER_IMAGE}}'
+          ARGS: --build-arg GCC_VERSION={{.GCC_VERSION}} --build-arg RUST_VERSION={{.RUST_VERSION}}
+  
+  build-info:
+    - task: docker:run-rm
+      vars:
+        COMMAND: sh /root/print-info.sh > temp/info.txt
+        DOCKER_IMAGE: '{{.MAIN_DOCKER_IMAGE}}'
+    - cat temp/info.txt
+    - cat readme-header.md > README.md
+    - cat temp/info.txt >> README.md
+    - echo '```' >> README.md
+
+  prep-crates:
+    internal: true
+    desc: Prepare crates by copying them to temp/ and creating isolated manifests and build scripts
+    cmds:
+      # clean up
+      - rm -rf temp/toolchain-build temp/megaton-cmd
+      # copy sources and clean up potential artifacts in the source dirs
+      - cp -R ../toolchain-build temp
+      - cp -R ../cli temp && mv temp/cli temp/megaton-cmd
+      - rm -f temp/megaton-cmd/*.tar.gz
+      # create isolated manifest and build script
+      - cargo run --bin megaton-docker-build-preprocess > temp/preprocess.out # too noisy due to reusing build-script code
+      # refresh lock files to stay updated with the repo
+      - cp ../../Cargo.lock temp/toolchain-build/Cargo.lock
+      - cp ../../Cargo.lock temp/megaton-cmd/Cargo.lock
+      - cd temp/toolchain-build && cargo metadata --quiet > ../toolchain-build.metadata.json
+      - cd temp/megaton-cmd && cargo metadata --quiet > ../megaton-cmd.metadata.json
+
+  curl-rustup-init:
+    - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > builder/temp/rustup-init.sh
+
+  clean:
+    - task: clean-temp
+    - task: docker:clean
+      vars:
+        DOCKER_IMAGE: '{{.MAIN_DOCKER_IMAGE}}'
+    - task: docker:clean-image
+      vars:
+        DOCKER_IMAGE: '{{.BUILDER_DOCKER_IMAGE}}'
+
+  clean-temp:
+    - rm -rf temp/*
+    - rm -rf builder/temp/*
+
+  publish:
+    vars:
+      TAG_VERSION:
+        sh: grep -E ^version ../cli/Cargo.toml | head -n1 | sed -E 's/^version\s*=\s"([^"]+)"$/v\1/'
+      TAG_COMMIT:
+        sh: echo "sha-$(git rev-parse --short=7 HEAD)"
+      DOCKER_IMAGE: '{{.MAIN_DOCKER_IMAGE}}'
+    cmds:
+      - docker tag {{.DOCKER_IMAGE}}:latest {{.DOCKER_IMAGE}}:{{.TAG_VERSION}}
+      - docker tag {{.DOCKER_IMAGE}}:latest {{.DOCKER_IMAGE}}:{{.TAG_COMMIT}}
+      - docker push {{.DOCKER_IMAGE}}:latest
+      - docker push {{.DOCKER_IMAGE}}:{{.TAG_VERSION}}
+      - docker push {{.DOCKER_IMAGE}}:{{.TAG_COMMIT}}
+      - cmd: echo 'https://github.com/orgs/Pistonite/packages/container/package/megaton-build'
+        silent: true
