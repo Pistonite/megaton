@@ -13,7 +13,10 @@ pub struct BuildArgs {
     #[clap(short = 'g', long)]
     pub configure: bool,
 
-    /// Specify the location of the config file
-    #[clap(short = 'c', long, default_value = "Megaton.toml")]
-    pub config: String,
+    /// Specify the location of the Metagon.toml config file
+    ///
+    /// By default, the first Megaton.toml found in the current paths and its ancestors
+    /// is used.
+    #[clap(short = 'c', long)]
+    pub config: Option<String>,
 }

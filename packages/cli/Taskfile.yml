@@ -15,3 +15,5 @@ tasks:
     - task: cargo:fmt-fix
   build:
     - cargo build
+  test:
+    - cargo test

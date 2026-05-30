@@ -3,7 +3,7 @@ version: '3'
 tasks:
   build:
     cmds:
-     - cargo run -p megaton-cmd --bin megaton -- build
+     - cargo run -p megaton-cmd --bin megaton -- build -vv
 
   # this is to upload the mod to console via ftp
   upload:

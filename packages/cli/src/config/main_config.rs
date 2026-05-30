@@ -1,37 +1,46 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025-2026 Megaton contributors
 
+
 //! Config structures
 use std::path::{Path, PathBuf};
 
 use cu::pre::*;
-use semver::{Version, VersionReq};
+use semver::VersionReq;
+
+use crate::config::util;
 
 use super::{BASE_PROFILE, Build, CaptureUnused, ExtendProfile, Profile, Validate, ValidateCtx};
 
-/// Load a Megaton.toml config file
-pub fn load_config(manifest_path: impl AsRef<Path>) -> cu::Result<Config> {
-    let cwd = PathBuf::from(".").normalize().unwrap();
-    let ancestors = cwd.ancestors();
-
-    for path in ancestors {
-        let p = PathBuf::from(path).join(&manifest_path).normalize();
-        match p {
-            Ok(p) => {
-                if p.exists() {
-                    std::env::set_current_dir(p.parent().unwrap())
-                        .expect("Could not open megaton project root");
-                    let content = cu::fs::read_string(p)?;
-                    let config = toml::parse::<Config>(&content)
-                        .context("Failed to parse Megaton config")?;
-                    config.validate_root()?;
-                    return Ok(config);
-                }
-            }
-            Err(_) => continue,
-        }
+/// Get the root path of the project
+pub fn get_root_and_manifest(manifest_path: Option<&str>) -> cu::Result<(PathBuf, PathBuf)> {
+    if let Some(p) = manifest_path {
+        let manifest_path = Path::new(p).normalize()?;
+        let root = manifest_path.parent_abs()?;
+        return Ok((root, manifest_path));
     }
-    cu::bail!("Failed to find Megaton config");
+    let cwd = PathBuf::from(".").normalize()?;
+    for path in cwd.ancestors() {
+        let manifest_path = PathBuf::from(path).join("Megaton.toml").normalize();
+        let Ok(manifest_path) = manifest_path else {
+            continue;
+        };
+        if !manifest_path.exists() {
+            continue;
+        }
+        let root = path.normalize()?;
+        return Ok((root, manifest_path));
+    }
+    cu::bail!("failed to determine root of project; please ensure Megaton.toml exists");
+}
+
+/// Load a Megaton.toml config file
+pub fn load(path: &Path) -> cu::Result<Config> {
+    let content = cu::fs::read_string(path)?;
+    let config = cu::check!(toml::parse::<Config>(&content),
+        "failed to parse Megaton config")?;
+    config.validate_root()?;
+    return Ok(config);
 }
 
 /// Config data read from Megaton.toml
@@ -162,23 +171,10 @@ pub struct MegatonConfig {
 impl Validate for MegatonConfig {
     fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
         if let Some(v) = &self.version {
-            check_version(v)?
+            util::check_megaton_version_requirement(v)?
         }
         self.unused.validate(ctx)
     }
-}
-
-fn check_version(version_req: &VersionReq) -> cu::Result<()> {
-    let true_version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
-    if !version_req.matches(&true_version) {
-        cu::error!(
-            "Version check: version {} does not match requirement {}",
-            true_version,
-            version_req
-        );
-        cu::bail!("Version check failed");
-    }
-    Ok(())
 }
 
 impl MegatonConfig {
@@ -212,13 +208,13 @@ pub struct Module {
     pub title_id: u64,
 
     /// The target directory to put build files
-    #[serde(default = "default_target")]
-    pub target: PathBuf,
+    #[serde(default = "Module::default_target")]
+    target: PathBuf,
 
     /// The compile_commands.json file to put/update compile commands
     /// for other tools like clangd
-    #[serde(default = "default_comp_commands")]
-    pub compdb: PathBuf,
+    #[serde(default = "Module::default_comp_commands")]
+    compdb: PathBuf,
 
     #[serde(flatten, default)]
     unused: CaptureUnused,
@@ -238,7 +234,7 @@ impl Validate for Module {
             .any(|c| !c.is_alphanumeric() && c != '-' && c != '_')
         {
             cu::bail!(
-                "'{}' is not a valid module name (must only contain alphanumeric characters, - or _",
+                "'{}' is not a valid module name (must only contain alphanumeric characters, - or _)",
                 self.name
             );
         }
@@ -251,15 +247,20 @@ impl Module {
     pub fn title_id_hex(&self) -> String {
         format!("{:016x}", self.title_id)
     }
+    pub fn target_path(&self, root: &Path) -> PathBuf {
+        root.join(&self.target)
+    }
+    fn default_target() -> PathBuf {
+        "target".into()
+    }
+    pub fn compdb_path(&self, root: &Path) -> PathBuf {
+        root.join(&self.compdb)
+    }
+    fn default_comp_commands() -> PathBuf {
+        "compile_commands.json".into()
+    }
 }
 
-fn default_target() -> PathBuf {
-    PathBuf::from("target")
-}
-
-fn default_comp_commands() -> PathBuf {
-    PathBuf::from("compile_commands.json")
-}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProfileConfig {

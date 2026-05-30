@@ -6,10 +6,13 @@ use std::{
     sync::Arc,
 };
 
+mod source_type;
+use source_type::*;
+
 use compile_db::{CompileCommands, CompileCommandsEntry, CompileDB};
 use source::SourceStatus;
 
-use crate::config::Flags;
+use crate::{config::Flags, env::Environment};
 
 mod compile_db;
 mod source;
@@ -41,6 +44,7 @@ pub async fn compile_all(
     compile_db_path: &Path,
     compile_commands_path: &Path,
     configure_only: bool,
+    env: &'static Environment
 ) -> cu::Result<(bool, Vec<PathBuf>)> {
     // Get compile_db
     let mut compile_db = CompileDB::try_load_or_new(compile_db_path);
@@ -62,10 +66,10 @@ pub async fn compile_all(
 
     // Configure all sources and start compile tasks
     for ctx in contexts {
-        for src in source::scan(&ctx.source_paths) {
+        for src in source::scan(&ctx.source_paths)? {
             let record = compile_db.find_record(src.pathhash);
             let source_hash = src.pathhash;
-            match src.configure_compilation(&ctx.flags, &ctx.output_path, record)? {
+            match src.configure(&ctx.flags, &ctx.output_path, record, env)? {
                 SourceStatus::UpToDate(object) => {
                     if !configure_only {
                         cu::debug!("Compile: object up to date {}", &object.display());

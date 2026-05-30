@@ -1,50 +1,69 @@
 
-use std::path::Path;
-
 use cu::pre::*;
-use flate2::bufread::GzDecoder;
 
 use crate::env;
-use crate::config::{self, Flags};
-use crate::buildsys::{BuildArgs, rust, compile, link, check};
+use crate::config::{self, BASE_PROFILE, Flags};
+use crate::buildsys::{self, BuildArgs, rust, compile, link, check, miscfile};
 
 pub async fn run(args: BuildArgs) -> cu::Result<()> {
     let env = env::get();
 
     ////////// Load config //////////
-    let config = config::load_config(&args.config).context("Failed to load config")?;
+    let (root_path, manifest_path) = config::get_root_and_manifest(args.config.as_deref())?;
+
+    // FIXME: we don't want this - we want to resolve the right path with root and pass
+    // it to different parts of the build system. Otherwise it could bite us down the road
+    std::env::set_current_dir(&root_path)?;
+
+    let config = config::load(&manifest_path)?;
     let profile = config.profile.resolve(&args.profile)?;
+    if profile != BASE_PROFILE {
+        cu::info!("building profile '{profile}'");
+    }
     let build_config = config.build.get_profile(profile);
     let mut build_flags = Flags::from_config(&build_config.flags);
+    let target_path = {
+        let mut p = config.module.target_path(&root_path);
+        p.push("megaton");
+        p
+    };
     let lib_enabled = config.megaton.lib_enabled();
-    let profile_target = config.module.target.join("megaton").join(profile);
-    cu::fs::make_dir(&profile_target)?;
+    let lib_unpack_path = target_path.join("lib");
 
+    let lib_unpack_task =  {
+        let lib_unpack_path = lib_unpack_path.clone();
+        cu::co::spawn(async move {
+            if lib_enabled {
+                buildsys::unpack_megaton_lib(&lib_unpack_path).await?
+            }
+            cu::Ok(())
+        })
+    };
+    let profile_target_path = target_path.join(profile);
+    cu::fs::make_dir(&profile_target_path)?;
+    
     // Set up target paths
-    let profile_target = profile_target.normalize()?;
-    let target_mod = profile_target.join(&config.module.name);
+    // TODO: probably don't need to do them at this time?
+    let target_mod = profile_target_path.join(&config.module.name);
     let target_mod_src = target_mod.join("src");
     let target_mod_include = target_mod.join("include");
     let target_mod_o = target_mod.join("o");
     let compile_db_path = target_mod.join("compiledb.cache");
-    let target_lib = profile_target.join("lib");
     cu::fs::make_dir(&target_mod_src)?;
     cu::fs::make_dir(&target_mod_include)?;
     cu::fs::make_dir(&target_mod_o)?;
-
+    
     if !args.configure {
-        make_npdm_json(&target_mod, &config.module.title_id_hex()).await?;
+        miscfile::make_npdm(&target_mod, &config.module.title_id_hex()).await?;
     }
-
-    cu::debug!("Cmd_build: using profile {profile}");
-
+    
     let mut static_libs = vec![];
     let mut need_link = false;
+    
+    // TODO: overhaul the dependency graph to take advantage of async
+    lib_unpack_task.co_join().await??;
 
-    if lib_enabled {
-        cu::debug!("Cmd_build: libmegaton enabled");
-        install_lib_if_needed(&target_lib)?;
-    }
+
 
     ////////// Build rust //////////
     let rust_ctx = rust::RustCtx::from_config(config.cargo);
@@ -53,7 +72,7 @@ pub async fn run(args: BuildArgs) -> cu::Result<()> {
         let rust_ctx =
             rust_ctx.context("Rust is enabled, but cargo context could not be initialized")?;
         rust_ctx.check_cxx_version()?;
-
+    
         if !args.configure {
             need_link |= rust_ctx
                 .build(&build_flags.cargoflags, &build_flags.rustflags, false)
@@ -70,32 +89,32 @@ pub async fn run(args: BuildArgs) -> cu::Result<()> {
                 .build(&build_flags.cargoflags, &build_flags.rustflags, true)
                 .await?;
         }
-
+    
         need_link |= rust_ctx
             .gen_cxxbridge(&target_mod_src, &target_mod_include)
             .await
             .context("Failed to generate CXX interop files")?;
     }
-
+    
     ////////// Compile sources //////////
     build_flags.add_includes(env.dkp_includes());
-
+    
     let mut contexts = vec![];
-
+    
     // If libmegaton enabled, create library context
     if lib_enabled {
         // Add public library includes
-        build_flags.add_includes([target_lib.join("include").into_utf8()?]);
-
+        build_flags.add_includes([lib_unpack_path.join("include").into_utf8()?]);
+    
         let mut lib_flags = build_flags.clone();
-
+    
         // Add nnheaders includes
         lib_flags.add_includes([
             env.dkp_path().join("libnx").join("include").into_utf8()?, // TODO: remove this
-            target_lib.join("nnheaders").join("include").into_utf8()?,
+            lib_unpack_path.join("nnheaders").join("include").into_utf8()?,
         ]);
-        cu::hint!("TODO: remove libnx includes");
-
+        // cu::hint!("TODO: remove libnx includes");
+    
         lib_flags.add_defines([
             "MEGATON_LIB",
             &format!("MEGART_NX_MODULE_NAME=\"{}\"", &config.module.name),
@@ -107,13 +126,13 @@ pub async fn run(args: BuildArgs) -> cu::Result<()> {
             lib_flags.add_defines(["MEGART_RUST"]);
         }
         let lib_ctx = compile::CompileCtx::new(
-            vec![target_lib.join("src")],
+            vec![lib_unpack_path.join("src")],
             target_mod_o.clone(),
             lib_flags,
         );
         contexts.push(lib_ctx);
     }
-
+    
     // Create module context
     let mut build_includes = vec![
         target_mod_include.into_utf8()?, // cxxbridge includes
@@ -121,63 +140,64 @@ pub async fn run(args: BuildArgs) -> cu::Result<()> {
     for include in build_config.includes {
         build_includes.push(include.normalize_exists()?.into_utf8()?);
     }
-
+    
     let mut build_sources = vec![
         target_mod_src, // cxxbridge src
     ];
     for source in build_config.sources {
         build_sources.push(source.normalize_exists()?);
     }
-
+    
     let mut module_flags = build_flags.clone();
     module_flags.add_includes(build_includes);
-
+    
     let mod_ctx = compile::CompileCtx::new(build_sources, target_mod_o.clone(), module_flags);
     contexts.push(mod_ctx);
-
+    
     // Compile both contexts
-    let compile_commands_path = config.module.compdb.normalize()?;
+    let compile_commands_path = config.module.compdb_path(&root_path);
     let (compiled, mut objects) = compile::compile_all(
         &contexts,
         &compile_db_path,
         &compile_commands_path,
         args.configure,
+        env
     )
     .await?;
     need_link |= compiled;
-
+    
     ////////// Link & Check //////////
     if args.configure {
         cu::info!("Configured build");
         return Ok(());
     }
-
+    
     let mut libpaths = vec![];
     for libpath in build_config.libpaths {
         libpaths.push(libpath.normalize_exists()?.into_utf8()?);
     }
     build_flags.add_libpaths(libpaths);
-
+    
     let mut ldscripts = vec![];
     if lib_enabled {
-        ldscripts.push(profile_target.join("lib").join("link.ld").into_utf8()?);
+        ldscripts.push(lib_unpack_path.join("link.ld").into_utf8()?);
     }
     for ldscript in build_config.ldscripts {
         ldscripts.push(ldscript.normalize_exists()?.into_utf8()?);
     }
-
+    
     let verfile_path = target_mod.join("verfile");
     let entry = config.megaton.entry_point();
-    make_verfile(&verfile_path, entry)?;
+    miscfile::make_verfile(&verfile_path, entry)?;
     build_flags.set_init(entry);
     build_flags.set_version_script(verfile_path.into_utf8()?);
     build_flags.add_ldscripts(ldscripts);
     build_flags.add_libraries(build_config.libraries);
-
+    
     for obj in build_config.objects {
         objects.push(obj.normalize_exists()?);
     }
-
+    
     let elf_path = target_mod.join(format!("{}.elf", config.module.name));
     let linked = link::build_elf(
         need_link,
@@ -188,7 +208,7 @@ pub async fn run(args: BuildArgs) -> cu::Result<()> {
         &target_mod.join("linkcmd.cache"),
     )
     .await?;
-
+    
     let nso_path = target_mod.join(format!("{}.nso", config.module.name));
     if linked || !nso_path.exists() {
         // TODO: check while building nso, delete nso afterwards if check fails
@@ -211,88 +231,9 @@ pub async fn run(args: BuildArgs) -> cu::Result<()> {
     } else {
         cu::info!("Up to date")
     }
-
+    
     Ok(())
 }
 
-static LIBRARY_TARGZ: &[u8] = include_bytes!("../../libmegaton.tar.gz");
 
-fn install_lib_if_needed(lib_path: &Path) -> cu::Result<()> {
-    if lib_needs_unpacked(lib_path) {
-        cu::hint!("Installing libmegaton");
-        unpack_lib(lib_path).context("Failed to unpack library archive")?;
-    }
-    Ok(())
-}
 
-/// True if version hash doesn't exist or doesn't match the stored tarball
-fn lib_needs_unpacked(lib_path: &Path) -> bool {
-    let lib_hash_file = lib_path.join(".hash");
-    if !lib_hash_file.exists() {
-        return true;
-    }
-    let Ok(existing_lib_hash) = cu::fs::read(lib_hash_file) else {
-        return true;
-    };
-
-    env!("MEGATON_LIB_SHA256").as_bytes() != existing_lib_hash
-}
-
-/// Deletes contents of dir and unpacks the library from the stored tarball
-fn unpack_lib(lib_path: &Path) -> cu::Result<()> {
-    let library_tar = GzDecoder::new(LIBRARY_TARGZ);
-    let mut library_archive = tar::Archive::new(library_tar);
-    if lib_path.exists() {
-        cu::fs::remove_contents(lib_path)?;
-    }
-    library_archive.unpack(lib_path)?;
-    let lib_hash_file = lib_path.join(".hash");
-    cu::fs::write(lib_hash_file, env!("MEGATON_LIB_SHA256").as_bytes())?;
-
-    Ok(())
-}
-
-async fn make_npdm_json(output_dir: &Path, title_id_hex: &str) -> cu::Result<()> {
-    // FIXME TODO: can be inlined JSON object to eliminate a parse
-    let mut npdm_data: json::Value = json::parse(include_str!("../../template.npdm.json"))?;
-    npdm_data["title_id"] = json!(format!("0x{}", title_id_hex));
-
-    let main_npdm_json = output_dir.join("main.npdm.json");
-    let main_npdm = output_dir.join("main.npdm");
-
-    cu::fs::write_json_pretty(&main_npdm_json, &npdm_data)?;
-
-    env::get()
-        .npdmtool()
-        .command()
-        .add(cu::args![&main_npdm_json, &main_npdm])
-        .all_null()
-        .co_wait_nz()
-        .await?;
-
-    cu::info!("Created npdm: {}", main_npdm.try_to_rel().display());
-    Ok(())
-}
-
-fn make_verfile(path: &Path, entry: &str) -> cu::Result<()> {
-    let verfile_before = "{\n\tglobal:\n\n";
-    let verfile_after = ";\n\tlocal: *;\n};";
-    let verfile_data = format!("{}{}{}", verfile_before, entry, verfile_after);
-    if write_if_changed(path, verfile_data.as_bytes())? {
-        cu::debug!("Cmd_build: updated verfile");
-    } else {
-        cu::debug!("Cmd_build: verfile up to date");
-    }
-    Ok(())
-}
-
-fn write_if_changed(path: &Path, bytes: &[u8]) -> cu::Result<bool> {
-    let changed = match cu::fs::read(path) {
-        Ok(existing) => existing != bytes,
-        Err(_) => true,
-    };
-    if changed {
-        cu::fs::write(path, bytes)?;
-    }
-    Ok(changed)
-}

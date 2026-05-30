@@ -14,6 +14,7 @@ jobs:
           tool-cargo-binstall: lisensor
           ccpp-cmake: true
       - run: task check-non-dkp
+      - run: task test
 
   build:
     runs-on: blacksmith-4vcpu-ubuntu-2404
