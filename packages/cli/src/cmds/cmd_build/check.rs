@@ -9,7 +9,7 @@ use std::{
 use cu::pre::*;
 use regex::Regex;
 
-use crate::env::environment;
+use crate::env;
 
 type Symbols = HashSet<String>;
 
@@ -70,7 +70,7 @@ async fn check_symbols(
     expected_symbols: Symbols,
     ignored_symbols: &[String],
 ) -> cu::Result<Vec<String>> {
-    let (child, stdout_handle) = environment()
+    let (child, stdout_handle) = env::get()
         .objdump()
         .command()
         .arg("-T")
@@ -128,7 +128,7 @@ async fn check_instructions(
     elf: &Path,
     disallowed_instructions: &[String],
 ) -> cu::Result<Vec<String>> {
-    let (child, stdout_handle) = environment()
+    let (child, stdout_handle) = env::get()
         .objdump()
         .command()
         .arg("-d")

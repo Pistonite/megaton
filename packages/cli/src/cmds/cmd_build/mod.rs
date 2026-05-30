@@ -4,10 +4,9 @@
 use std::path::Path;
 
 use cu::pre::*;
-use derive_more::AsRef;
 use flate2::bufread::GzDecoder;
 
-use crate::env::environment;
+use crate::env;
 use config::Flags;
 
 mod check;
@@ -20,6 +19,8 @@ mod rust;
 #[derive(Debug, Clone, AsRef, clap::Parser)]
 pub struct CmdBuild {
     /// Select profile to build
+    ///
+    /// See https://megaton-new.pistonite.dev/tutorial/profiles
     #[clap(short, long, default_value = "none")]
     pub profile: String,
 
@@ -44,7 +45,7 @@ impl CmdBuild {
 }
 
 async fn run_build(args: CmdBuild) -> cu::Result<()> {
-    let env = environment();
+    let env = env::get();
 
     ////////// Load config //////////
     let config = config::load_config(&args.config).context("Failed to load config")?;
@@ -296,7 +297,7 @@ async fn make_npdm_json(output_dir: &Path, title_id_hex: &str) -> cu::Result<()>
 
     cu::fs::write_json_pretty(&main_npdm_json, &npdm_data)?;
 
-    environment()
+    env::get()
         .npdmtool()
         .command()
         .add(cu::args![&main_npdm_json, &main_npdm])

@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use cu::pre::*;
 
-use crate::env::environment;
+use crate::env;
 
 /// Link a list of artifacts into an elf file.
 pub async fn build_elf(
@@ -17,7 +17,7 @@ pub async fn build_elf(
     out_path: &Path,
     link_cmd_path: &Path,
 ) -> cu::Result<bool> {
-    let env = environment();
+    let env = env::get();
     let mut args = vec![];
 
     // sort so args are always comparable regardless of compilation order
@@ -89,7 +89,7 @@ impl LinkCmd {
 }
 
 pub async fn build_nso(elf_path: &Path, nso_path: &Path) -> cu::Result<()> {
-    let elf2nso = environment().elf2nso();
+    let elf2nso = env::get().elf2nso();
     let res = elf2nso
         .command()
         .args([elf_path, nso_path])

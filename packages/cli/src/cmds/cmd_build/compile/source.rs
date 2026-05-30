@@ -9,7 +9,7 @@ use std::{
 use cu::pre::*;
 
 use super::compile_db::CompileRecord;
-use crate::{cmds::cmd_build::config::Flags, env::environment};
+use crate::{cmds::cmd_build::config::Flags, env};
 
 /// A source file and its corresponding artifacts
 #[derive(Debug, Clone)]
@@ -172,7 +172,7 @@ impl SourceFile {
 
 impl Lang {
     fn get_compiler_path(&self) -> &Path {
-        let env = environment();
+        let env = env::get();
         match self {
             Lang::C => env.cc(),
             Lang::Cpp => env.cxx(),

@@ -9,15 +9,13 @@ publish = false
 
 [dependencies.cu]
 workspace = true
-features = ["cli", "process", "prompt", "toml", "json", "fs", "coroutine-heavy"]
+features = ["cli", "process", "prompt", "toml", "json", "fs", "coroutine-heavy", "derive"]
 
 [dependencies]
 serde = "1"
 tokio = "1"
 flate2.workspace = true
 tar.workspace = true
-derive_more = { version = "2.0.1", features = ["as_ref", "deref", "deref_mut"] }
-which = "8.0.0"
 walkdir = "2.5.0"
 fxhash = "0.2.1"
 depfile = "0.1.1"
