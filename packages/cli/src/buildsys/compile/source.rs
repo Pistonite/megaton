@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Megaton contributors
 
-use std:: path::{Path, PathBuf} ;
+use std::path::{Path, PathBuf};
 
 use cu::pre::*;
 
 use super::compile_db::CompileRecord;
 
 use crate::buildsys::compile::SourceType;
-use crate::env::Environment;
 use crate::config::Flags;
+use crate::env::Environment;
 
 /// A source file and its corresponding artifacts
 #[derive(Debug, Clone)]
@@ -28,20 +28,18 @@ pub enum SourceStatus {
     CompileNeeded(CompileRecord),
 }
 
-
-
 impl SourceFile {
     /// Returns a source file object, or None, if the given file is not a valid source
     /// i.e. the name cannot be parsed or the file extension is invalid
     fn from_path(path: PathBuf) -> Option<Self> {
-        // if path does not have extension or does not 
+        // if path does not have extension or does not
         let source_type = SourceType::from_extension(path.extension()?)?;
         let basename = match path.file_name()?.as_utf8() {
             Err(e) => {
                 cu::warn!("skipping source with non-utf8 name: {e}");
-                return None
+                return None;
             }
-            Ok(x) => x
+            Ok(x) => x,
         };
 
         Some(Self {
@@ -57,9 +55,8 @@ impl SourceFile {
         flags: &Flags,
         output_path: &Path,
         record: Option<&CompileRecord>,
-        env: &'static Environment
+        env: &'static Environment,
     ) -> cu::Result<SourceStatus> {
-
         let compiler = self.typ.get_compiler(env);
         // FIXME: clone() is expensive to do for every source file
         let mut args = self.typ.get_flags(flags).clone();
@@ -114,7 +111,7 @@ impl SourceFile {
         let d_path = self.get_d_path(output_path);
 
         // Check that artifacts exist
-        if !o_path.exists() || (!d_path.exists() && self.typ.uses_depfile() ) {
+        if !o_path.exists() || (!d_path.exists() && self.typ.uses_depfile()) {
             return Ok(false);
         }
 
@@ -165,14 +162,12 @@ impl SourceFile {
     }
 }
 
-
-
-pub fn scan(dirs: &[PathBuf]) -> cu::Result<impl Iterator<Item=SourceFile>> {
+pub fn scan(dirs: &[PathBuf]) -> cu::Result<impl Iterator<Item = SourceFile>> {
     cu::debug!("dirs to scan: {dirs:#?}");
     let mut walks = Vec::with_capacity(dirs.len());
     for dir in dirs {
         let walk = cu::check!(cu::fs::walk(dir), "failed to open source directory")?;
-        walks.push(WalkIterAdapter{walk});
+        walks.push(WalkIterAdapter { walk });
     }
     struct WalkIterAdapter {
         walk: cu::fs::Walk,
@@ -198,4 +193,3 @@ pub fn scan(dirs: &[PathBuf]) -> cu::Result<impl Iterator<Item=SourceFile>> {
 
     Ok(walks.into_iter().flatten())
 }
-

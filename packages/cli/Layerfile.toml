@@ -1,7 +1,7 @@
 [crate]
 
 [layer.cmds]
-depends-on = ["buildsys", "config", "env"]
+depends-on = ["buildsys", "env"]
 [layer.buildsys]
 depends-on = ["config", "env"]
 [layer.config]

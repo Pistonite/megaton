@@ -9,10 +9,12 @@ pub struct CmdToolchain {
     #[clap(subcommand)]
     command: CmdToolchainSubcommand,
 }
-impl CmdToolchain{
+impl CmdToolchain {
     pub fn run(self) -> cu::Result<()> {
         match self.command {
-            CmdToolchainSubcommand::Install { keep, clean, .. } => megaton_toolchain_build::cmd::install(keep, clean),
+            CmdToolchainSubcommand::Install { keep, clean, .. } => {
+                megaton_toolchain_build::cmd::install(keep, clean)
+            }
             CmdToolchainSubcommand::Remove(_) => megaton_toolchain_build::cmd::remove(),
             CmdToolchainSubcommand::Clean(_) => megaton_toolchain_build::cmd::clean(),
         }
@@ -27,7 +29,6 @@ impl AsRef<cu::cli::Flags> for CmdToolchain {
         }
     }
 }
-
 
 #[derive(Debug, clap::Subcommand)]
 enum CmdToolchainSubcommand {
@@ -50,4 +51,3 @@ enum CmdToolchainSubcommand {
     /// Remove artifacts from building Rust compiler
     Clean(cu::cli::Flags),
 }
-

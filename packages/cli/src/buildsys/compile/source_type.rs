@@ -7,7 +7,6 @@ use std::path::Path;
 use crate::config::Flags;
 use crate::env::Environment;
 
-
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SourceType {
     C,
@@ -18,21 +17,18 @@ pub enum SourceType {
 impl SourceType {
     pub fn from_extension(ext: &OsStr) -> Option<Self> {
         match ext.as_encoded_bytes() {
-            [ b'c' | b'C' ] => Some(Self::C),
-            [ b'c' | b'C', b'p' | b'P', b'p' | b'P' ]|
-            [ b'c' | b'C', b'+', b'+' ]|
-            [ b'c' | b'C', b'x' | b'X', b'x' | b'X' ]|
-            [ b'c' | b'C', b'c' | b'C']
-            => Some(Self::Cpp),
-            [ b's' | b'S' ]|
-            [ b'a'| b'A', b's' | b'S', b'm'| b'M' ]
-            => Some(Self::Assembly),
-            _ => None
+            [b'c' | b'C'] => Some(Self::C),
+            [b'c' | b'C', b'p' | b'P', b'p' | b'P']
+            | [b'c' | b'C', b'+', b'+']
+            | [b'c' | b'C', b'x' | b'X', b'x' | b'X']
+            | [b'c' | b'C', b'c' | b'C'] => Some(Self::Cpp),
+            [b's' | b'S'] | [b'a' | b'A', b's' | b'S', b'm' | b'M'] => Some(Self::Assembly),
+            _ => None,
         }
     }
 
     #[inline]
-    pub fn get_compiler<'a>(self, env: &'a Environment) -> &'a Path {
+    pub fn get_compiler(self, env: &Environment) -> &Path {
         match self {
             SourceType::C => env.cc(),
             SourceType::Cpp => env.cxx(),
@@ -41,7 +37,7 @@ impl SourceType {
     }
 
     #[inline]
-    pub fn get_flags<'a>(self, flags: &'a Flags) -> &'a Vec<String> {
+    pub fn get_flags(self, flags: &Flags) -> &Vec<String> {
         match self {
             SourceType::C => &flags.cflags,
             SourceType::Cpp => &flags.cxxflags,
@@ -78,14 +74,14 @@ mod tests {
         assert_eq!(ext("CpP"), Some(SourceType::Cpp));
         assert_eq!(ext("CXX"), Some(SourceType::Cpp));
         assert_eq!(ext("cXx"), Some(SourceType::Cpp));
-        assert_eq!(ext("cc"),  Some(SourceType::Cpp));
-        assert_eq!(ext("CC"),  Some(SourceType::Cpp));
+        assert_eq!(ext("cc"), Some(SourceType::Cpp));
+        assert_eq!(ext("CC"), Some(SourceType::Cpp));
     }
 
     #[test]
     fn assembly_extensions() {
-        assert_eq!(ext("s"),   Some(SourceType::Assembly));
-        assert_eq!(ext("S"),   Some(SourceType::Assembly));
+        assert_eq!(ext("s"), Some(SourceType::Assembly));
+        assert_eq!(ext("S"), Some(SourceType::Assembly));
         assert_eq!(ext("asm"), Some(SourceType::Assembly));
         assert_eq!(ext("ASM"), Some(SourceType::Assembly));
         assert_eq!(ext("Asm"), Some(SourceType::Assembly));
@@ -93,10 +89,10 @@ mod tests {
 
     #[test]
     fn unknown_extensions() {
-        assert_eq!(ext("rs"),  None);
-        assert_eq!(ext("h"),   None);
+        assert_eq!(ext("rs"), None);
+        assert_eq!(ext("h"), None);
         assert_eq!(ext("hpp"), None);
         assert_eq!(ext("txt"), None);
-        assert_eq!(ext(""),    None);
+        assert_eq!(ext(""), None);
     }
 }

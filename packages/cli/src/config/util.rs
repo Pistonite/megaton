@@ -76,7 +76,9 @@ impl ValidateCtx {
 pub fn check_megaton_version_requirement(version_req: &VersionReq) -> cu::Result<()> {
     let curr_version = Version::parse(env!("CARGO_PKG_VERSION"))?;
     if !version_req.matches(&curr_version) {
-        cu::bail!("the project requires megaton version {version_req}, current version is {curr_version}");
+        cu::bail!(
+            "the project requires megaton version {version_req}, current version is {curr_version}"
+        );
     }
     Ok(())
 }
@@ -99,17 +101,16 @@ mod tests {
     }
 
     #[test]
-    fn version_req_impossible_fails() -> cu::Result<()>{
+    fn version_req_impossible_fails() -> cu::Result<()> {
         let curr = Version::parse(env!("CARGO_PKG_VERSION"))?;
         let req = VersionReq::parse(">=99999.0.0")?;
         let result = check_megaton_version_requirement(&req);
         assert!(result.is_err());
         let error_message = format!("{:?}", result.unwrap_err());
         assert_eq!(
-        error_message,
+            error_message,
             format!("the project requires megaton version >=99999.0.0, current version is {curr}")
         );
         Ok(())
     }
 }
-

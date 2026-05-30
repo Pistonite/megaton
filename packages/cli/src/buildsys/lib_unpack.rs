@@ -7,7 +7,6 @@ use cu::pre::*;
 
 use flate2::bufread::GzDecoder;
 
-
 static LIBRARY_TARGZ: &[u8] = include_bytes!("../../libmegaton.tar.gz");
 
 pub async fn unpack_megaton_lib(lib_path: &Path) -> cu::Result<()> {
@@ -45,8 +44,11 @@ async fn do_unpack(lib_path: &Path) -> cu::Result<()> {
         library_archive.unpack(lib_path)?;
         cu::Ok(())
     });
-    cu::check!(handle.co_join().await.flatten(), "failed to unpack megaton library")?;
+    cu::check!(
+        handle.co_join().await.flatten(),
+        "failed to unpack megaton library"
+    )?;
     cu::fs::co_write(lib_hash_file, env!("MEGATON_LIB_SHA256").as_bytes()).await?;
-    
+
     Ok(())
 }

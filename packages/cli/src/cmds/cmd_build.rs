@@ -3,7 +3,10 @@
 
 use cu::pre::*;
 
-use crate::{buildsys::{self, BuildArgs}, env};
+use crate::{
+    buildsys::{self, BuildArgs},
+    env,
+};
 
 /// The `build` subcommand
 #[derive(Debug, AsRef, clap::Parser)]

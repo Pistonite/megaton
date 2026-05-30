@@ -3,7 +3,7 @@
 
 use cu::pre::*;
 
-use crate::cmds::{CmdToolchain, CmdVersion, CmdBuild};
+use crate::cmds::{CmdBuild, CmdToolchain, CmdVersion};
 
 static LOGO: &str = r#"
  __    __ ______ ______ ______ ______ ______ __   __  
@@ -46,7 +46,7 @@ impl Cmd {
         match command {
             CmdSubcommand::Build(cmd) => cmd.run()?,
             CmdSubcommand::Toolchain(cmd) => cmd.run()?,
-            CmdSubcommand::Version(_) => {},
+            CmdSubcommand::Version(_) => {}
         }
 
         Ok(())

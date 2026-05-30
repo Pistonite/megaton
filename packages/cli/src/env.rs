@@ -20,10 +20,16 @@ pub fn get() -> &'static Environment {
 pub fn init() -> cu::Result<()> {
     let megaton_home = megaton_toolchain_build::get_megaton_home()?;
 
-    let devkitpro = cu::check!(cu::env_var("DEVKITPRO"), "DEVKITPRO environment variable not set; please ensure devkitpro is installed.")?;
+    let devkitpro = cu::check!(
+        cu::env_var("DEVKITPRO"),
+        "DEVKITPRO environment variable not set; please ensure devkitpro is installed."
+    )?;
     let devkitpro = Path::new(&devkitpro).normalize()?;
 
-    let env = cu::check!(Environment::new(megaton_home, devkitpro), "failed to initialize environment")?;
+    let env = cu::check!(
+        Environment::new(megaton_home, devkitpro),
+        "failed to initialize environment"
+    )?;
     env.debug();
     if ENVIRONMENT.set(env).is_err() {
         cu::bail!("unexpected: environment was already set before init_env()");
@@ -57,7 +63,7 @@ pub struct Environment {
 impl Environment {
     fn new(megaton_home: PathBuf, devkitpro: PathBuf) -> cu::Result<Self> {
         let devkita64 = devkitpro.join("devkitA64");
-        let dkp_bin =   devkita64.join("bin");
+        let dkp_bin = devkita64.join("bin");
         let cc = dkp_bin.join("aarch64-none-elf-gcc");
         let cxx = dkp_bin.join("aarch64-none-elf-g++");
         let asm = dkp_bin.join("aarch64-none-elf-gcc");
@@ -130,7 +136,10 @@ impl Environment {
         &self.cc_version
     }
     pub fn cxxbridge(&self) -> cu::Result<&Path> {
-        cu::check!(self.cxxbridge.as_deref(), "cxxbridge not found; please run `megaton toolchain install`")
+        cu::check!(
+            self.cxxbridge.as_deref(),
+            "cxxbridge not found; please run `megaton toolchain install`"
+        )
     }
 
     /// Print the environment for debugging
@@ -204,7 +213,8 @@ impl Environment {
 
 #[cu::context("failed to get devkitpro compiler version (path: '{}')", cc_path.display())]
 fn get_cc_version(cc_path: &Path) -> cu::Result<String> {
-    let (child, _, output) = cc_path.command()
+    let (child, _, output) = cc_path
+        .command()
         .arg("-v")
         .stdio_null()
         .stderr(cu::pio::string())
@@ -251,10 +261,6 @@ fn get_dkp_includes(devkita64: &Path, cc_version: &str) -> cu::Result<Vec<String
             let mut p = gcc_include_path;
             p.push("include-fixed");
             p.into_utf8()?
-        }
+        },
     ])
 }
-
-
-
-

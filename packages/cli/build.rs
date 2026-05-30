@@ -18,8 +18,10 @@ fn main() -> ExitCode {
 }
 
 fn main_internal() -> cu::Result<()> {
-    let crate_path = PathBuf::from(cu::env_var("LAYERED_CRATE_ORIGINAL_MANIFEST_DIR")
-        .unwrap_or(env!("CARGO_MANIFEST_DIR").to_string()));
+    let crate_path = PathBuf::from(
+        cu::env_var("LAYERED_CRATE_ORIGINAL_MANIFEST_DIR")
+            .unwrap_or(env!("CARGO_MANIFEST_DIR").to_string()),
+    );
     let lib_output_path = crate_path.join("libmegaton.tar.gz");
 
     let commit_hash = megaton_cli_build::get_commit()?;

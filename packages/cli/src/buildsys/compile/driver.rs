@@ -6,7 +6,9 @@ use std::{
     sync::Arc,
 };
 
-use crate::buildsys::compile::{source, SourceStatus, CompileCommands, CompileCommandsEntry, CompileDB};
+use crate::buildsys::compile::{
+    CompileCommands, CompileCommandsEntry, CompileDB, SourceStatus, source,
+};
 
 use crate::config::Flags;
 use crate::env::Environment;
@@ -38,7 +40,7 @@ pub async fn compile_all(
     compile_db_path: &Path,
     compile_commands_path: &Path,
     configure_only: bool,
-    env: &'static Environment
+    env: &'static Environment,
 ) -> cu::Result<(bool, Vec<PathBuf>)> {
     // Get compile_db
     let mut compile_db = CompileDB::try_load_or_new(compile_db_path);

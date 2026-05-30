@@ -12,7 +12,7 @@ mod main_config;
 pub use main_config::*;
 
 mod profile;
-use profile::*;
 pub use profile::BASE_PROFILE;
+use profile::*;
 mod util;
 use util::*;

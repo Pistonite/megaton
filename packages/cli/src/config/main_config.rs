@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025-2026 Megaton contributors
 
-
 //! Config structures
 use std::path::{Path, PathBuf};
 
@@ -37,10 +36,12 @@ pub fn get_root_and_manifest(manifest_path: Option<&str>) -> cu::Result<(PathBuf
 /// Load a Megaton.toml config file
 pub fn load(path: &Path) -> cu::Result<Config> {
     let content = cu::fs::read_string(path)?;
-    let config = cu::check!(toml::parse::<Config>(&content),
-        "failed to parse Megaton config")?;
+    let config = cu::check!(
+        toml::parse::<Config>(&content),
+        "failed to parse Megaton config"
+    )?;
     config.validate_root()?;
-    return Ok(config);
+    Ok(config)
 }
 
 /// Config data read from Megaton.toml
@@ -260,7 +261,6 @@ impl Module {
         "compile_commands.json".into()
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProfileConfig {

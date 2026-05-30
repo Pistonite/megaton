@@ -16,10 +16,7 @@ pub struct CmdVersion {
 impl CmdVersion {
     pub fn run() -> cu::Result<()> {
         if !cu::lv::I.enabled() {
-            println!(
-                "{}",
-                env!("CARGO_PKG_VERSION"),
-            );
+            println!("{}", env!("CARGO_PKG_VERSION"),);
             return Ok(());
         }
         cu::lv::disable_print_time();
