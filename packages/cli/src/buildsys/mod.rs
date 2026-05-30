@@ -9,6 +9,5 @@ pub use run::*;
 
 mod check;
 mod compile;
-mod config;
 mod link;
 mod rust;

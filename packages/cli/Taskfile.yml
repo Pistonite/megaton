@@ -8,6 +8,7 @@ includes:
 
 tasks:
   check:
+    - layered-crate
     - task: cargo:clippy-all
     - task: cargo:fmt-check
   fix:

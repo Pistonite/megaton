@@ -6,9 +6,10 @@ use std::{
     sync::Arc,
 };
 
-use super::config::Flags;
 use compile_db::{CompileCommands, CompileCommandsEntry, CompileDB};
 use source::SourceStatus;
+
+use crate::config::Flags;
 
 mod compile_db;
 mod source;

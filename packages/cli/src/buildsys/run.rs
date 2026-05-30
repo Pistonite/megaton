@@ -5,7 +5,7 @@ use cu::pre::*;
 use flate2::bufread::GzDecoder;
 
 use crate::env;
-use crate::buildsys::config::{self, Flags};
+use crate::config::{self, Flags};
 use crate::buildsys::{BuildArgs, rust, compile, link, check};
 
 pub async fn run(args: BuildArgs) -> cu::Result<()> {

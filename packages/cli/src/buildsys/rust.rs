@@ -10,8 +10,7 @@ use cargo_metadata::{MetadataCommand, semver::Version};
 use cu::pre::*;
 
 use crate::env;
-
-use super::config::CargoConfig;
+use crate::config::CargoConfig;
 
 #[derive(Debug, Clone)]
 pub struct RustCtx {
