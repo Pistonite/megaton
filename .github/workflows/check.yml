@@ -11,7 +11,7 @@ jobs:
       - uses: Pistonight/mono-dev/actions/setup@main
         with:
           rust: stable
-          tool-cargo-binstall: lisensor
+          tool-cargo-binstall: lisensor,layered-crate
           ccpp-cmake: true
       - run: task check-non-dkp
       - run: task test
