@@ -28,7 +28,10 @@ tasks:
     cmds:
       - task: cargo-binstall
         vars:
-          PACKAGES: lisensor mdbook@0.4 mdbook-admonish shwoop
+          PACKAGES: lisensor mdbook@0.4 mdbook-admonish shwoop layered-crate
+
+  test:
+    - task: cli:test
 
   check:
     - task: check-non-dkp

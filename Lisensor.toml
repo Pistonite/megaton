@@ -1,6 +1,7 @@
 ["Megaton contributors"]
 
-"packages/cli/**/*.rs" = "MIT"
+"packages/cli/src/*.rs" = "MIT"
+"packages/cli/build.rs" = "MIT"
 "packages/cli-build/**/*.rs" = "MIT"
 "packages/docker-build/*.rs" = "MIT"
 

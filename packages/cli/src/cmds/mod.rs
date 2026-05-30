@@ -1,98 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025-2026 Megaton contributors
 
-use cu::pre::*;
+mod cmd;
+pub use cmd::Cmd;
 
-use crate::env;
-
+mod cmd_version;
+use cmd_version::*;
 mod cmd_build;
 use cmd_build::*;
 mod cmd_toolchain;
 use cmd_toolchain::*;
-
-static LOGO: &str = r#"
- __    __ ______ ______ ______ ______ ______ __   __  
-/\ "-./  \\  ___\\  ___\\  __ \\__  _\\  __ \\ "-.\ \ 
-\ \ \-./\ \\  __\ \ \__ \\  __ \_/\ \/ \ \/\ \\ \-.  \
- \ \_\ \ \_\\_____\\_____\\_\ \_\\ \_\\ \_____\\_\\"\_\
-  \/_/  \/_//_____//_____//_/\/_/ \/_/ \/_____//_/ \/_/"#;
-
-/// Megaton Build Tool
-#[derive(clap::Parser, Clone)]
-#[clap(before_help(LOGO))]
-pub struct CmdMegaton {
-    #[clap(subcommand)]
-    sub: Option<CmdMegatonSub>,
-
-    /// Print the version
-    #[clap(short = 'V', long)]
-    version: bool,
-
-    #[clap(flatten)]
-    flags: cu::cli::Flags,
-}
-
-impl AsRef<cu::cli::Flags> for CmdMegaton {
-    fn as_ref(&self) -> &cu::cli::Flags {
-        &self.flags
-    }
-}
-impl CmdMegaton {
-    pub fn preprocess(&mut self) {
-        if let Some(command) = &self.sub {
-            self.flags.merge(command.as_ref());
-        }
-    }
-}
-
-#[derive(clap::Subcommand, Clone)]
-pub enum CmdMegatonSub {
-    /// Print the version and build information
-    Version(cu::cli::Flags),
-    Build(CmdBuild),
-    Toolchain {
-        #[clap(subcommand)]
-        cmd: CmdToolchain,
-    },
-}
-
-impl AsRef<cu::cli::Flags> for CmdMegatonSub {
-    fn as_ref(&self) -> &cu::cli::Flags {
-        match self {
-            Self::Version(x) => x,
-            Self::Build(cmd) => cmd.as_ref(),
-            Self::Toolchain { cmd } => cmd.as_ref(),
-        }
-    }
-}
-
-/// Main entry point to running the `megaton` command
-pub fn main(cmd: CmdMegaton) -> cu::Result<()> {
-    if cmd.version || matches!(cmd.sub, Some(CmdMegatonSub::Version(_))) {
-        print_version();
-        return Ok(());
-    }
-    let Some(sub) = cmd.sub else {
-        cu::cli::print_help::<CmdMegaton>(false);
-        cu::lv::disable_print_time();
-        return Ok(());
-    };
-    // safety: program is single threaded at this point
-    unsafe { env::init_env()? };
-
-    match sub {
-        CmdMegatonSub::Version(_) => unreachable!(),
-        // Start of async
-        CmdMegatonSub::Build(cmd) => cu::co::run(async move { cmd.run().await }),
-        CmdMegatonSub::Toolchain { cmd } => cmd.run(),
-    }
-}
-
-fn print_version() {
-    println!(
-        "megaton v{} ({})",
-        env!("CARGO_PKG_VERSION"),
-        &env::commit()[0..8]
-    );
-    cu::lv::disable_print_time();
-}

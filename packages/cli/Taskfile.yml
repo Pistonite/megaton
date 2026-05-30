@@ -8,9 +8,12 @@ includes:
 
 tasks:
   check:
+    - layered-crate
     - task: cargo:clippy-all
     - task: cargo:fmt-check
   fix:
     - task: cargo:fmt-fix
   build:
     - cargo build
+  test:
+    - cargo test

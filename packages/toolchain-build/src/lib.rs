@@ -11,3 +11,4 @@ pub use cargo_workspace::{
 };
 
 mod home;
+pub use home::get_megaton_home;

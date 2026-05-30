@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025-2026 Megaton contributors
 
-use megaton_cmd::cmds;
+use megaton_cmd::cmds::Cmd;
 
-#[cu::cli(preprocess=cmds::CmdMegaton::preprocess)]
-fn main(cmd: cmds::CmdMegaton) -> cu::Result<()> {
-    cmds::main(cmd)
+#[cu::cli(preprocess=Cmd::preprocess)]
+fn main(cmd: Cmd) -> cu::Result<()> {
+    cmd.run()
 }

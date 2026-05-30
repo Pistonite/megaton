@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025-2026 Megaton contributors
 
+// Configuration corresponds to
+// https://megaton-new.pistonite.dev/reference/configuration/
+
 mod build_config;
 pub use build_config::*;
 mod build_flag;
@@ -9,6 +12,7 @@ mod main_config;
 pub use main_config::*;
 
 mod profile;
+pub use profile::BASE_PROFILE;
 use profile::*;
 mod util;
 use util::*;

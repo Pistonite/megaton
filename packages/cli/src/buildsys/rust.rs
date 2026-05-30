@@ -9,9 +9,8 @@ use std::{
 use cargo_metadata::{MetadataCommand, semver::Version};
 use cu::pre::*;
 
-use crate::env::environment;
-
-use super::config::CargoConfig;
+use crate::config::CargoConfig;
+use crate::env;
 
 #[derive(Debug, Clone)]
 pub struct RustCtx {
@@ -138,11 +137,12 @@ impl RustCtx {
                 "Build rust crate"
             }));
 
+        let env = env::get();
         command = command.args(cargoflags);
         command = command.env("RUSTFLAGS", rustflags);
-        command = command.env("CC", environment().cc());
-        command = command.env("CXX", environment().cxx());
-        command = command.env("AR", environment().ar());
+        command = command.env("CC", env.cc());
+        command = command.env("CXX", env.cxx());
+        command = command.env("AR", env.ar());
 
         command.co_spawn().await?.0.co_wait_nz().await?;
         if check {
@@ -316,7 +316,7 @@ async fn cxxbridge_process(
 // Run the cxxbridge cmd and update the corresponding file if changed
 // returns Ok(true) iff new code was generated and written
 async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::Result<bool> {
-    let env = environment();
+    let env = env::get();
     let mut args = vec![];
     if let Some(file) = file {
         args.push(cu::check!(file.to_str(), "Not utf-8: {}", file.display())?);
@@ -326,7 +326,7 @@ async fn cxxbridge_cmd(file: Option<&Path>, header: bool, output: &Path) -> cu::
     }
 
     let command = env
-        .cxxbridge()
+        .cxxbridge()?
         .command()
         .stdout(cu::pio::buffer())
         .stderr(cu::pio::string())

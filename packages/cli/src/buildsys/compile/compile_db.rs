@@ -9,7 +9,7 @@ use std::{
 
 use cu::pre::*;
 
-use crate::env::environment;
+use crate::env;
 
 type Records = BTreeMap<usize, CompileRecord>;
 
@@ -54,21 +54,22 @@ impl CompileDB {
 
     /// Generate a new compiledb with empty record table
     pub fn new() -> Self {
-        let env = environment();
+        let env = env::get();
+        // FIXME: dedupe fields
         Self {
             records: Records::default(),
             cc_version: env.cc_version().to_string(),
-            cxx_version: env.cxx_version().to_string(),
-            asm_version: env.asm_version().to_string(),
+            cxx_version: env.cc_version().to_string(),
+            asm_version: env.cc_version().to_string(),
         }
     }
 
     /// Check if the recorded compiler versions are the same as in the environment
     pub fn is_version_correct(&self) -> bool {
-        let env = environment();
+        let env = env::get();
         env.cc_version() == self.cc_version
-            && env.cxx_version() == self.cxx_version
-            && env.asm_version() == self.asm_version
+            && env.cc_version() == self.cxx_version
+            && env.cc_version() == self.asm_version
     }
 
     /// Saves the compiledb to the disk, erroring if the path doesn't exist
@@ -168,7 +169,7 @@ pub struct CompileCommandsEntry {
 
 impl From<&CompileRecord> for CompileCommandsEntry {
     fn from(value: &CompileRecord) -> Self {
-        let env = environment().dkp_includes();
+        let env = env::get().dkp_includes();
         let arguments = value
             .clone()
             .args

@@ -41,7 +41,9 @@ Default: `["src"]`
 ### Key: `cargo.header-suffix`
 Type: `string`
 
-Suffix to generated headers. The user can put the empty string here so they can do `#include <foo/lib.rs>` instead of `<foo/lib.rs.h>`
+Suffix to generated headers. You can put the empty string here so they can
+do `#include <foo/lib.rs>` instead of `<foo/lib.rs.h>` (where `foo` is the name of the
+crate as specified in `Cargo.toml`
 
 Default: `".h"`
 

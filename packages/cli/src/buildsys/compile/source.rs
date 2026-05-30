@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Megaton contributors
 
-use std::{
-    ffi::OsStr,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use cu::pre::*;
 
 use super::compile_db::CompileRecord;
-use crate::{cmds::cmd_build::config::Flags, env::environment};
+
+use crate::buildsys::compile::SourceType;
+use crate::config::Flags;
+use crate::env::Environment;
 
 /// A source file and its corresponding artifacts
 #[derive(Debug, Clone)]
@@ -17,57 +17,49 @@ pub struct SourceFile {
     pub path: PathBuf,
     pub pathhash: usize,
     basename: String,
-    lang: Lang,
+    typ: SourceType,
 }
 
-/// UpToDate(path) - The source doesn't need compiled, its artifact is at `path`
-/// CompileNeeded(record) - The source needs to be compiled with `record`
 #[derive(PartialEq, Eq, Debug)]
 pub enum SourceStatus {
+    /// The source doesn't need compiled, its artifact is at `path`
     UpToDate(PathBuf),
+    /// The source needs to be compiled with `record`
     CompileNeeded(CompileRecord),
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-enum Lang {
-    C,
-    Cpp,
-    S,
 }
 
 impl SourceFile {
     /// Returns a source file object, or None, if the given file is not a valid source
     /// i.e. the name cannot be parsed or the file extension is invalid
-    pub fn new(path: PathBuf) -> Option<Self> {
-        let basename = path.file_name();
-        let basename = match basename {
-            Some(name) => name.display().to_string(),
-            None => return None,
-        };
-
-        let lang = match path.extension().and_then(OsStr::to_str).unwrap_or_default() {
-            "c" => Lang::C,
-            "cpp" | "c++" | "cc" | "cxx" => Lang::Cpp,
-            "s" | "asm" => Lang::S,
-            _ => return None,
+    fn from_path(path: PathBuf) -> Option<Self> {
+        // if path does not have extension or does not
+        let source_type = SourceType::from_extension(path.extension()?)?;
+        let basename = match path.file_name()?.as_utf8() {
+            Err(e) => {
+                cu::warn!("skipping source with non-utf8 name: {e}");
+                return None;
+            }
+            Ok(x) => x,
         };
 
         Some(Self {
-            path: path.to_owned(),
             pathhash: fxhash::hash(&path),
-            basename,
-            lang,
+            basename: basename.to_string(),
+            path,
+            typ: source_type,
         })
     }
 
-    pub fn configure_compilation(
+    pub fn configure(
         self,
         flags: &Flags,
         output_path: &Path,
         record: Option<&CompileRecord>,
+        env: &'static Environment,
     ) -> cu::Result<SourceStatus> {
-        let compiler = self.lang.get_compiler_path();
-        let mut args = self.lang.get_flags(flags).clone();
+        let compiler = self.typ.get_compiler(env);
+        // FIXME: clone() is expensive to do for every source file
+        let mut args = self.typ.get_flags(flags).clone();
 
         let o_path = self.get_o_path(output_path);
         let d_path = self.get_d_path(output_path);
@@ -119,7 +111,7 @@ impl SourceFile {
         let d_path = self.get_d_path(output_path);
 
         // Check that artifacts exist
-        if !o_path.exists() || (!d_path.exists() && self.lang != Lang::S) {
+        if !o_path.exists() || (!d_path.exists() && self.typ.uses_depfile()) {
             return Ok(false);
         }
 
@@ -129,7 +121,7 @@ impl SourceFile {
         }
 
         // Assembly files don't need dependency checks
-        if self.lang == Lang::S {
+        if !self.typ.uses_depfile() {
             return Ok(true);
         }
 
@@ -170,52 +162,34 @@ impl SourceFile {
     }
 }
 
-impl Lang {
-    fn get_compiler_path(&self) -> &Path {
-        let env = environment();
-        match self {
-            Lang::C => env.cc(),
-            Lang::Cpp => env.cxx(),
-            Lang::S => env.cc(),
-        }
+pub fn scan(dirs: &[PathBuf]) -> cu::Result<impl Iterator<Item = SourceFile>> {
+    cu::debug!("dirs to scan: {dirs:#?}");
+    let mut walks = Vec::with_capacity(dirs.len());
+    for dir in dirs {
+        let walk = cu::check!(cu::fs::walk(dir), "failed to open source directory")?;
+        walks.push(WalkIterAdapter { walk });
+    }
+    struct WalkIterAdapter {
+        walk: cu::fs::Walk,
     }
 
-    fn get_flags<'a>(&self, flags: &'a Flags) -> &'a Vec<String> {
-        match self {
-            Lang::C => &flags.cflags,
-            Lang::Cpp => &flags.cxxflags,
-            Lang::S => &flags.cflags,
-        }
-    }
-}
-
-pub fn scan(dirs: &[PathBuf]) -> SourceIterator {
-    let walks = dirs
-        .iter()
-        .filter_map(|dir| cu::fs::walk(dir).ok())
-        .collect::<Vec<_>>();
-
-    SourceIterator { walks }
-}
-
-pub struct SourceIterator {
-    walks: Vec<cu::fs::Walk>,
-}
-
-impl Iterator for SourceIterator {
-    type Item = SourceFile;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        while let Some(mut walk) = self.walks.pop() {
-            while let Some(Ok(entry)) = walk.next() {
-                let source = SourceFile::new(entry.path());
-                if let Some(source) = source {
-                    self.walks.push(walk);
-                    cu::debug!("Scan: found source {}", source.path.display());
-                    return Some(source);
+    impl Iterator for WalkIterAdapter {
+        type Item = SourceFile;
+        fn next(&mut self) -> Option<Self::Item> {
+            loop {
+                let entry = match self.walk.next()? {
+                    Ok(x) => x,
+                    Err(e) => {
+                        cu::warn!("error reading source directory entry: {e:?}");
+                        continue;
+                    }
+                };
+                if let Some(x) = SourceFile::from_path(entry.path()) {
+                    return Some(x);
                 }
             }
         }
-        None
     }
+
+    Ok(walks.into_iter().flatten())
 }
