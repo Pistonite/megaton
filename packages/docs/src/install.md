@@ -4,9 +4,8 @@
 - Megaton requires `DevKitA64` from [DevKitPro](https://devkitpro.org/wiki/Getting_Started).
   (Select the `switch-dev` group)
 
-  ```admonish todo
-  TODO Add info about how megaton searches for DKP installation
-  ```
+  > [!NOTE]
+  > TODO Add info about how megaton searches for DKP installation
 - For Rust support (building mods written in Rust), a Rust toolchain for the host system
   (i.e. the system used to build the mod) and `git` are required to clone and build
   the Rust compiler for the `aarch64-unknown-hermit` target.
@@ -14,9 +13,8 @@
 ## Install Megaton
 The `megaton` CLI is a single binary, which can be installed in 3 ways:
 
-```admonish todo
-TODO These don't work yet
-```
+> [!NOTE]
+> TODO These don't work yet
 
 1. (Recommended) Install from prebuilt binary with `cargo-binstall`
     ```bash
@@ -42,12 +40,11 @@ Run the following command to install the toolchain, or upgrade the toolchain in 
 megaton toolchain install
 ```
 
-```admonish note
-This compiles LLVM and bootstraps the Rust compiler, which will take a while.
-To keep the build artifact, use the `-k`/`--keep` flag: `megaton toolchain install -k`.
-This will make it faster to rebuild the toolchain in the future when upgrading. However,
-this will consume 10-20GB of disk spaces.
-```
+> [!NOTE]
+> This compiles LLVM and bootstraps the Rust compiler, which will take a while.
+> To keep the build artifact, use the `-k`/`--keep` flag: `megaton toolchain install -k`.
+> This will make it faster to rebuild the toolchain in the future when upgrading. However,
+> this will consume 10-20GB of disk spaces.
 
 You can check if the toolchain is installed with
 ```bash

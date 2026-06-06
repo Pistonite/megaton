@@ -1,10 +1,9 @@
 # Create Project
 
-```admonish info
-At the moment, there is no `megaton init` command, so the initial files
-will need to be created manually. When this command is added in the future,
-this step will be much faster and easier.
-```
+> [!NOTE]
+> At the moment, there is no `megaton init` command, so the initial files
+> will need to be created manually. When this command is added in the future,
+> this step will be much faster and easier.
 
 ## Create Megaton Config
 To initialize a Megaton project, you will need a `Megaton.toml` config file.

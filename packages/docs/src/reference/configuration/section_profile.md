@@ -5,10 +5,9 @@ or different versions of a game. See the tutorial for [Profile](../../tutorial/p
 for more info.
 
 
-```admonish tip
-For each key, if a default value/behavior is not specified, it is required in the config.
-Otherwise it is optional.
-```
+> [!TIP]
+> For each key, if a default value/behavior is not specified, it is required in the config.
+> Otherwise it is optional.
 
 ### Key: `profile.allow-base`
 Type: `bool`

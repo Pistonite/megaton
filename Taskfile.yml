@@ -28,7 +28,7 @@ tasks:
     cmds:
       - task: cargo-binstall
         vars:
-          PACKAGES: lisensor mdbook@0.4 mdbook-admonish shwoop layered-crate
+          PACKAGES: lisensor mdbook shwoop layered-crate
 
   test:
     - task: cli:test
@@ -57,4 +57,7 @@ tasks:
   build-dkp:
     - task: lib:configure
     - task: lib:build-c
+
+  upgrade:
+    - cargo upgrade
 

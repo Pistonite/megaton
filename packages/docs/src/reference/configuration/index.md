@@ -17,5 +17,5 @@ Profile enabled keys are options which can have a unique value for different pro
 Each config options set for a profile uses one of two inheritance behaviors. The parent of a user-specified profile is the base profile. The "parent" of the base profile is the base profile's default value. If a profile enabled key is not an array type, it will always override its parent.
 
 - Append: The value for this key is the appended to that of its parent. This means that a profile will always extend the default behavior but cannot disable it.
-- Override: The value for this key will override that of its parent. These values can still optionally extend their parent by including "<default>" in their value. If the values is specified as [], the parent value will be completely disabled.
+- Override: The value for this key will override that of its parent. These values can still optionally extend their parent by including `"<default>"` in their value. If the values is specified as [], the parent value will be completely disabled.
 

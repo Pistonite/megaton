@@ -30,12 +30,6 @@ and should be specified like `[build.profiles.foo.flags]`, **NOT** `[build.flags
 
 ## Base Profile
 
-```admonish danger
-The base profile will be called `"none"`, as described in this documentation.
-However in the current development, it's coded as `"base"`. This will be changed
-in the stable release, and is tracked by [Issue #80](https://github.com/Pistonite/megaton/issues/80)
-```
-
 The configs without any explicit profiles is known as the "base profile", and
 has the name `"none"`. (This word is reserved you cannot name your custom profile `"none"`).
 

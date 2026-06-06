@@ -1,14 +1,13 @@
 
 Megaton can be used to build mods that contain both C++ and Rust code. Internally Megaton uses Cargo to compile Rust sources. It also provides support for the [cxx](https://cxx.rs/) crate to handle interop between C++ and Rust (if needed).  Rust crates should be configured, as usual, in the `Cargo.toml` file. This sections controls Megaton options for Cargo and CXX.
 
-```admonish tip
-The root of a particular project is the directory that contains the config (Megaton.toml).
-For all values that determine a path, unless otherwise specified,
-the path is relative to the project root.
-
-For each key, if a default value/behavior is not specified, it is required in the config.
-Otherwise it is optional.
-```
+> [!TIP]
+> The root of a particular project is the directory that contains the config (Megaton.toml).
+> For all values that determine a path, unless otherwise specified,
+> the path is relative to the project root.
+>
+> For each key, if a default value/behavior is not specified, it is required in the config.
+> Otherwise it is optional.
 
 ### Key: `cargo.enabled`
 Type: `bool`

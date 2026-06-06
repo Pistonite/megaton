@@ -19,7 +19,7 @@ tar.workspace = true
 walkdir = "2.5.0"
 fxhash = "0.2.1"
 depfile = "0.1.1"
-regex = "1.12.2"
+regex = "1.12.3"
 cargo_metadata = "0.23.1"
 semver = { version = "1.0.28", features = ["serde"] }
 
