@@ -9,14 +9,13 @@ name = "my-mod"
 title-id = 0x01007ef00011e000
 ```
 
-```admonish tip
-The root of a particular project is the directory that contains the config (Megaton.toml).
-For all values that determine a path, unless otherwise specified,
-the path is relative to the project root.
-
-For each key, if a default value/behavior is not specified, it is required in the config.
-Otherwise it is optional.
-```
+> [!TIP]
+> The root of a particular project is the directory that contains the config (Megaton.toml).
+> For all values that determine a path, unless otherwise specified,
+> the path is relative to the project root.
+>
+> For each key, if a default value/behavior is not specified, it is required in the config.
+> Otherwise it is optional.
 
 ### Key: `module.name`
 Type: `string`

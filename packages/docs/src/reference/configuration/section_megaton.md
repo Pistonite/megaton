@@ -6,10 +6,9 @@ Example:
 version = "1"
 ```
 
-```admonish tip
-For each key, if a default value/behavior is not specified, it is required in the config.
-Otherwise it is optional.
-```
+> [!TIP]
+> For each key, if a default value/behavior is not specified, it is required in the config.
+> Otherwise it is optional.
 
 ### Key: `megaton.version`
 Type: `string`
@@ -28,9 +27,8 @@ Use this option to use Megaton as a standalone build tool, without the Megaton l
 When using Megaton library, the `megaton_main` function is not the real "main function"; instead,
 it is wrapped with a function that initializes Megaton and calls `megaton_main`.
 
-```admonish warning
-Megaton library is required to use Rust. If `megaton.custom-entry` is `true`, Rust is also
-disabled.
-```
+> [!WARNING]
+> Megaton library is required to use Rust. If `megaton.custom-entry` is `true`, Rust is also
+> disabled.
 
 Default: `""` (use Megaton library)

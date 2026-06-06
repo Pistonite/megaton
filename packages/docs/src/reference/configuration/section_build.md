@@ -12,16 +12,15 @@ rust = ["<default>", "-Zub-checks=yes"]
 cargo = ["<default>", "--features", "my-feature"]
 ```
 
-```admonish tip
-The root of a particular project is the directory that contains the config (Megaton.toml).
-For all values that determine a path, unless otherwise specified,
-the path is relative to the project root.
-
-For each key, if a default value/behavior is not specified, it is required in the config.
-Otherwise it is optional.
-
-This section can be extended with [profiles](../../tutorial/profiles.md).
-```
+> [!TIP]
+> The root of a particular project is the directory that contains the config (Megaton.toml).
+> For all values that determine a path, unless otherwise specified,
+> the path is relative to the project root.
+>
+> For each key, if a default value/behavior is not specified, it is required in the config.
+> Otherwise it is optional.
+>
+> This section can be extended with [profiles](../../tutorial/profiles.md).
 
 
 ### Key: `build.sources` 
@@ -90,20 +89,18 @@ behavior is detailed below.
 | `rust`   | None                  |
 | `cargo`  | None                  |
 
-~~~admonish example
-For this flag config:
-```toml
-[build.flags]
-c = ["<default>", "-DDEBUG"]
-```
-`-DDEBUG` will be added to the flags when invoking `gcc`
-(using `C` flags), `g++` (using `CXX` flags, extended from `C` flags), and `as` (using `AS` flags, extended from `CXX` flags).
-~~~
+> [!NOTE]
+> For example, with this flag config:
+> ```toml
+> [build.flags]
+> c = ["<default>", "-DDEBUG"]
+> ```
+> `-DDEBUG` will be added to the flags when invoking `gcc`
+> (using `C` flags), `g++` (using `CXX` flags, extended from `C` flags), and `as` (using `AS` flags, extended from `CXX` flags).
 
-```admonish todo
-Replace the link above with link to the GitHub source code where flags
-are specified
-```
+> [!NOTE]
+> TODO - Replace the link above with link to the GitHub source code where flags
+> are specified
 
 Inheritance: Override
 
@@ -124,10 +121,9 @@ Flags for the assembler to use with assembly sources.
 #### Key: `build.flags.ld`
 Flags for the linker.
 
-```admonish warning
-C++ compiler is used for linking. Flags for `ld`
-should be specified as `-Wl,--flag` instead of `--flag`.
-```
+> [!WARNING]
+> C++ compiler is used for linking. Flags for `ld`
+> should be specified as `-Wl,--flag` instead of `--flag`.
 
 #### Key: `build.flags.rust`
 Flags for rust. Corresponds to the RUSTFLAGS environment variable.

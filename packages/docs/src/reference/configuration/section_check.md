@@ -1,16 +1,15 @@
 
 Megaton performs a check step after linking the module into an ELF and before converting it to a `.nso` file. This check allows Megaton to blacklist certain symbols and instructions, preventing an unstable binary from being created to catch bugs earlier.
 
-```admonish tip
-The root of a particular project is the directory that contains the config (Megaton.toml).
-For all values that determine a path, unless otherwise specified,
-the path is relative to the project root.
-
-For each key, if a default value/behavior is not specified, it is required in the config.
-Otherwise it is optional.
-
-This section can be extended with [profiles](../../tutorial/profiles.md).
-```
+> [!TIP]
+> The root of a particular project is the directory that contains the config (Megaton.toml).
+> For all values that determine a path, unless otherwise specified,
+> the path is relative to the project root.
+>
+> For each key, if a default value/behavior is not specified, it is required in the config.
+> Otherwise it is optional.
+>
+> This section can be extended with [profiles](../../tutorial/profiles.md).
 
 
 ### Key: `check.ignore` (array of strings)
@@ -20,9 +19,8 @@ Inheritance: Override
 
 Default: `["<default>"]`
 
-```admonish todo
-Link to the code where list of default symbols that are ignored (or the default behavior)
-```
+> [!NOTE]
+> TODO - Link to the code where list of default symbols that are ignored (or the default behavior)
 
 ### Key: `check.symbols` (array of strings)
 Type: `string[]` (array of strings)
@@ -43,6 +41,5 @@ Inheritance: Override
 Default: `["<default>"]`
 
 
-```admonish todo
-Link to the code where list of default symbols that are ignored (or the default behavior)
-```
+> [!NOTE]
+> TODO - Link to the code where list of default symbols that are ignored (or the default behavior)
