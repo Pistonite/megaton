@@ -122,10 +122,10 @@ pub async fn run(args: BuildArgs) -> cu::Result<()> {
 
         lib_flags.add_defines([
             "MEGATON_LIB",
-            &format!("MEGART_NX_MODULE_NAME=\"{}\"", &config.module.name),
-            &format!("MEGART_NX_MODULE_NAME_LEN={}", &config.module.name.len()),
-            &format!("MEGART_TITLE_ID={}", &config.module.title_id),
-            &format!("MEGART_TITLE_ID_HEX=\"0x{:016x}\"", &config.module.title_id),
+            &format!("MEGART_NX_MODULE_NAME=\"{}\"", config.module.name),
+            &format!("MEGART_NX_MODULE_NAME_LEN={}", config.module.name.len()),
+            &format!("MEGART_TITLE_ID={}", config.module.title_id),
+            &format!("MEGART_TITLE_ID_HEX=\"0x{:016x}\"", config.module.title_id),
         ]);
         if rust_enabled {
             lib_flags.add_defines(["MEGART_RUST"]);

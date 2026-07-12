@@ -56,7 +56,7 @@ fn load_known_symbols(symbol_files: &[PathBuf]) -> cu::Result<Symbols> {
     for symbol_file in symbol_files {
         let content = cu::fs::read_string(symbol_file).context(format!(
             "failed to read symbol file {}",
-            &symbol_file.display()
+            symbol_file.display()
         ))?;
         let syms = parse_objdump_syms(content);
         symbols.extend(syms);
