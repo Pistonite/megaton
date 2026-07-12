@@ -1,6 +1,6 @@
 [package]
 name = "megaton-cmd"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 license = "MIT"
 description = "The `megaton` CLI command"
@@ -12,22 +12,22 @@ workspace = true
 features = ["cli", "process", "prompt", "toml", "json", "fs", "coroutine-heavy", "derive"]
 
 [dependencies]
-serde = "1"
-tokio = "1"
+serde.workspace = true
+tokio.workspace = true
 flate2.workspace = true
 tar.workspace = true
-walkdir = "2.5.0"
-fxhash = "0.2.1"
-depfile = "0.1.1"
-regex = "1.12.3"
-cargo_metadata = "0.23.1"
-semver = { version = "1.0.28", features = ["serde"] }
+walkdir.workspace = true
+fxhash.workspace = true
+depfile.workspace = true
+regex.workspace = true
+cargo_metadata.workspace = true
+semver.workspace = true
+semver.features = ["serde"]
 
 megaton-toolchain-build.path = "../toolchain-build"
 
 [build-dependencies]
 cu = { workspace = true, features = ["fs", "toml"] }
-
 megaton-cli-build.path = "../cli-build"
 
 [[bin]]

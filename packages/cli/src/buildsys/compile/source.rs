@@ -184,7 +184,7 @@ pub fn scan(dirs: &[PathBuf]) -> cu::Result<impl Iterator<Item = SourceFile>> {
                         continue;
                     }
                 };
-                if let Some(x) = SourceFile::from_path(entry.path()) {
+                if let Some(x) = SourceFile::from_path(entry.path().to_path_buf()) {
                     return Some(x);
                 }
             }

@@ -4,7 +4,7 @@ version = "0.0.0"
 edition = "2024"
 
 [dependencies]
-cxx = "1.0.194"
+cxx = "1.0.197"
 megaton.path = "../lib/" # usually we should point to target/megaton/lib
 
 [lib]

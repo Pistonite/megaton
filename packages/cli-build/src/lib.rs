@@ -6,7 +6,6 @@ use std::path::Path;
 
 use cu::pre::*;
 use flate2::{Compression, write::GzEncoder};
-use ignore::{Walk as IgnoreWalk, WalkBuilder as IgnoreWalkBuilder};
 use sha2::{Digest, Sha256};
 use tar::{Builder as TarBuilder, HeaderMode};
 
@@ -39,20 +38,27 @@ pub fn pack_library(packages_path: &Path, output: &Path) -> cu::Result<PackLibra
     // lib
     {
         let source_path = packages_path.join("lib");
-        let walk = IgnoreWalkBuilder::new(&source_path)
-            .require_git(true)
-            .add_custom_ignore_filename(".libpackignore")
-            .build();
-        add_to_tar(&mut tar_builder, walk, &source_path, Path::new("."))?;
+        let mut walker = cu::fs::walker(&source_path);
+        walker.git(true).add_ignore_filename(".libpackignore");
+        add_to_tar(
+            &mut tar_builder,
+            walker.walk()?,
+            &source_path,
+            Path::new("."),
+        )?;
     }
 
     // nnheaders
     {
         let source_path = packages_path.join("nnheaders");
-        let walk = IgnoreWalkBuilder::new(&source_path)
-            .require_git(true)
-            .build();
-        add_to_tar(&mut tar_builder, walk, &source_path, Path::new("nnheaders"))?;
+        let mut walker = cu::fs::walker(&source_path);
+        walker.git(true);
+        add_to_tar(
+            &mut tar_builder,
+            walker.walk()?,
+            &source_path,
+            Path::new("nnheaders"),
+        )?;
     }
     // lib/Cargo.toml - need to make it a workspace
     {
@@ -83,7 +89,7 @@ pub fn pack_library(packages_path: &Path, output: &Path) -> cu::Result<PackLibra
 }
 fn add_to_tar(
     tar_builder: &mut TarBuilder<GzEncoder<Vec<u8>>>,
-    walk: IgnoreWalk,
+    walk: cu::fs::Walk,
     source_path: &Path,
     dest_path: &Path,
 ) -> cu::Result<()> {

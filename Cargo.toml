@@ -13,17 +13,24 @@ members = [
 
 [workspace.dependencies.cu]
 package = "pistonite-cu"
-version = "0.8.3"
+version = "0.9.0"
 # path = "../../../cu/packages/copper"
 
 [workspace.dependencies.pm]
 package = "pistonite-pm"
-version = "0.2.6"
+version = "0.2.7"
 
 [workspace.dependencies]
 static_assertions = "1.1.0"
 hermit-abi = "0.5.2"
-ignore = "0.4.26"
 flate2 = "1.1.9"
 tar = "0.4.46"
 sha2 = "0.11.0"
+serde = "1"
+tokio = "1"
+walkdir = "2.5.0"
+fxhash = "0.2.1"
+depfile = "0.1.1"
+regex = "1.13.0"
+cargo_metadata = "0.23.1"
+semver = "1.0.28"

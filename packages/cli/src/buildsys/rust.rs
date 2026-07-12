@@ -260,11 +260,11 @@ impl RustCtx {
     fn get_source_files(&self) -> cu::Result<Vec<PathBuf>> {
         let mut source_files: Vec<PathBuf> = vec![];
         for dir in &self.source_paths {
-            let mut walk = cu::fs::walk(dir)?;
-            while let Some(entry) = walk.next() {
-                let p = entry?.path();
+            for entry in cu::fs::walk(dir)? {
+                let entry = entry?;
+                let p = entry.path();
                 if p.extension().is_some_and(|e| e == "rs") {
-                    source_files.push(p);
+                    source_files.push(p.to_path_buf());
                 }
             }
         }
