@@ -260,11 +260,11 @@ impl RustCtx {
     fn get_source_files(&self) -> cu::Result<Vec<PathBuf>> {
         let mut source_files: Vec<PathBuf> = vec![];
         for dir in &self.source_paths {
-            let mut walk = cu::fs::walk(dir)?;
-            while let Some(entry) = walk.next() {
-                let p = entry?.path();
+            for entry in cu::fs::walk(dir)? {
+                let entry = entry?;
+                let p = entry.path();
                 if p.extension().is_some_and(|e| e == "rs") {
-                    source_files.push(p);
+                    source_files.push(p.to_path_buf());
                 }
             }
         }
@@ -295,18 +295,18 @@ async fn cxxbridge_process(
     out_cc.set_file_name(format!("{stem}.cc"));
 
     let header_updated = if cxxbridge_cmd(Some(&file), true, &out_h).await? {
-        cu::debug!("Cxxbridge: generated header {}", &out_h.display());
+        cu::debug!("Cxxbridge: generated header {}", out_h.display());
         true
     } else {
-        cu::debug!("Cxxbridge: header up to date {}", &out_h.display());
+        cu::debug!("Cxxbridge: header up to date {}", out_h.display());
         false
     };
 
     let source_updated = if cxxbridge_cmd(Some(&file), false, &out_cc).await? {
-        cu::debug!("Cxxbridge: generated source {}", &out_cc.display());
+        cu::debug!("Cxxbridge: generated source {}", out_cc.display());
         true
     } else {
-        cu::debug!("Cxxbridge: source up to date {}", &out_cc.display());
+        cu::debug!("Cxxbridge: source up to date {}", out_cc.display());
         false
     };
 

@@ -68,7 +68,7 @@ pub async fn compile_all(
             match src.configure(&ctx.flags, &ctx.output_path, record, env)? {
                 SourceStatus::UpToDate(object) => {
                     if !configure_only {
-                        cu::debug!("Compile: object up to date {}", &object.display());
+                        cu::debug!("Compile: object up to date {}", object.display());
                     }
                     // Record must exist if object is up to date
                     let old_rec = record.unwrap();

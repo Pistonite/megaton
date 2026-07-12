@@ -8,7 +8,7 @@ use cu::pre::*;
 use crate::home;
 
 /// The "blessed" cxxbridge-cmd version to use
-pub static BLESSED_VERSION: &str = "1.0.194";
+pub static BLESSED_VERSION: &str = "1.0.197";
 
 pub struct CxxBridgeInfo {
     pub version: String,

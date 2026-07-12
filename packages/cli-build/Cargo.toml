@@ -7,7 +7,6 @@ license = "MIT"
 
 [dependencies]
 cu = { workspace = true, features = ["process", "toml"] }
-ignore.workspace = true
 flate2.workspace = true
 tar.workspace = true
 sha2.workspace = true
