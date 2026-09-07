@@ -8,17 +8,18 @@ members = [
     "packages/lib/macros",
     "packages/toolchain-build",
     "packages/test-mod",
+    "packages/ftp-tool",
 ]
 
 
 [workspace.dependencies.cu]
 package = "pistonite-cu"
-version = "0.9.0"
+version = "0.9.3"
 # path = "../../../cu/packages/copper"
 
 [workspace.dependencies.pm]
 package = "pistonite-pm"
-version = "0.2.7"
+version = "0.3.0"
 
 [workspace.dependencies]
 static_assertions = "1.1.0"
@@ -34,3 +35,4 @@ depfile = "0.1.1"
 regex = "1.13.0"
 cargo_metadata = "0.23.1"
 semver = "1.0.28"
+suppaftp = "11.0.0"

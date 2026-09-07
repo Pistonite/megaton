@@ -1,0 +1,11 @@
+[package]
+name = "ftp-tool"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+cu = { workspace = true, features = [ "cli", "fs", "coroutine-heavy", "derive", "toml" ] }
+suppaftp = { workspace = true, features = ["tokio-rustls-aws-lc-rs"] }
+serde.workspace = true
+tokio.workspace = true

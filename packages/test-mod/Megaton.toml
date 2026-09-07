@@ -1,6 +1,7 @@
 [module]
 name = "test-mod"
 title-id = 0x01007ef00011e000
+nso-name = "subsdk9"
 
 [megaton]
 version = "0.1.0"
