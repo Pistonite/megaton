@@ -7,6 +7,25 @@ includes:
     optional: true
 
 tasks:
+  setup-rust:
+    desc: Clone the rust-lang/rust repo locally for working on the patch
+    cmds:
+      - python scripts/setup_rust.py setup
+  make-patch:
+    desc: Generate a patch file for rust-lang/rust using the current commit against origin/main
+    cmds:
+      - python scripts/setup_rust.py make-patch
+
+  run-install:
+    desc: Run the install cmd to install the megaton toolchain
+    cmds:
+      - cargo run -p megaton-toolchain-build --example docker_install -- {{.CLI_ARGS}}
+  run-remove:
+    desc: Unlink the megaton toolchain
+    cmds:
+      - rustup toolchain uninstall megaton
+
+
   check:
     - task: cargo:clippy-all
     - task: cargo:fmt-check

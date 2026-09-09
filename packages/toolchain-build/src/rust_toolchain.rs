@@ -10,9 +10,13 @@ static TOOLCHAIN_NAME: &str = "megaton";
 /// The Rust compiler repo
 static RUST_REPO: &str = "https://github.com/rust-lang/rust";
 /// The "blessed" commit hash to use (i.e. tested and will work)
-pub static BLESSED_COMMIT: &str = "caadc8df3519f1c92ef59ea816eb628345d9f52a";
+pub static BLESSED_COMMIT: &str = "0d31508599a7814a7044e9a7a871e3dc5f037753";
 /// The "blessed" version tag corresponding to the commit
-pub static BLESSED_VERSION: &str = "1.91.0-dev";
+pub static BLESSED_VERSION: &str = "1.100.0-dev";
+/// Rust compiler/library patch file
+static RUST_PATCH: &[u8] = include_bytes!("../scripts/rust-2026-09-09-0d31508599a7814a.patch");
+/// File name the patch is written to inside the rust repo, to be applied from there
+static RUST_PATCH_FILE: &str = "megaton.patch";
 
 pub struct RustToolchainInfo {
     pub commit_hash: Option<String>,
@@ -112,15 +116,14 @@ pub fn install(home: &Path, keep: bool, mut clean: bool) -> cu::Result<()> {
     let rust_path = source_location(home);
     if !clean {
         // try to get the current commit hash, will succeed if we have a valid repo
+        // note we perform a checkout_blessed_commit regardless to re-apply the patch if needed
         match try_get_rust_source_commit(&rust_path) {
             Ok(hash) => {
-                if hash == BLESSED_COMMIT {
-                    cu::info!("blessed commit is already checkout, skipping update");
-                } else {
+                cu::debug!("current commit: {hash}");
+                if hash != BLESSED_COMMIT {
                     cu::info!(
                         "current commit is not the blessed commit, checking out the blessed commit"
                     );
-                    checkout_blessed_commit(&rust_path)?;
                 }
             }
             Err(e) => {
@@ -132,83 +135,84 @@ pub fn install(home: &Path, keep: bool, mut clean: bool) -> cu::Result<()> {
     if clean {
         cu::warn!("performing full re-checkout");
         clone_rust_source(&rust_path)?;
-        checkout_blessed_commit(&rust_path)?;
     }
+    checkout_blessed_commit(&rust_path)?;
 
     // verify the blessed commit is checked out
-    let actual_commit = try_get_rust_source_commit(&rust_path)
-        .context("failed to verify the blessed commit is checked out")?;
+    let actual_commit = cu::check!(
+        try_get_rust_source_commit(&rust_path),
+        "failed to verify the blessed commit is checked out"
+    )?;
     if actual_commit != BLESSED_COMMIT {
         cu::bail!("failed to checkout the blessed commit.");
     }
 
-    let mut bootstrap_toml = String::new();
-    // using the compiler profile, since it usually builds the fastest (compared to other)
-    bootstrap_toml += "profile = 'compiler'\n";
-    let change_id = get_change_id(&rust_path)?;
-    cu::info!("change-id: {change_id}");
-    bootstrap_toml += &format!("change-id = {change_id}\n");
-
-    // llvm configs
-    // even though it's faster to download ci-llvm, in my experience
-    // it will just fail
-    bootstrap_toml += "llvm.download-ci-llvm = false\n";
-    if host_triple.starts_with("x86_64-") {
-        bootstrap_toml += "llvm.targets = 'AArch64;X86'\n";
-    } else if host_triple.starts_with("aarch64-") {
-        bootstrap_toml += "llvm.targets = 'AArch64'\n";
-    } else {
-        cu::warn!("using default llvm targets since the host is neither x86_64 or aarch64");
-    };
-
-    // build configs
-    bootstrap_toml += "build.compiler-docs = false\n";
-    bootstrap_toml += "build.extended = false\n";
-    // stage 2 compiler will be newer, but doubly slow to build
-    // (basically fresh built from stage 1 compiler)
-    bootstrap_toml += "build.build-stage = 1\n";
-    bootstrap_toml += &format!("build.host = ['{host_triple}']\n");
-    // TODO: building nintendo switch target just for testing, when hermit is mature, can remove
-    // the other, to make it build faster
-    bootstrap_toml += &format!(
-        "build.target = ['{host_triple}', 'aarch64-unknown-hermit', 'aarch64-nintendo-switch-freestanding']\n"
-    );
-
-    // install configs
     let install_location = install_location(home);
     cu::fs::make_dir_empty(&install_location)?;
     let install_location = install_location.normalize_exists()?;
-    bootstrap_toml += &format!("install.prefix = '{}'\n", install_location.as_utf8()?);
-    bootstrap_toml += &format!(
-        "install.sysconfdir = '{}'\n",
-        install_location.join("etc").into_utf8()?
-    );
 
-    // rust build configs
-    bootstrap_toml += "rust.debug-logging = false\n";
-    bootstrap_toml += "rust.debug-assertions = false\n";
-    bootstrap_toml += "rust.debuginfo-level = 0\n";
-    bootstrap_toml += "rust.backtrace-on-ice = false\n";
-    bootstrap_toml += "rust.frame-pointers = false\n";
-    bootstrap_toml += "rust.download-rustc = false\n";
-    bootstrap_toml += "rust.incremental = false\n";
-    // reducing this will make the built compiler faster,
-    // but will make building the compiler slow, which is not what we want
-    // (since the mod is usually small and pretty fast to build anyway)
-    bootstrap_toml += "rust.codegen-units = 16\n";
-    // https://github.com/rust-lang/rust/blob/master/bootstrap.example.toml
-    // anything other than 1 "occasionally have bugs"
-    bootstrap_toml += "rust.codegen-units-std = 1\n";
-    // we need the hash to check when rebuild is needed
-    bootstrap_toml += "rust.omit-git-hash = false\n";
-    if host_triple == "x86_64-unknown-linux-gnu" {
-        bootstrap_toml += "rust.lto = 'thin'\n";
-    }
+    let bootstrap_toml = {
+        let bootstrap_toml_template =
+            cu::fs::read_string(rust_path.join("bootstrap.megaton.toml"))?;
+        let llvm_targets = if host_triple.starts_with("x86_64-") {
+            "llvm.targets = 'AArch64;X86'"
+        } else if host_triple.starts_with("aarch64-") {
+            "llvm.targets = 'AArch64'"
+        } else {
+            cu::warn!("using default llvm targets since the host is neither x86_64 or aarch64");
+            ""
+        };
+        let install_prefix = install_location.as_utf8()?;
+        let install_sysconfdir = install_location.join("etc").into_utf8()?;
+        let rust_lto = if host_triple == "x86_64-unknown-linux-gnu" {
+            // enable thin lto on x86 linux gnu, which is the only target tested
+            "rust.lto = 'thin'"
+        } else {
+            ""
+        };
+        let mut bootstrap_toml = String::new();
+        let mut start = 0;
+        while let Some(i) = bootstrap_toml_template[start..].find("{{MEGATON_") {
+            let i = start + i;
+            bootstrap_toml.push_str(&bootstrap_toml_template[start..i]);
+            let Some(j) = bootstrap_toml_template[i..].find("}}") else {
+                cu::bail!(
+                    "unexpected: unclosed {{{{MEGATON_ key in bootstrap template; this is a bug in megaton"
+                );
+            };
+            start = i + j + 2;
+            match &bootstrap_toml_template[i..start] {
+                "{{MEGATON_LLVM_TARGETS_KEY_VALUE}}" => {
+                    bootstrap_toml.push_str(llvm_targets);
+                }
+                "{{MEGATON_HOST_TRIPLE}}" => {
+                    bootstrap_toml.push_str(&host_triple);
+                }
+                "{{MEGATON_INSTALL_PREFIX}}" => {
+                    bootstrap_toml.push_str(install_prefix);
+                }
+                "{{MEGATON_INSTALL_SYSCONFDIR}}" => {
+                    bootstrap_toml.push_str(&install_sysconfdir);
+                }
+                "{{MEGATON_RUST_LTO_KEY_VALUE}}" => {
+                    bootstrap_toml.push_str(rust_lto);
+                }
+                other => {
+                    cu::bail!(
+                        "unexpected: unknown '{other}' key in bootstrap template; this is a bug in megaton"
+                    );
+                }
+            }
+        }
+        bootstrap_toml.push_str(&bootstrap_toml_template[start..]);
+        cu::trace!("bootstrap_toml: {bootstrap_toml}");
+        bootstrap_toml
+    };
 
     cu::fs::write(rust_path.join("bootstrap.toml"), bootstrap_toml)?;
 
     cu::info!("building and installing rust");
-    cu::hint!(" - this may take a while, please be patient.");
+    cu::hint!(" ** this may take a while, please be patient **");
     {
         let debug_log = cu::lv::D.enabled();
         let command = cu::bin::resolve("rust-x", rust_path.join("x"))?
@@ -217,11 +221,11 @@ pub fn install(home: &Path, keep: bool, mut clean: bool) -> cu::Result<()> {
             .add(cu::color_flag())
             .args(["--stage", "1", "install", "compiler/rustc", "library/std"])
             .stdin_null();
-        let code = if debug_log {
-            command.stdoe(cu::pio::inherit()).wait()?
+        let (code, bar) = if debug_log {
+            (command.stdoe(cu::pio::inherit()).wait()?, None)
         } else {
-            let (child, _, _) = command.stdoe(cu::pio::spinner("")).spawn()?;
-            child.wait()?
+            let (child, bar, _) = command.stdoe(cu::pio::spinner("")).spawn()?;
+            (child.wait()?, Some(bar))
         };
 
         if !code.success() {
@@ -230,10 +234,14 @@ pub fn install(home: &Path, keep: bool, mut clean: bool) -> cu::Result<()> {
             }
             cu::bail!("rust/x failed!");
         }
+
+        if let Some(bar) = bar {
+            bar.done();
+        }
     }
 
     let install_location = self::install_location(home);
-    cu::which("rustup")?
+    let toolchain_link_result = cu::which("rustup")?
         .command()
         .add(cu::args![
             "toolchain",
@@ -242,8 +250,8 @@ pub fn install(home: &Path, keep: bool, mut clean: bool) -> cu::Result<()> {
             install_location
         ])
         .all_null()
-        .wait_nz()
-        .context("failed to link built toolchain")?;
+        .wait_nz();
+    cu::check!(toolchain_link_result, "failed to link built toolchain")?;
 
     let toolchain_info = cu::check!(
         check(true),
@@ -299,7 +307,10 @@ pub fn remove(home: &Path) -> cu::Result<()> {
         "cleaning up toolchain files at '{}'",
         install_path.display()
     );
-    cu::fs::make_dir_empty(install_path).context("failed to clean up old toolchain files")?;
+    cu::check!(
+        cu::fs::make_dir_empty(install_path),
+        "failed to clean up old toolchain files"
+    )?;
     Ok(())
 }
 
@@ -343,7 +354,10 @@ fn get_rustc_host_triple() -> cu::Result<String> {
 }
 
 fn clone_rust_source(path: &Path) -> cu::Result<()> {
-    cu::fs::make_dir_empty(path).context("fail to clean rust source directory")?;
+    cu::check!(
+        cu::fs::make_dir_empty(path),
+        "fail to clean rust source directory"
+    )?;
     let git = cu::which("git")?;
     git.command()
         .add(cu::args!["-C", &path, "init"])
@@ -360,7 +374,8 @@ fn clone_rust_source(path: &Path) -> cu::Result<()> {
 
 fn checkout_blessed_commit(path: &Path) -> cu::Result<()> {
     let git = cu::which("git")?;
-    git.command()
+    let (child, bar, _) = git
+        .command()
         .add(cu::args![
             "-C",
             &path,
@@ -373,22 +388,57 @@ fn checkout_blessed_commit(path: &Path) -> cu::Result<()> {
         ])
         .stdoe(cu::pio::spinner("fetching rust source"))
         .stdin_null()
-        .spawn()?
-        .0
-        .wait()?;
-    git.command()
+        .spawn()?;
+    // git doesn't exit with 0..
+    child.wait()?;
+    bar.done();
+
+    // --force, since the patch applied to the previously checked-out commit
+    // leaves the tracked files modified
+    let (child, bar, _) = git
+        .command()
         .add(cu::args![
             "-C",
             &path,
             "checkout",
+            "--force",
             BLESSED_COMMIT,
             "--progress"
         ])
         .stdoe(cu::pio::spinner("checking-out rust source"))
         .stdin_null()
-        .spawn()?
-        .0
-        .wait()?;
+        .spawn()?;
+    // git doesn't exit with 0..
+    child.wait()?;
+    bar.done();
+
+    // delete untracked files
+    let clean_result = git
+        .command()
+        .add(cu::args!["-C", &path, "clean", "--force", "-d"])
+        .stdoe(cu::lv::D)
+        .stdin_null()
+        .wait_nz();
+    cu::check!(clean_result, "failed to clean the rust source")?;
+
+    // apply the megaton patch
+    cu::fs::write(path.join(RUST_PATCH_FILE), RUST_PATCH)?;
+    let apply_result = git
+        .command()
+        .add(cu::args![
+            "-C",
+            &path,
+            "apply",
+            "--whitespace=nowarn",
+            RUST_PATCH_FILE
+        ])
+        .stdoe(cu::pio::spinner("applying megaton rust patch"))
+        .stdin_null()
+        .spawn();
+    let (child, bar, _) = cu::check!(apply_result, "failed to apply the rust patch: spawn failed")?;
+    cu::check!(child.wait_nz(), "failed to apply the rust patch")?;
+    bar.done();
+
     Ok(())
 }
 
@@ -396,7 +446,7 @@ fn checkout_blessed_commit(path: &Path) -> cu::Result<()> {
 /// if any
 fn try_get_rust_source_commit(path: &Path) -> cu::Result<String> {
     if !path.join(".git").exists() {
-        cu::bail!("not a git repo");
+        cu::bail!("not a git repo: '{}'", path.display());
     }
     let (child, commit) = cu::which("git")?
         .command()
@@ -411,21 +461,4 @@ fn try_get_rust_source_commit(path: &Path) -> cu::Result<String> {
         cu::bail!("commit is empty");
     }
     Ok(commit.to_string())
-}
-
-fn get_change_id(path: &Path) -> cu::Result<String> {
-    let change_tracker_path = path.join("src/bootstrap/src/utils/change_tracker.rs");
-    let source = cu::fs::read_string(change_tracker_path)?;
-    let mut change_id = None;
-    for line in source.lines().rev() {
-        let line = line.trim();
-        if let Some(after) = line.strip_prefix("change_id: ") {
-            change_id = Some(after.trim_matches(','));
-            break;
-        }
-    }
-    let Some(change_id) = change_id else {
-        cu::bail!("cannot find change-id from change_tracker.rs");
-    };
-    Ok(change_id.to_string())
 }

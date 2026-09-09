@@ -85,6 +85,7 @@ pub fn install(home: &Path) -> cu::Result<()> {
         .command()
         .add(cu::args![
             "install",
+            "--force",
             "--root",
             home,
             "--no-track",
