@@ -160,6 +160,7 @@ impl FtpClient {
     }
 
     pub async fn download(&mut self, dir: &str, out_root: &str, keep: bool) -> cu::Result<()> {
+        cu::info!("downloading {dir}");
         let result = execute_in_ctrlc_frame(move |ctrlc| async move {
             let mut pending_dirs = vec!["".to_string()];
             let download_pool = cu::co::pool(4);
