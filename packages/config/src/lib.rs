@@ -1,4 +1,5 @@
-mod cmd;
-pub use cmd::*;
-mod config_file;
-pub use config_file::*;
+//! Megaton cli, project and toolchain environment config
+
+pub mod cmd;
+pub mod config_file;
+pub mod toolchain;

@@ -66,30 +66,39 @@ pub fn extend_by_default_token<T: DefaultToken + Clone>(current: &mut Option<Vec
 /// Resolve the default tokens in `values` into `output`
 pub fn resolve_default_token<T: DefaultToken + Clone, F: FnOnce() -> Vec<T>>(
     mut output: Vec<T>,
-    values: &[T], resolve_fn: F
+    values: Option<&[T]>, resolve_fn: F
 ) -> Vec<T> {
     enum ResolveState<T, F: FnOnce() -> Vec<T>> {
         Pending(F),
         Resolved(Vec<T>),
     }
-    let mut default_values = ResolveState::Pending(resolve_fn);
-    for value in values {
-        if value.is_default_token() {
-            match &default_values {
-                ResolveState::Pending(_) => {
-                    let resolved = match default_values {
-                        ResolveState::Pending(f) => {f()},
-                        _ => unreachable!()
-                    };
-                    output.extend_from_slice(&resolved);
-                    default_values = ResolveState::Resolved(resolved);
-                }
-                ResolveState::Resolved(resolved) => {
-                    output.extend_from_slice(&resolved);
+    match values {
+        Some(values) => {
+            let mut default_values = ResolveState::Pending(resolve_fn);
+            for value in values {
+                if value.is_default_token() {
+                    match &default_values {
+                        ResolveState::Pending(_) => {
+                            let resolved = match default_values {
+                                ResolveState::Pending(f) => {f()},
+                                _ => unreachable!()
+                            };
+                            output.extend_from_slice(&resolved);
+                            default_values = ResolveState::Resolved(resolved);
+                        }
+                        ResolveState::Resolved(resolved) => {
+                            output.extend_from_slice(&resolved);
+                        }
+                    }
+                } else {
+                    output.push(value.clone());
                 }
             }
-        } else {
-            output.push(value.clone());
+        }
+        None => {
+            // treat as ["<default>"]
+            let resolved = resolve_fn();
+            output.extend(resolved);
         }
     }
 

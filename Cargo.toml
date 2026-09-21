@@ -3,18 +3,22 @@ resolver = "2"
 members = [
     "packages/cli",
     "packages/cli-build",
+    "packages/config",
     "packages/docker-build",
     "packages/lib",
     "packages/lib/macros",
     "packages/toolchain-build",
     "packages/test-mod",
-    "packages/ftp-tool",
+    "packages/ftp",
 ]
+
+[workspace.package]
+version = "0.1.0"
 
 
 [workspace.dependencies.cu]
 package = "pistonite-cu"
-version = "0.9.3"
+version = "0.9.5"
 # path = "../../../cu/packages/copper"
 
 [workspace.dependencies.pm]
@@ -22,6 +26,7 @@ package = "pistonite-pm"
 version = "0.3.0"
 
 [workspace.dependencies]
+megaton-config.path = "packages/config"
 static_assertions = "1.1.0"
 hermit-abi = "0.5.2"
 flate2 = "1.1.9"

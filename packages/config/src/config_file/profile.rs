@@ -4,10 +4,12 @@
 //! Utils for managing profiles for sections in the config
 
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use cu::pre::*;
 
-use super::{Validate, ValidateCtx};
+use crate::config_file::{Resolve, Validate, ValidateCtx};
+use crate::toolchain::ToolchainEnv;
 
 /// Name of the base profile
 pub static BASE_PROFILE: &str = "none";
@@ -51,6 +53,16 @@ impl<T: ExtendProfile> Validate for Profile<T> {
     fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
         self.base.validate(ctx)?;
         self.profiles.validate_property(ctx, "profiles")?;
+        Ok(())
+    }
+}
+
+impl<T: Resolve + ExtendProfile> Resolve for Profile<T> {
+    fn resolve(&mut self, root: &Path, toolchain: &ToolchainEnv) -> cu::Result<()> {
+        cu::check!(self.base.resolve(root, toolchain), "failed to resolve config for profile \"none\"")?;
+        for (name, config) in &mut self.profiles.0 {
+            cu::check!(config.resolve(root, toolchain), "failed to resolve config for profile \"{name}\"")?;
+        }
         Ok(())
     }
 }

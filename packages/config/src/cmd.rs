@@ -1,6 +1,6 @@
 use cu::pre::*;
 
-use crate::{BASE_PROFILE, Config, ProjectEnv};
+use crate::config_file::{BASE_PROFILE, Config, ProjectEnv};
 
 #[derive(clap::Parser, AsRef)]
 pub struct Cmd {

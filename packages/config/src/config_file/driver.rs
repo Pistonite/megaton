@@ -3,8 +3,7 @@ use std::path::PathBuf;
 use cu::pre::*;
 use semver::VersionReq;
 
-use crate::{BASE_PROFILE, RustConfig};
-use crate::config_file::{self, CaptureUnused, Validate, ValidateCtx, ModuleConfig, MegatonConfig};
+use crate::config_file::{self, CaptureUnused, Validate, ValidateCtx, ModuleConfig, MegatonConfig, RustConfig, BASE_PROFILE};
 
 /// Project environment
 pub struct ProjectEnv {
