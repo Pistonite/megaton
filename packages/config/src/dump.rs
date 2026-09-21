@@ -1,7 +1,64 @@
+
 use cu::pre::*;
 
+/// Dump a value given the key
+pub fn dump(key: &str, mut value: json::Value) -> cu::Result<json::Value> {
+        let mut rest = key;
+        let mut current_path = String::new();
+        loop {
+            let next = cu::check!(
+                parse_next_key(rest),
+                "error parsing config key"
+            )?;
+            let key = match next {
+                Some((key, next_rest)) => {
+                    rest = next_rest;
+                    key
+                }
+                None => return Ok(value),
+            };
+            match value {
+                json::Value::Object(mut map) => match map.remove(key) {
+                    None => {
+                        let keys = format!("{:?}", map.keys().collect::<Vec<_>>());
+                        cu::bail!(
+                            "invalid key '{key}' at '{current_path}', valid keys are: {keys}"
+                        );
+                    }
+                    Some(v) => value = v,
+                },
+                json::Value::Array(mut values) => {
+                    let len = values.len();
+                    let num = cu::parse::<usize>(key.trim());
+                    let num = cu::check!(
+                        num,
+                        "invalid key '{key}' at '{current_path}', valid keys are: [0 - {}] for array of length {len}",
+                        len - 1
+                    )?;
+                    if num >= len {
+                        cu::bail!("index {num} out of bound: length at '{current_path}' is {len}");
+                    }
+                    value = values.swap_remove(num);
+                }
+                x => {
+                    let stringified = match json::stringify(&x) {
+                        Ok(x) => x,
+                        Err(_) => format!("{x:?}"),
+                    };
+                    cu::bail!(
+                        "invalid key '{key}' at '{current_path}', is a scalar value: {stringified}"
+                    );
+                }
+            }
+            if !current_path.is_empty() {
+                current_path.push('.');
+            }
+            current_path.push_str(key);
+        }
+}
+
 /// Parse the next key segment
-pub fn parse_next_key(key: &str) -> cu::Result<Option<(&str, &str)>> {
+fn parse_next_key(key: &str) -> cu::Result<Option<(&str, &str)>> {
     let key = trim_rest(key);
     if key.is_empty() {
         return Ok(None);
@@ -35,6 +92,94 @@ fn trim_rest(key: &str) -> &str {
         key = key[1..].trim_start();
     }
     key
+}
+
+#[derive(clap::ValueEnum, Default, Clone, Copy)]
+pub enum DumpFormat {
+    /// One-line JSON
+    Json,
+    /// Pretty JSON
+    JsonPretty,
+    /// Raw: arrays are dumped as one value per line; objects are dumped as one `key=value` per
+    /// line; over-complex objects cannot be dumped
+    #[default]
+    Raw,
+    /// Like Raw, but array and objects are space-separated instead of one per line.
+    OneLine
+}
+impl DumpFormat {
+    pub fn stringify(self, value: &json::Value, hex: bool) -> cu::Result<String> {
+        match self {
+            Self::Json => {
+                json::stringify(&value)
+            }
+            Self::JsonPretty => {
+                json::stringify_pretty(&value)
+            }
+            Self::Raw => {
+                json_obj_to_raw(&value, '\n', hex)
+            }
+            Self::OneLine => {
+                json_obj_to_raw(&value, ' ', hex)
+            }
+        }
+    }
+}
+
+fn json_obj_to_raw(value: &json::Value, join: char, hex: bool) -> cu::Result<String> {
+    let mut buf = String::new();
+    match value {
+        json::Value::Array(values) => {
+            for v in values {
+                if !buf.is_empty() {
+                    buf.push(join);
+                }
+                json_to_raw(&mut buf, v, hex)?;
+            }
+        }
+        json::Value::Object(map) => {
+            for (k,v) in map {
+                if !buf.is_empty() {
+                    buf.push(join);
+                }
+                buf.push_str(k);
+                buf.push('=');
+                json_to_raw(&mut buf, v, hex)?;
+            }
+        }
+        other => {
+            json_to_raw(&mut buf, other, hex)?;
+        }
+    }
+    Ok(buf)
+}
+
+fn json_to_raw(out: &mut String, value: &json::Value, hex: bool) -> cu::Result<()> {
+    match value {
+        json::Value::Object(_) | json::Value::Array(_) => {
+            cu::bail!("object is too complex; please use --format=json or --format=json-pretty");
+        }
+        json::Value::Null => out.push_str("null"),
+        json::Value::Bool(x) => {
+            if *x {
+                out .push_str( "true");
+            } else {
+                out .push_str( "false");
+            }
+        }
+        json::Value::Number(n) => {
+            use std::fmt::Write;
+            if hex && let Some(x) = n.as_u64() {
+                let _ = write!(out, "0x{x:x}");
+            } else {
+                let _ = write!(out, "{n}");
+            }
+        }
+        json::Value::String(x) => {
+            out.push_str(x)
+        }
+    }
+    Ok(())
 }
 
 

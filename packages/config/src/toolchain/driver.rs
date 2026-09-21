@@ -14,4 +14,9 @@ impl ToolchainEnv {
             devkita64: DevKitA64Env::resolve()?
         })
     }
+
+    /// Turn the toolchain env into a JSON blob
+    pub fn to_json(&self) -> cu::Result<json::Value> {
+        json::to_value(self)
+    }
 }

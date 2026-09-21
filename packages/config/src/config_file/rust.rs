@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use cu::pre::*;
 
-use crate::config_file::{CaptureUnused, Validate, ValidateCtx};
+use crate::config_file::{CaptureUnused, ProjectTargetEnv, Validate, ValidateCtx};
 
 /// `[rust]` config section
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -38,8 +38,8 @@ impl Default for RustConfig {
 }
 
 impl RustConfig {
-    pub fn resolve(&mut self, root: &Path) {
-        let resolved_manifest = root.join(&self.cargo_manifest);
+    pub fn resolve(&mut self, project: &ProjectTargetEnv) {
+        let resolved_manifest = project.root.join(&self.cargo_manifest);
         match self.enabled {
             None => {
                 if self.cargo_manifest.as_path() != Path::new("Cargo.toml") {
@@ -61,7 +61,7 @@ impl RustConfig {
         }
         self.cargo_manifest = resolved_manifest;
         for s in &mut self.sources {
-            *s = root.join(&*s);
+            *s = project.root.join(&*s);
         }
     }
     pub fn enabled(&self) -> bool {

@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use cu::pre::*;
 
-static TRIPLE: &str = "aarch64-none-elf";
+pub static DEVKITA64_TRIPLE: &str = "aarch64-none-elf";
 
 #[derive(Debug, Serialize)]
 pub struct DevKitA64Env {
@@ -71,7 +71,7 @@ impl DevKitA64Env {
         let tools_bin = cu::path!(&dkp / "tools" / "bin");
         let dka64 = cu::path!(dkp / "devkitA64");
         let dka64_bin = cu::path!(&dka64 / "bin");
-        let cc = cu::path!(&dka64_bin / format!("{TRIPLE}-gcc"));
+        let cc = cu::path!(&dka64_bin / format!("{DEVKITA64_TRIPLE}-gcc"));
 
         let version = match get_gcc_version_from_installation(&dka64) {
             Some(v) => {
@@ -86,10 +86,10 @@ impl DevKitA64Env {
             }
         };
 
-        let cxx = cu::path!(&dka64_bin / format!("{TRIPLE}-g++"));
-        let asm = cu::path!(&dka64_bin / format!("{TRIPLE}-as"));
-        let ar = cu::path!(&dka64_bin / format!("{TRIPLE}-ar"));
-        let objdump = cu::path!(&dka64_bin / format!("{TRIPLE}-objdump"));
+        let cxx = cu::path!(&dka64_bin / format!("{DEVKITA64_TRIPLE}-g++"));
+        let asm = cu::path!(&dka64_bin / format!("{DEVKITA64_TRIPLE}-as"));
+        let ar = cu::path!(&dka64_bin / format!("{DEVKITA64_TRIPLE}-ar"));
+        let objdump = cu::path!(&dka64_bin / format!("{DEVKITA64_TRIPLE}-objdump"));
         let npdmtool = cu::path!(&tools_bin / "npdmtool");
         let elf2nso = cu::path!(&tools_bin / "elf2nso");
 
@@ -112,7 +112,7 @@ impl DevKitA64Env {
 }
 
 fn get_gcc_version_from_installation(dka64: &Path) -> Option<String> {
-    let dka64_include_cpp = cu::path!(&dka64 / TRIPLE / "include" / "c++");
+    let dka64_include_cpp = cu::path!(&dka64 / DEVKITA64_TRIPLE / "include" / "c++");
     // the include directory should have 1 version
     let readdir = match cu::fs::read_dir(&dka64_include_cpp) {
         Ok(readdir) => readdir,
@@ -175,16 +175,16 @@ fn get_gcc_version_from_gcc(cc_path: &Path) -> cu::Result<String> {
 }
 
 fn get_includes(dka64: &Path, version: &str) -> cu::Result<(Vec<String>, Vec<String>)> {
-    let dka64_triple_include = cu::path!(&dka64 / TRIPLE / "include");
+    let dka64_triple_include = cu::path!(&dka64 / DEVKITA64_TRIPLE / "include");
     let dka64_triple_include_cpp = cu::path!(&dka64_triple_include / "c++" / version);
-    let dka64_lib_gcc_include = cu::path!(&dka64 / "lib" / "gcc" / TRIPLE / version);
+    let dka64_lib_gcc_include = cu::path!(&dka64 / "lib" / "gcc" / DEVKITA64_TRIPLE / version);
 
     Ok((vec![
         dka64_triple_include.into_utf8()?,
         dka64_lib_gcc_include.join("include").into_utf8()?,
         cu::path!(dka64_lib_gcc_include / "include-fixed").into_utf8()?
     ], vec![
-        dka64_triple_include_cpp.join(TRIPLE).into_utf8()?,
+        dka64_triple_include_cpp.join(DEVKITA64_TRIPLE).into_utf8()?,
         dka64_triple_include_cpp.join("backward").into_utf8()?,
         dka64_triple_include_cpp.into_utf8()?,
     ]))

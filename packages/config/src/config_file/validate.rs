@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
-use std::path::Path;
 
 use cu::pre::*;
 
+use crate::config_file::ProjectTargetEnv;
 use crate::toolchain::ToolchainEnv;
 
 /// Container for detecting and warning user about unused values
@@ -20,7 +20,10 @@ impl Validate for CaptureUnused {
 
 pub trait Resolve {
     /// Resolve values in the config
-    fn resolve(&mut self, root: &Path, toolchain: &ToolchainEnv) -> cu::Result<()>;
+    ///
+    /// Toolchain maybe optional if the caller decides to not resolve the toolchain
+    /// environment. The implementation can either pick default values or bail
+    fn resolve(&mut self, project: &ProjectTargetEnv, toolchain: Option<&ToolchainEnv>) -> cu::Result<()>;
 }
 
 /// Trait for validating the config

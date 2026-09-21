@@ -1,6 +1,8 @@
 use cu::pre::*;
 
-use crate::config_file::{BASE_PROFILE, Config, ProjectEnv};
+use crate::config_file::{BASE_PROFILE, Config, ConfigLoadOpts};
+use crate::dump::{self, DumpFormat};
+use crate::toolchain::ToolchainEnv;
 
 #[derive(clap::Parser, AsRef)]
 pub struct Cmd {
@@ -24,7 +26,7 @@ pub struct Cmd {
     no_config: bool,
 
     /// Do not run the resolve phase when loading the config.
-    /// 
+    ///
     /// The resolve phase resolves paths and default tokens in the config.
     #[clap(long, conflicts_with = "env")]
     no_resolve: bool,
@@ -34,11 +36,11 @@ pub struct Cmd {
     no_validate: bool,
 
     /// Format non-neg integers as hex in raw or one-line format
-    #[clap(short='H', long)]
+    #[clap(short = 'H', long)]
     hex: bool,
 
     #[clap(short, long, default_value = "raw")]
-    format: ConfigDumpFormat,
+    format: DumpFormat,
 
     #[clap(flatten)]
     #[as_ref]
@@ -47,42 +49,45 @@ pub struct Cmd {
 impl Cmd {
     pub fn run(self, dir: Option<&str>) -> cu::Result<()> {
         cu::lv::disable_print_time();
+        cu::cli::print_to(cu::cli::Target::Stderr);
+        let key = self.key.as_deref().unwrap_or_default();
         let value = if self.env {
-            todo!();
+            let toolchain = ToolchainEnv::resolve()?;
+            let value = cu::check!(
+                toolchain.to_json(),
+                "failed to convert toolchain environment to JSON"
+            )?;
+            value
         } else {
-            let config = if self.no_config {
-                Config::new_no_megaton_toml(!self.no_resolve, !self.no_validate)?
+            let toolchain = if self.no_resolve {
+                None
             } else {
-                let project = ProjectEnv::resolve(dir)?;
-                project.load_config(!self.no_resolve, !self.no_validate)?
+                let toolchain = ToolchainEnv::resolve()?;
+                Some(toolchain)
+            };
+            let opts = ConfigLoadOpts {
+                resolve: !self.no_resolve,
+                validate: !self.no_validate,
+                cli_profile: self.profile.as_deref(),
+                toolchain: toolchain.as_ref(),
+            };
+            let config = if self.no_config {
+                Config::new_no_megaton_toml(opts)?
+            } else {
+                Config::new_from_project_dir(dir, opts)?
             };
 
-            let profile = config.select_profile(self.profile.as_deref())?;
-
-
-            let key = self.key.as_deref().unwrap_or_default();
-            let value = cu::check!(config.dump(key, profile), "failed to get config value by key: '{key}'")?;
+            let value = cu::check!(config.to_json(), "failed to convert config value to JSON")?;
             value
         };
+        let value = cu::check!(
+            dump::dump(key, value),
+            "failed to dump value by key: '{key}'"
+        )?;
 
-        match self.format {
-            ConfigDumpFormat::Json => {
-                let x = json::stringify(&value)?;
-                println!("{x}");
-            }
-            ConfigDumpFormat::JsonPretty => {
-                let x = json::stringify_pretty(&value)?;
-                println!("{x}");
-            }
-            ConfigDumpFormat::Raw => {
-                let x = json_obj_to_raw(&value, '\n', self.hex)?;
-                println!("{x}");
-            }
-            ConfigDumpFormat::OneLine => {
-                let x = json_obj_to_raw(&value, ' ', self.hex)?;
-                println!("{x}");
-            }
-        }
+        let dumped = self.format.stringify(&value, self.hex)?;
+        println!("{dumped}");
+
         Ok(())
     }
 }
@@ -91,76 +96,6 @@ impl AsProfileFlag for Cmd {
     fn as_profile_mut(&mut self) -> Option<&mut Option<String>> {
         Some(&mut self.profile)
     }
-}
-
-#[derive(clap::ValueEnum, Default, Clone)]
-pub enum ConfigDumpFormat {
-    /// One-line JSON
-    Json,
-    /// Pretty JSON
-    JsonPretty,
-    /// Raw: arrays are dumped as one value per line; objects are dumped as one `key=value` per
-    /// line; over-complex objects cannot be dumped
-    #[default]
-    Raw,
-    /// Like Raw, but array and objects are space-separated instead of one per line.
-    OneLine
-}
-
-fn json_obj_to_raw(value: &json::Value, join: char, hex: bool) -> cu::Result<String> {
-    let mut buf = String::new();
-    match value {
-        json::Value::Array(values) => {
-            for v in values {
-                if !buf.is_empty() {
-                    buf.push(join);
-                }
-                json_to_raw(&mut buf, v, hex)?;
-            }
-        }
-        json::Value::Object(map) => {
-            for (k,v) in map {
-                if !buf.is_empty() {
-                    buf.push(join);
-                }
-                buf.push_str(k);
-                buf.push('=');
-                json_to_raw(&mut buf, v, hex)?;
-            }
-        }
-        other => {
-            json_to_raw(&mut buf, other, hex)?;
-        }
-    }
-    Ok(buf)
-}
-
-fn json_to_raw(out: &mut String, value: &json::Value, hex: bool) -> cu::Result<()> {
-    match value {
-        json::Value::Object(_) | json::Value::Array(_) => {
-            cu::bail!("object is too complex; please use --format=json or --format=json-pretty");
-        }
-        json::Value::Null => out.push_str("null"),
-        json::Value::Bool(x) => {
-            if *x {
-                out .push_str( "true");
-            } else {
-                out .push_str( "false");
-            }
-        }
-        json::Value::Number(n) => {
-            use std::fmt::Write;
-            if hex && let Some(x) = n.as_u64() {
-                let _ = write!(out, "0x{x:x}");
-            } else {
-                let _ = write!(out, "{n}");
-            }
-        }
-        json::Value::String(x) => {
-            out.push_str(x)
-        }
-    }
-    Ok(())
 }
 
 pub trait AsProfileFlag {

@@ -2,24 +2,24 @@ use std::path::{Path, PathBuf};
 
 use cu::pre::*;
 
-use crate::config_file::{self, CaptureUnused, ExtendProfile, Resolve, Validate, ValidateCtx};
-use crate::toolchain::ToolchainEnv;
+use crate::config_file::{self, CaptureUnused, ExtendProfile, ProjectTargetEnv, Resolve, Validate, ValidateCtx};
+use crate::toolchain::{DEVKITA64_TRIPLE, ToolchainEnv};
 
 /// Config in the `[build]` section
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub struct Build {
+pub struct BuildConfig {
     /// If STD support is enabled.
     ///
     /// When false, megaton just links rocrt for you. You need
     /// to provide megaton_nnmain
-    #[serde(default = "Build::default_std")]
+    #[serde(default = "BuildConfig::default_std")]
     pub std: bool,
 
     /// C++ STD version, should be a string passed to -std
-    #[serde(rename = "std-c++", default = "Build::default_std_cpp")]
+    #[serde(rename = "std-c++", default = "BuildConfig::default_std_cpp")]
     pub std_cpp: String,
-    #[serde(rename = "std-c", default = "Build::default_std_c")]
+    #[serde(rename = "std-c", default = "BuildConfig::default_std_c")]
     pub std_c: String,
 
     /// C/C++ Source directories
@@ -46,8 +46,11 @@ pub struct Build {
     pub ldscripts: Vec<PathBuf>,
 
     /// Additional objects to link
+    ///
+    /// These are linked directly after the compiled objects, right before
+    /// linking libraries
     #[serde(default)]
-    pub objects: Vec<PathBuf>,
+    pub objects: Vec<PathBuf>, // TODO - maybe we need an object graph?
 
     #[serde(default)]
     pub compiler: BuildCompilerConfig,
@@ -58,7 +61,7 @@ pub struct Build {
     #[serde(flatten, default, skip_serializing)]
     unused: CaptureUnused,
 }
-impl Default for Build {
+impl Default for BuildConfig {
     fn default() -> Self {
         Self {
             std: Self::default_std(),
@@ -77,7 +80,7 @@ impl Default for Build {
         }
     }
 }
-impl Build {
+impl BuildConfig {
     fn default_std() -> bool {
         true
     }
@@ -89,40 +92,48 @@ impl Build {
     }
 }
 
-impl Resolve for Build {
-    fn resolve(&mut self, root: &Path, toolchain: &ToolchainEnv) -> cu::Result<()> {
+impl Resolve for BuildConfig {
+    fn resolve(&mut self, project: &ProjectTargetEnv, toolchain: Option<&ToolchainEnv>) -> cu::Result<()> {
         for p in &mut self.sources {
-            *p = root.join(&*p);
+            *p = project.root.join(&*p);
         }
         for p in &mut self.includes {
-            *p = root.join(&*p);
+            *p = project.root.join(&*p);
         }
         for p in &mut self.system_includes {
-            *p = root.join(&*p);
+            *p = project.root.join(&*p);
         }
         for p in &mut self.ldscripts {
-            *p = root.join(&*p);
+            *p = project.root.join(&*p);
         }
         for p in &mut self.objects {
-            *p = root.join(&*p);
+            *p = project.root.join(&*p);
         }
         if let Some(p) = &mut self.sysroot {
-            *p = root.join(&*p);
+            *p = project.root.join(&*p);
         }
-        self.compiler.resolve(root, toolchain)?;
+        self.compiler.resolve(project, toolchain)?;
+        self.flags.resolve(&self.compiler, &self.std_c, &self.std_cpp);
         Ok(())
     }
 }
 
-impl Validate for Build {
+impl Validate for BuildConfig {
     fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
         self.flags.validate_property(ctx, "flags")?;
+        self.compiler.validate_property(ctx, "compiler")?;
         self.unused.validate(ctx)?;
+
+        if self.std {
+            if self.compiler.cc_is_clang || self.compiler.cxx_is_clang {
+                cu::bail!("DevKitA64 toolchain must be used when std is enabled; either remove build.compiler.C and build.compiler.CXX to use DevKitA64, or set build.std = false to disable standard library support.");
+            }
+        }
         Ok(())
     }
 }
 
-impl ExtendProfile for Build {
+impl ExtendProfile for BuildConfig {
     fn extend_profile(&mut self, other: &Self) {
         config_file::extend_by_appending(&mut self.sources, &other.sources);
         config_file::extend_by_appending(&mut self.includes, &other.includes);
@@ -174,41 +185,53 @@ pub struct BuildCompilerConfig {
 }
 impl BuildCompilerConfig {
     #[cu::context("failed to resolve build.compiler")]
-    pub fn resolve(&mut self, root: &Path, toolchain: &ToolchainEnv) -> cu::Result<()> {
+    pub fn resolve(&mut self, project: &ProjectTargetEnv, toolchain: Option<&ToolchainEnv>) -> cu::Result<()> {
         match &self.cc {
             None => {
-                self.cc = Some(toolchain.devkita64.cc.clone());
+                self.cc = match toolchain {
+                    None => Some(format!("{DEVKITA64_TRIPLE}-gcc")),
+                    Some(tc) => Some(tc.devkita64.cc.clone())
+                };
                 self.cc_is_clang = false;
             }
             Some(x) => {
-                self.cc = Some(Self::resolve_program(root, x, "C compiler")?);
+                self.cc = Some(Self::resolve_program(&project.root, x, "C compiler")?);
                 self.cc_is_clang = self.cc.as_deref().unwrap_or_default().contains("clang");
             }
         }
         match &self.cxx {
             None => {
-                self.cxx = Some(toolchain.devkita64.cxx.clone());
+                self.cxx = match toolchain {
+                    None => Some(format!("{DEVKITA64_TRIPLE}-g++")),
+                    Some(tc) => Some(tc.devkita64.cxx.clone())
+                };
                 self.cxx_is_clang = false;
             }
             Some(x) => {
-                self.cxx = Some(Self::resolve_program(root, x, "CXX compiler")?);
+                self.cxx = Some(Self::resolve_program(&project.root, x, "CXX compiler")?);
                 self.cxx_is_clang = self.cxx.as_deref().unwrap_or_default().contains("clang");
             }
         }
         match &self.asm {
             None => {
-                self.asm = Some(toolchain.devkita64.asm.clone());
+                self.asm = match toolchain {
+                    None => Some(format!("{DEVKITA64_TRIPLE}-as")),
+                    Some(tc) => Some(tc.devkita64.asm.clone())
+                };
             }
             Some(x) => {
-                self.asm = Some(Self::resolve_program(root, x, "AS assembler")?);
+                self.asm = Some(Self::resolve_program(&project.root, x, "AS assembler")?);
             }
         }
         match &self.cxx_ld {
             None => {
-                self.cxx_ld = Some(toolchain.devkita64.cxx.clone());
+                self.cxx_ld = match toolchain {
+                    None => Some(format!("{DEVKITA64_TRIPLE}-g++")),
+                    Some(tc) => Some(tc.devkita64.cxx.clone())
+                };
             }
             Some(x) => {
-                self.cxx_ld = Some(Self::resolve_program(root, x, "CXX compiler for linking")?);
+                self.cxx_ld = Some(Self::resolve_program(&project.root, x, "CXX compiler for linking")?);
             }
         }
 
@@ -279,7 +302,7 @@ pub struct BuildFlagConfig {
 }
 
 impl BuildFlagConfig {
-    pub fn resolve(&mut self, build: &Build) -> cu::Result<()> {
+    pub fn resolve(&mut self, compiler: &BuildCompilerConfig, std_c: &str, std_cpp: &str) {
         let common = config_file::resolve_default_token(
             vec![],
             self.common.as_ref().map(|x| x.as_slice()),
@@ -296,7 +319,7 @@ impl BuildFlagConfig {
             || {
                 let mut out = common.clone();
                 out.extend(DEFAULT_C_COMMON.iter().map(|x| x.to_string()));
-                if build.compiler.cc_is_clang {
+                if compiler.cc_is_clang {
                     out.extend(DEFAULT_C_CLANG.iter().map(|x| x.to_string()));
                 }
                 out
@@ -308,13 +331,15 @@ impl BuildFlagConfig {
             || {
                 let mut out = c.clone();
                 out.extend(DEFAULT_CPP_COMMON.iter().map(|x| x.to_string()));
-                if build.compiler.cxx_is_clang {
+                if compiler.cxx_is_clang {
                     out.extend(DEFAULT_CPP_CLANG.iter().map(|x| x.to_string()));
                 }
                 out
             }
         );
-        let mut cc_asm = config_file::resolve_default_token(
+        c.push(format!("-std={std_c}"));
+        cxx.push(format!("-std={std_cpp}"));
+        let cc_asm = config_file::resolve_default_token(
             vec![],
             self.cc_asm.as_ref().map(|x| x.as_slice()),
             || {
@@ -323,7 +348,7 @@ impl BuildFlagConfig {
                 out
             }
         );
-        let mut cxx_ld = config_file::resolve_default_token(
+        let cxx_ld = config_file::resolve_default_token(
             vec![],
             self.cxx_ld.as_ref().map(|x| x.as_slice()),
             || {
@@ -332,7 +357,39 @@ impl BuildFlagConfig {
                 out
             }
         );
-        todo!()
+        let rustflags = config_file::resolve_default_token(
+            vec![],
+            self.rust.as_ref().map(|x| x.as_slice()),
+            || {
+                DEFAULT_RUST.iter().map(|x| x.to_string()).collect()
+            }
+        );
+        let cargo = config_file::resolve_default_token(
+            vec![],
+            self.cargo.as_ref().map(|x| x.as_slice()),
+            || {
+                DEFAULT_CARGO.iter().map(|x| x.to_string()).collect()
+            }
+        );
+
+        // TODO - add:
+        // includes:
+        //   - megaton includes
+        //   - system includes
+        // defines
+        // linker:
+        //   - specs
+        //   - version script
+        //   - linker scripts
+        //   - library order
+        
+        self.resolved.c = c;
+        self.resolved.cxx = cxx;
+        self.resolved.cc_asm = cc_asm;
+        self.resolved.cxx_ld = cxx_ld;
+        self.resolved.rustflags = rustflags.join(" ");
+        self.resolved.cargo = cargo;
+
     }
 }
 
@@ -352,18 +409,39 @@ impl Validate for BuildFlagConfig {
         self.unused.validate(ctx)
     }
 }
-/// Resolved build flags
+/// For compatibility with compile_commands.json
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct CompdbFlags {
+    /// Resolved C flags for compatibility with compile_commands.json
+    pub c: Vec<String>,
+    /// Resolved CXX flags for compatibility with compile_commands.json
+    pub cxx: Vec<String>,
+    /// Resolved flags passed to the GCC driver for compatibility with compile_commands.json
+    pub cc_asm: Vec<String>,
+}
+
+/// Resolved build flags.
+///
+/// These don't yet include:
+/// - Input/Output flags like -MF, -c, -o
+/// - Objects passed to the linker
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct BuildFlags {
+    /// Resolved C flags passed to the compiler
     pub c: Vec<String>,
+    /// Resolved CXX flags passed to the compiler
     pub cxx: Vec<String>,
+    /// Resolved flags passed to the GCC driver for assembling
     pub cc_asm: Vec<String>,
-    pub c_compdb: Vec<String>,
-    pub cxx_compdb: Vec<String>,
-    pub cc_asm_compdb: Vec<String>,
+    /// Resolved linker flags
     pub cxx_ld: Vec<String>,
+    /// Resolved linker flags after objects (i.e. archives and -l libraries)
+    pub cxx_ld_after_obj: Vec<String>,
+    /// Resolved RUSTFLAGS
     pub rustflags: String,
+    /// Resolved Cargo flags
     pub cargo: Vec<String>,
 }
 

@@ -4,11 +4,10 @@
 //! Utils for managing profiles for sections in the config
 
 use std::collections::BTreeMap;
-use std::path::Path;
 
 use cu::pre::*;
 
-use crate::config_file::{Resolve, Validate, ValidateCtx};
+use crate::config_file::{ProjectTargetEnv, Resolve, Validate, ValidateCtx};
 use crate::toolchain::ToolchainEnv;
 
 /// Name of the base profile
@@ -16,7 +15,7 @@ pub static BASE_PROFILE: &str = "none";
 
 /// Check whether a profile name is legal
 pub fn is_profile_name_allowed(name: &str) -> bool {
-    BASE_PROFILE != name
+    !name.is_empty() && BASE_PROFILE != name && "lib" != name
 }
 
 /// Generic config section that can be extended with profiles
@@ -35,17 +34,18 @@ pub struct Profile<T: ExtendProfile> {
 impl<T: ExtendProfile> Profile<T> {
     /// Get a profile by name
     ///
-    /// If the name is "none", or there is no profile with that name,
-    /// the base profile will be returned. Otherwise, returns the base profile
+    /// If the name is "none", the base profile will be returned.
+    /// Otherwise, returns the base profile
     /// extended with the profile with the given name.
-    pub fn get_profile(&self, name: &str) -> T {
+    ///
+    /// Err if the profile does not exist
+    pub fn get_profile(&self, name: &str, desc: &str) -> cu::Result<T> {
         let mut base = self.base.clone();
         if name != BASE_PROFILE {
-            if let Some(profile) = self.profiles.0.get(name) {
-                base.extend_profile(profile);
-            }
+            let profile = cu::check!(self.profiles.0.get(name), "{desc} profile '{name}' does not exist")?;
+            base.extend_profile(profile);
         }
-        base
+        Ok(base)
     }
 }
 
@@ -53,15 +53,20 @@ impl<T: ExtendProfile> Validate for Profile<T> {
     fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
         self.base.validate(ctx)?;
         self.profiles.validate_property(ctx, "profiles")?;
+        for name in self.profiles.0.keys() {
+            if !is_profile_name_allowed(name) {
+                cu::bail!("{name:?} cannot be used as a profile name");
+            }
+        }
         Ok(())
     }
 }
 
 impl<T: Resolve + ExtendProfile> Resolve for Profile<T> {
-    fn resolve(&mut self, root: &Path, toolchain: &ToolchainEnv) -> cu::Result<()> {
-        cu::check!(self.base.resolve(root, toolchain), "failed to resolve config for profile \"none\"")?;
+    fn resolve(&mut self, project: &ProjectTargetEnv, toolchain: Option<&ToolchainEnv>) -> cu::Result<()> {
+        cu::check!(self.base.resolve(project, toolchain), "failed to resolve config for profile \"none\"")?;
         for (name, config) in &mut self.profiles.0 {
-            cu::check!(config.resolve(root, toolchain), "failed to resolve config for profile \"{name}\"")?;
+            cu::check!(config.resolve(project, toolchain), "failed to resolve config for profile \"{name}\"")?;
         }
         Ok(())
     }

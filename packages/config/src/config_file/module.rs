@@ -1,8 +1,8 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use cu::pre::*;
 
-use crate::config_file::{CaptureUnused, Validate, ValidateCtx};
+use crate::config_file::{CaptureUnused, ProjectTargetEnv, Validate, ValidateCtx};
 
 /// `[module]` config section
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -54,9 +54,9 @@ impl ModuleConfig {
             ..Default::default()
         }
     }
-    pub fn resolve(&mut self, root: &Path) {
-        self.target_dir = root.join(&self.target_dir);
-        self.compile_commands = root.join(&self.compile_commands);
+    pub fn resolve(&mut self, project: &ProjectTargetEnv) {
+        self.target_dir = project.root.join(&self.target_dir);
+        self.compile_commands = project.root.join(&self.compile_commands);
     }
     /// Get the title ID as a lower-case hex string (without the `0x` prefix)
     pub fn title_id_hex(&self) -> String {
