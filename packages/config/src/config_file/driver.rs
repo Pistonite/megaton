@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use cu::pre::*;
 use semver::VersionReq;
 
-use crate::config_file::{self, BASE_PROFILE, BuildConfig, CaptureUnused, MegatonConfig, ModuleConfig, Profile, ProjectTargetEnv, Resolve, RustConfig, Validate, ValidateCtx};
+use crate::config_file::{self, BASE_PROFILE, BuildConfig, CaptureUnused, FtpConfig, MegatonConfig, ModuleConfig, Profile, ProjectTargetEnv, Resolve, RustConfig, Validate, ValidateCtx};
 use crate::toolchain::ToolchainEnv;
 
 /// The Megaton.toml config file
@@ -28,6 +28,12 @@ pub struct Config {
     #[serde(default)]
     build: Profile<BuildConfig>,
 
+    // TODO - [check]
+    
+    /// `[ftp]` section
+    #[serde(default)]
+    ftp: Profile<FtpConfig>,
+
     #[serde(flatten, default, skip_serializing)]
     unused: CaptureUnused,
 }
@@ -41,6 +47,8 @@ impl Config {
         )?;
         if opts.resolve {
             config.resolve(paths.root, paths.config_path, opts.cli_profile, opts.toolchain)?;
+        } else {
+            config.project.profile = BASE_PROFILE.to_string();
         }
         if opts.validate {
             config.validate_root()?;
@@ -48,24 +56,26 @@ impl Config {
         Ok(config)
     }
     pub fn new_no_megaton_toml(opts: ConfigLoadOpts<'_, '_>) -> cu::Result<Self> {
-        let mut raw = Self {
+        let mut config = Self {
             module: ModuleConfig::new_no_megaton_toml(),
             ..Default::default()
         };
         if let Ok(v) = VersionReq::parse(
             env!("CARGO_PKG_VERSION")
         ) {
-            raw.megaton.version = Some(v);
+            config.megaton.version = Some(v);
         }
         if opts.resolve {
-            raw.resolve(PathBuf::new(), PathBuf::new(), opts.cli_profile, opts.toolchain)?;
+            config.resolve(PathBuf::new(), PathBuf::new(), opts.cli_profile, opts.toolchain)?;
+        } else {
+            config.project.profile = BASE_PROFILE.to_string();
         }
         if opts.validate {
-            raw.validate_root()?;
+            config.validate_root()?;
         }
         // reset the module name after validating since module name cannot be empty
-        raw.module.name = String::new();
-        Ok(raw)
+        config.module.name = String::new();
+        Ok(config)
     }
     #[cu::context("error resolving config")]
     fn resolve(&mut self, root: PathBuf, config_path: PathBuf, cli_profile: Option<&str>, toolchain: Option<&ToolchainEnv>) -> cu::Result<()> {
@@ -73,6 +83,8 @@ impl Config {
         let target_root = cu::path!(&root / (self.module.target_dir) / "megaton");
         let project = ProjectTargetEnv::new(
             &self.module.name,
+            self.module.title_id,
+            self.module.nso_name.clone(),
             profile.to_string(),
             root,
             config_path,
@@ -82,6 +94,7 @@ impl Config {
         self.module.resolve(&self.project);
         self.rust.resolve(&self.project);
         cu::check!(self.build.resolve(&self.project, toolchain), "failed to resolve build config")?;
+        cu::check!(self.ftp.resolve(&self.project, toolchain), "failed to resolve ftp config")?;
         Ok(())
     }
     /// Select profile based on command line and config
@@ -127,18 +140,25 @@ impl Config {
 
         Ok(profile)
     }
+    /// Get the resolved build config based on the profile
     pub fn build_config(&self) -> cu::Result<BuildConfig> {
         self.build.get_profile(&self.project.profile, "build")
+    }
+    /// Get the resolved ftp config based on the profile
+    pub fn ftp_config(&self) -> cu::Result<FtpConfig> {
+        self.ftp.get_profile(&self.project.profile, "ftp")
     }
     /// Turn the config into a JSON blob after profile selection
     pub fn to_json(&self) -> cu::Result<json::Value> {
         let build = self.build_config()?;
+        let ftp = self.ftp_config()?;
         Ok(json!({
             "project": self.project,
             "module": self.module,
             "megaton": self.megaton,
             "rust": self.rust,
             "build": build,
+            "ftp": ftp,
         }))
     }
 }
@@ -147,6 +167,8 @@ impl Validate for Config {
         self.module.validate_property(ctx, "module")?;
         self.megaton.validate_property(ctx, "megaton")?;
         self.rust.validate_property(ctx, "rust")?;
+        self.build.validate_property(ctx, "build")?;
+        self.ftp.validate_property(ctx, "ftp")?;
         self.unused.validate(ctx)
     }
 }

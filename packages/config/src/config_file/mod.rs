@@ -7,6 +7,7 @@ pub use rust::*;
 mod build;
 pub use build::*;
 mod ftp;
+pub use ftp::*;
 
 mod profile;
 pub use profile::*;

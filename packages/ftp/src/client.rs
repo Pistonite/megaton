@@ -97,7 +97,7 @@ impl FtpClient {
     }
 
     /// Upload multiple files to the same directory. Create the directory if does not exist
-    pub async fn upload(&mut self, dir: &str, files: Vec<(&str, Vec<u8>)>) -> cu::Result<()> {
+    pub async fn upload(&mut self, dir: &str, files: Vec<(String, Vec<u8>)>) -> cu::Result<()> {
         let result = execute_in_ctrlc_frame(move |ctrlc| async move {
             // change/create the directory first
             cu::info!("cwd: {dir}");
@@ -265,10 +265,10 @@ impl FtpClient {
                 }
             }
 
-            cu::info!("{success_count} files downloaded.");
+            cu::info!("{success_count} files downloaded from {dir}");
             if error_count > 0 {
                 cu::warn!("{error_count} files failed to download!");
-                cu::bail!("failed to download some files");
+                cu::bail!("failed to download some files from {dir}");
             }
 
             Ok(())

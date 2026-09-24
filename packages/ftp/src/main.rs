@@ -2,8 +2,8 @@ use std::path::Path;
 
 use cu::pre::*;
 
-mod ftp_client;
-mod min_config;
+// mod ftp_client;
+// mod min_config;
 
 #[derive(clap::Parser, AsRef)]
 struct Cli {

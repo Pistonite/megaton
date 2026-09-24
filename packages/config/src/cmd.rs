@@ -1,13 +1,13 @@
 use cu::pre::*;
 
-use crate::config_file::{BASE_PROFILE, Config, ConfigLoadOpts};
+use crate::config_file::{Config, ConfigLoadOpts};
 use crate::dump::{self, DumpFormat};
 use crate::toolchain::ToolchainEnv;
 
+/// The `config-dump` command
 #[derive(clap::Parser, AsRef)]
 pub struct Cmd {
     /// The key path to dump in the config object. [default: dumps whole config]
-    #[clap(short, long)]
     key: Option<String>,
 
     /// Dump the environment config instead of the project config
@@ -15,7 +15,7 @@ pub struct Cmd {
     env: bool,
 
     /// The profile to dump the config for
-    #[clap(short = 'p', long, conflicts_with = "env", default_value = BASE_PROFILE)]
+    #[clap(short = 'p', long, conflicts_with = "env")]
     profile: Option<String>,
 
     /// Do not try to resolve Megaton.toml config.
@@ -35,11 +35,12 @@ pub struct Cmd {
     #[clap(long)]
     no_validate: bool,
 
-    /// Format non-neg integers as hex in raw or one-line format
+    /// Format non-negative integers as hex in raw or one-line format
     #[clap(short = 'H', long)]
     hex: bool,
 
-    #[clap(short, long, default_value = "raw")]
+    /// Output format
+    #[clap(short = 'F', long, default_value = "raw")]
     format: DumpFormat,
 
     #[clap(flatten)]
