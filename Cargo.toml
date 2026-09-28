@@ -7,7 +7,7 @@ members = [
     "packages/docker-build",
     "packages/lib",
     "packages/lib/macros",
-    "packages/toolchain-build",
+    "packages/toolchain",
     "packages/test-mod",
     "packages/ftp",
 ]

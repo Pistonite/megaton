@@ -883,7 +883,7 @@ name = "megaton-cli-build"
 version = "0.0.0"
 dependencies = [
  "flate2",
- "megaton-toolchain-build",
+ "megaton-toolchain",
  "pistonite-cu",
  "sha2",
  "tar",
@@ -898,7 +898,7 @@ dependencies = [
  "flate2",
  "fxhash",
  "megaton-cli-build",
- "megaton-toolchain-build",
+ "megaton-toolchain",
  "pistonite-cu",
  "regex",
  "semver",
@@ -922,7 +922,7 @@ name = "megaton-docker-build"
 version = "0.0.0"
 dependencies = [
  "megaton-cli-build",
- "megaton-toolchain-build",
+ "megaton-toolchain",
  "pistonite-cu",
 ]
 
@@ -945,9 +945,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "megaton-toolchain-build"
+name = "megaton-toolchain"
 version = "0.0.0"
 dependencies = [
+ "megaton-config",
  "pistonite-cu",
 ]
 
@@ -1330,6 +1331,7 @@ version = "1.0.151"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c841b55ecdae098c80dcae9cf767f6f8a0c2cdb3416bbef72181df4d0fe73f14"
 dependencies = [
+ "indexmap",
  "itoa",
  "memchr",
  "serde",

@@ -6,6 +6,8 @@ mod rust;
 pub use rust::*;
 mod build;
 pub use build::*;
+mod check;
+pub use check::*;
 mod ftp;
 pub use ftp::*;
 

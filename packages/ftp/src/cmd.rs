@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use cu::pre::*;
@@ -9,7 +9,7 @@ use megaton_config::config_file::{Config, ConfigLoadOpts, FtpConfig};
 use crate::client::FtpClient;
 
 /// The `ftp` command
-#[derive(clap::Parser, AsRef)]
+#[derive(clap::Parser)]
 pub struct Cmd {
     #[clap(subcommand)]
     command: SubCmd,
@@ -28,12 +28,20 @@ impl Cmd {
             SubCmd::Download { delete, common } => {
                 let config = common.load_config(dir)?;
                 let ftp_config = config.ftp_config()?;
-                let profile = &config.project.profile;
                 let server = get_server(common.server)?;
-                cu::check!(run_upload(&server, profile, &ftp_config).await, "upload failed")?;
+                cu::check!(run_download(&server, &ftp_config, !delete).await, "download failed")?;
             }
         }
         Ok(())
+    }
+}
+
+impl AsRef<cu::cli::Flags> for Cmd {
+    fn as_ref(&self) -> &cu::cli::Flags {
+        match &self.command {
+            SubCmd::Upload { common } => &common.common,
+            SubCmd::Download { common, .. } => &common.common,
+        }
     }
 }
 
@@ -156,19 +164,15 @@ async fn run_upload(
 async fn run_download(
     server: &str, config: &FtpConfig, keep: bool
 ) -> cu::Result<()> {
-    cu::fs::make_dir(&base_dir)?;
     let mut ftp = FtpClient::connect(&server).await?;
     for task in config.resolved_download_tasks() {
-        let local_path = task.local_path;
+        let local_path = &task.local_path;
+        let server_path = &task.server_path;
+        ftp.download(server_path, local_path.as_utf8()?, keep)
+        .await?;
     }
-    let dir = cu::path!(&base_dir / "crash_reports");
-    ftp.download("/atmosphere/crash_reports", dir.as_utf8()?, keep)
-    .await?;
-    let dir = cu::path!(&base_dir / "megaton_logs");
-    let log_server_path = format!("/megaton/{}/logs", module.name);
-    ftp.download(&log_server_path, dir.as_utf8()?, keep).await?;
     ftp.quit().await;
-    todo!()
+    Ok(())
 }
 
 #[cu::context("failed to get server address")]

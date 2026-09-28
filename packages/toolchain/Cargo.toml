@@ -1,0 +1,12 @@
+[package]
+name = "megaton-toolchain"
+description = "The megaton toolchain command"
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[dependencies]
+cu = { workspace = true, features = ["process", "print", "prompt", "toml", "json", "cli"] }
+
+megaton-config.workspace = true

@@ -53,12 +53,22 @@ impl Cmd {
         cu::cli::print_to(cu::cli::Target::Stderr);
         let key = self.key.as_deref().unwrap_or_default();
         let value = if self.env {
-            let toolchain = ToolchainEnv::resolve()?;
-            let value = cu::check!(
-                toolchain.to_json(),
-                "failed to convert toolchain environment to JSON"
-            )?;
-            value
+            match ToolchainEnv::resolve() {
+                Ok(tc) => {
+                    cu::check!(
+                        tc.to_json(),
+                        "failed to convert toolchain environment to JSON"
+                    )?
+                }
+                Err(_) => {
+                    // attempt to resolve partial
+                    let tc = ToolchainEnv::resolve_partial()?;
+                    cu::check!(
+                        tc.to_json(),
+                        "failed to convert toolchain environment to JSON"
+                    )?
+                }
+            }
         } else {
             let toolchain = if self.no_resolve {
                 None

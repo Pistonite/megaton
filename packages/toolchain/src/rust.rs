@@ -1,119 +1,77 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Megaton contributors
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use cu::pre::*;
+use megaton_config::toolchain::{HomeEnv, MEGATON_TOOLCHAIN_NAME, RustEnv, RustEnvPartial, RustHostEnv};
 
-/// The Rust toolchain name to be installed/linked
-static TOOLCHAIN_NAME: &str = "megaton";
 /// The Rust compiler repo
 static RUST_REPO: &str = "https://github.com/rust-lang/rust";
 /// The "blessed" commit hash to use (i.e. tested and will work)
 pub static BLESSED_COMMIT: &str = "0d31508599a7814a7044e9a7a871e3dc5f037753";
 /// The "blessed" version tag corresponding to the commit
+#[allow(unused)]
 pub static BLESSED_VERSION: &str = "1.100.0-dev";
 /// Rust compiler/library patch file
 static RUST_PATCH: &[u8] = include_bytes!("../scripts/rust-2026-09-09-0d31508599a7814a.patch");
 /// File name the patch is written to inside the rust repo, to be applied from there
 static RUST_PATCH_FILE: &str = "megaton.patch";
 
-pub struct RustToolchainInfo {
-    pub commit_hash: Option<String>,
-}
-
-/// Check the current status of the megaton Rust toolchain
-pub fn check(print: bool) -> cu::Result<Option<RustToolchainInfo>> {
-    let (child, out) = cu::which("rustc")?
-        .command()
-        .arg(format!("+{TOOLCHAIN_NAME}"))
-        .arg("-vV")
-        .stdout(cu::pio::string())
-        .stdie_null()
-        .spawn()?;
-    let status = child.wait()?;
-    if !status.success() {
-        // toolchain not found
-        return Ok(None);
-    }
-    let output = out.join()??;
-    let mut commit_hash = None;
-    for line in output.lines() {
-        if print {
-            cu::print!("{line}");
+pub fn inspect() {
+    let rust_env = RustEnvPartial::resolve();
+    match rust_env.host {
+        None => {
+            cu::print!("host rustc: <not installed>")
         }
-        if let Some(line) = line.strip_prefix("commit-hash:") {
-            let line = line.trim();
-            if line == "unknown" || line.is_empty() {
-                // no commit hash info for the toolchain installation
-                continue;
-            }
-            commit_hash = Some(line.to_string());
+        Some(env) => {
+            cu::print!("host rustc: {}", env.env.release)
         }
     }
-    Ok(Some(RustToolchainInfo { commit_hash }))
+    match rust_env.megaton {
+        None => {
+            cu::print!("megaton rustc: <not installed>")
+        }
+        Some(env) => {
+            cu::print!("megaton rustc: {}", env.release);
+            cu::print!("  commit_hash: {}", env.commit_hash);
+            cu::print!("  commit_date: {}", env.commit_date);
+            cu::print!("  llvm_version: {}", env.llvm_version);
+            cu::print!("  targets: {}", env.targets.join(", "));
+        }
+    }
 }
 
-pub fn install(home: &Path, keep: bool, mut clean: bool) -> cu::Result<()> {
-    cu::check!(
-        cu::which("rustup"),
-        "rustup is required to manage Rust toolchains. Please install Rust"
-    )?;
-    cu::check!(
-        cu::which("rustc"),
-        "rustc is required to manage Rust toolchains. Please install Rust"
-    )?;
+#[cu::context("failed to install megaton rust toolchain")]
+pub fn install(home: &HomeEnv, keep: bool, mut clean: bool) -> cu::Result<()> {
+    let rust_env = RustEnvPartial::resolve();
+    let host_env = cu::check!(rust_env.host, "cannot find rust toolchain, which is required to install megaton's custom rust toolchain; please install rustup")?;
 
-    // check current status
-    match check(false) {
-        Err(e) => {
-            cu::debug!("failed to check existing toolchain status: {e}, proceeding with reinstall");
-        }
-        Ok(None) => {
+    match rust_env.megaton {
+        None => {
             cu::debug!("no toolchain installation found");
         }
-        Ok(Some(info)) => {
-            match info.commit_hash {
-                None => {
-                    cu::warn!("existing toolchain found with unknown commit hash");
-                    match cu::yesno!("do you want to reinstall from the blessed commit?") {
-                        Err(e) => {
-                            cu::hint!(
-                                "prompt is disabled. you can remove the toolchain with 'megaton toolchain remove', then try install again."
-                            );
-                            cu::rethrow!(e);
-                        }
-                        Ok(false) => {
-                            cu::bail!("aborted by user");
-                        }
-                        Ok(true) => {}
-                    }
-                }
-                Some(hash) => {
-                    if hash == BLESSED_COMMIT {
-                        cu::warn!(
-                            "found existing toolchain installation that matched blessed commit hash"
-                        );
-                        cu::hint!(
-                            "if you want to reinstall it, remove it first with 'megaton toolchain remove'."
-                        );
-                        return Ok(());
-                    }
-                    // older toolchain installed, proceed with reinstallment
-                    cu::info!("found older toolchain installation with commit hash: {hash}");
-                    remove(home)?;
-                }
+        Some(env) => {
+            if env.commit_hash == BLESSED_COMMIT {
+                cu::warn!(
+                "found existing toolchain installation that matched blessed commit hash"
+            );
+                cu::hint!(
+                "if you want to reinstall it, remove it first with 'megaton toolchain remove'."
+            );
+                return Ok(());
             }
+            // older toolchain installed, proceed with reinstallment
+            cu::info!("found older toolchain installation with commit hash: {}", env.commit_hash);
+            remove(home)?;
         }
     }
 
-    cu::check!(cu::which("git"), "git is required to clone rust source")?;
-    cu::check!(cu::which("ninja"), "ninja is required to build llvm")?;
-    cu::check!(cu::which("cmake"), "cmake is required to build llvm")?;
+    let build_dep = rust_env.build_dep.resolve_full()?;
+    let host_triple = &host_env.env.host;
 
-    let host_triple = get_rustc_host_triple()?;
     cu::info!("building rust toolchain for host triple: {host_triple}");
-    let rust_path = source_location(home);
+    let rust_path = home.rust_source_path();
     if !clean {
         // try to get the current commit hash, will succeed if we have a valid repo
         // note we perform a checkout_blessed_commit regardless to re-apply the patch if needed
@@ -134,7 +92,7 @@ pub fn install(home: &Path, keep: bool, mut clean: bool) -> cu::Result<()> {
     }
     if clean {
         cu::warn!("performing full re-checkout");
-        clone_rust_source(&rust_path)?;
+        clone_rust_source( &build_dep.git, &rust_path)?;
     }
     checkout_blessed_commit(&rust_path)?;
 
@@ -147,7 +105,7 @@ pub fn install(home: &Path, keep: bool, mut clean: bool) -> cu::Result<()> {
         cu::bail!("failed to checkout the blessed commit.");
     }
 
-    let install_location = install_location(home);
+    let install_location = home.rust_install_path();
     cu::fs::make_dir_empty(&install_location)?;
     let install_location = install_location.normalize_exists()?;
 
@@ -240,38 +198,32 @@ pub fn install(home: &Path, keep: bool, mut clean: bool) -> cu::Result<()> {
         }
     }
 
-    let install_location = self::install_location(home);
-    let toolchain_link_result = cu::which("rustup")?
+    let install_location = home.rust_install_path();
+    let toolchain_link_result = host_env.rustup
         .command()
         .add(cu::args![
             "toolchain",
             "link",
-            TOOLCHAIN_NAME,
+            MEGATON_TOOLCHAIN_NAME,
             install_location
         ])
         .all_null()
         .wait_nz();
     cu::check!(toolchain_link_result, "failed to link built toolchain")?;
 
-    let toolchain_info = cu::check!(
-        check(true),
+    let rust_env = cu::check!(
+        RustEnv::resolve(),
         "failed to get toolchain, installation might have failed."
     )?;
-    let toolchain_info = cu::check!(
-        toolchain_info,
-        "failed to get toolchain, installation might have failed."
+    let rust_megaton_env = cu::check!(
+        rust_env.megaton,
+        "failed to get megaton toolchain, installation might have failed."
     )?;
-    match toolchain_info.commit_hash {
-        None => {
-            cu::warn!("failed to get commit hash from installed toolchain");
-        }
-        Some(hash) => {
-            if hash == BLESSED_COMMIT {
-                cu::info!("verified installed toolchain has the blessed commit hash");
-            } else {
-                cu::warn!("the installed toolchain does not have the blessed commit hash");
-            }
-        }
+
+    if rust_megaton_env.commit_hash == BLESSED_COMMIT {
+        cu::info!("verified installed toolchain has the blessed commit hash");
+    } else {
+        cu::warn!("the installed toolchain does not have the blessed commit hash");
     }
 
     if !keep {
@@ -288,21 +240,33 @@ pub fn install(home: &Path, keep: bool, mut clean: bool) -> cu::Result<()> {
     Ok(())
 }
 
-pub fn remove(home: &Path) -> cu::Result<()> {
-    cu::which("rustup")?
+#[cu::context("failed to uninstall megaton rust toolchain")]
+pub fn remove(home: &HomeEnv) -> cu::Result<()> {
+    let rust_env = RustEnvPartial::resolve();
+    if rust_env.megaton.is_none() {
+        cu::info!("megaton rust toolchain is not installed");
+    }
+    let host_env = cu::check!(rust_env.host, "cannot find rust toolchain, which is required to install megaton's custom rust toolchain; please install rustup")?;
+    remove_internal(home, &host_env)
+}
+
+fn remove_internal(home: &HomeEnv, host_env: &RustHostEnv) -> cu::Result<()> {
+    host_env.rustup
         .command()
-        .args(["toolchain", "uninstall", TOOLCHAIN_NAME])
+        .args(["toolchain", "uninstall", MEGATON_TOOLCHAIN_NAME])
         .name("rustup")
         .stderr(cu::lv::P)
         .stdio_null()
         .wait_nz()?;
-    if let Ok(Some(_)) = check(false) {
+
+    let rust_env = RustEnvPartial::resolve();
+    if rust_env.megaton.is_some() {
         cu::bail!(
-            "failed to uninstall toolchain. Please run 'rustup toolchain uninstall {TOOLCHAIN_NAME}' to uninstall it manually, then try again."
-        );
+        "failed to uninstall toolchain. Please run 'rustup toolchain uninstall {MEGATON_TOOLCHAIN_NAME}' to uninstall it manually, then try again."
+    );
     }
 
-    let install_path = install_location(home);
+    let install_path = home.rust_install_path();
     cu::debug!(
         "cleaning up toolchain files at '{}'",
         install_path.display()
@@ -314,8 +278,9 @@ pub fn remove(home: &Path) -> cu::Result<()> {
     Ok(())
 }
 
-pub fn clean(home: &Path) -> cu::Result<()> {
-    let rust_path = source_location(home);
+#[cu::context("failed to clean megaton rust toolchain")]
+pub fn clean(home: &HomeEnv) -> cu::Result<()> {
+    let rust_path = home.rust_source_path();
     if !rust_path.exists() {
         cu::info!("rust repo is already removed");
         return Ok(());
@@ -327,38 +292,11 @@ pub fn clean(home: &Path) -> cu::Result<()> {
     Ok(())
 }
 
-fn install_location(home: &Path) -> PathBuf {
-    home.join("rust-toolchain")
-}
-
-fn source_location(home: &Path) -> PathBuf {
-    home.join("rust")
-}
-
-/// Get rustc host triple by running `rustc -vV`, like `x86_64-unknown-linux-gnu`
-fn get_rustc_host_triple() -> cu::Result<String> {
-    let (child, output) = cu::which("rustc")?
-        .command()
-        .arg("-vV")
-        .stdout(cu::pio::string())
-        .stdie_null()
-        .spawn()?;
-    child.wait_nz()?;
-    let output = output.join()??;
-    for line in output.lines() {
-        if let Some(host) = line.strip_prefix("host: ") {
-            return Ok(host.to_string());
-        }
-    }
-    cu::bail!("failed to get host triple from rustc");
-}
-
-fn clone_rust_source(path: &Path) -> cu::Result<()> {
+fn clone_rust_source(git: &Path, path: &Path) -> cu::Result<()> {
     cu::check!(
         cu::fs::make_dir_empty(path),
         "fail to clean rust source directory"
     )?;
-    let git = cu::which("git")?;
     git.command()
         .add(cu::args!["-C", &path, "init"])
         .stdoe(cu::lv::P)

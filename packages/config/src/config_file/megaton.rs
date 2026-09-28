@@ -5,6 +5,7 @@ use crate::config_file::{Validate, ValidateCtx, CaptureUnused};
 
 /// The `[megaton]` section
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MegatonConfig {
     /// If specified, megaton will run version check and error if the current
     /// version doesn't match the given requirement.

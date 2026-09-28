@@ -24,7 +24,7 @@ cargo_metadata.workspace = true
 semver.workspace = true
 semver.features = ["serde"]
 
-megaton-toolchain-build.path = "../toolchain-build"
+megaton-toolchain.path = "../toolchain"
 
 [build-dependencies]
 cu = { workspace = true, features = ["fs", "toml"] }

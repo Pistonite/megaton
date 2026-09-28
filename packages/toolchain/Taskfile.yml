@@ -16,10 +16,10 @@ tasks:
     cmds:
       - python scripts/setup_rust.py make-patch
 
-  run-install:
-    desc: Run the install cmd to install the megaton toolchain
+  run:
+    desc: Run the megaton toolchain command
     cmds:
-      - cargo run -p megaton-toolchain-build --example docker_install -- {{.CLI_ARGS}}
+      - cargo run -p megaton-toolchain -- {{.CLI_ARGS}}
   run-remove:
     desc: Unlink the megaton toolchain
     cmds:

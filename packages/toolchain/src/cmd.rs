@@ -1,0 +1,74 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Megaton contributors
+
+use cu::pre::*;
+use megaton_config::toolchain::HomeEnv;
+
+/// The `toolchain` subcommand
+#[derive(Debug, clap::Parser)]
+pub struct Cmd {
+    #[clap(subcommand)]
+    command: SubCmd,
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum SubCmd {
+    /// Build and install the toolchain
+    Install {
+        /// Keep the rustc/llvm build output. This may consume a lot of disk space,
+        /// but makes it faster when debugging the toolchain
+        #[clap(short, long)]
+        keep: bool,
+
+        /// Clean build rustc/llvm
+        #[clap(short, long)]
+        clean: bool,
+
+        #[clap(flatten)]
+        common: cu::cli::Flags,
+    },
+    /// Uninstall the toolchain
+    Remove(cu::cli::Flags),
+    /// Remove artifacts from building Rust compiler
+    Clean(cu::cli::Flags),
+    /// Check toolchain installation
+    Check(cu::cli::Flags),
+}
+
+impl Cmd {
+    pub fn run(self) -> cu::Result<()> {
+        let home = HomeEnv::resolve()?;
+        match self.command {
+            SubCmd::Install { keep, clean, .. } => {
+                crate::cxxbridge::install(&home)?;
+                crate::rust::install(&home, keep, clean)?;
+                Ok(())
+            }
+            SubCmd::Remove(_) => {
+    crate::cxxbridge::remove(&home)?;
+    cu::info!("uninstalled cxxbridge");
+    crate::rust::remove(&home)?;
+    cu::info!("uninstalled megaton rust toolchain");
+    Ok(())
+            }
+            SubCmd::Clean(_) => {
+                crate::rust::clean(&home)
+            }
+            SubCmd::Check(_) => {
+    crate::cxxbridge::inspect(&home);
+    crate::rust::inspect();
+                Ok(())
+            }
+        }
+    }
+}
+impl AsRef<cu::cli::Flags> for Cmd {
+    fn as_ref(&self) -> &cu::cli::Flags {
+        match &self.command {
+            SubCmd::Install { common, .. } => common,
+            SubCmd::Remove(args) => args,
+            SubCmd::Clean(args) => args,
+            SubCmd::Check(args) => args,
+        }
+    }
+}

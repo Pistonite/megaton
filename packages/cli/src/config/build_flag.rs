@@ -7,38 +7,6 @@ use cu::pre::*;
 
 use super::{CaptureUnused, ExtendProfile, Validate, ValidateCtx};
 
-/// Flags from configuration
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct FlagConfig {
-    pub common: Option<Vec<String>>,
-    pub c: Option<Vec<String>>,
-    pub cxx: Option<Vec<String>>,
-    #[serde(rename = "as")]
-    pub as_: Option<Vec<String>>,
-    pub ld: Option<Vec<String>>,
-    pub rust: Option<Vec<String>>,
-    pub cargo: Option<Vec<String>>,
-
-    #[serde(flatten, default)]
-    unused: CaptureUnused,
-}
-
-impl Validate for FlagConfig {
-    fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {
-        self.unused.validate(ctx)
-    }
-}
-
-impl ExtendProfile for FlagConfig {
-    fn extend_profile(&mut self, other: &Self) {
-        extend_flags(&mut self.common, &other.common);
-        extend_flags(&mut self.c, &other.c);
-        extend_flags(&mut self.cxx, &other.cxx);
-        extend_flags(&mut self.as_, &other.as_);
-        extend_flags(&mut self.ld, &other.ld);
-    }
-}
 
 fn extend_flags(dst: &mut Option<Vec<String>>, src: &Option<Vec<String>>) {
     match (dst.as_mut(), src) {
