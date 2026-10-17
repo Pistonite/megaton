@@ -1,0 +1,13 @@
+[package]
+name = "megaton-packaging"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "Steps to package the megaton tool"
+license = "MIT"
+
+[dependencies]
+cu = { workspace = true, features = ["process", "toml"] }
+flate2.workspace = true
+tar.workspace = true
+sha2.workspace = true

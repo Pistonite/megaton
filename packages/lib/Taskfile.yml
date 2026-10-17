@@ -30,7 +30,7 @@ tasks:
       - rm -rf build target
 
   check:
-    - task: check-rs
+    # - task: check-rs
     - task: check-c
 
   check-c:

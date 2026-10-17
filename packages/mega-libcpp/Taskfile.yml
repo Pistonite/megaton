@@ -1,0 +1,65 @@
+version: '3'
+
+tasks:
+  configure:
+    desc: (Re)-configure ninja build and generate compile_commands.json
+    cmds:
+      - cmake -G Ninja -B build -S .
+
+  build:
+    cmds:
+      - ninja -C build
+
+  update-lib-nnsdk:
+    - rm -rf .cache/nnheaders include-lib/nn
+    - mkdir -p .cache
+    - cmd: |
+        echo '==> updating lib: nnsdk (open-ead/nnheaders)'
+        mkdir -p .cache/nnheaders/.git/info
+        cd .cache/nnheaders 
+        git init
+        git config core.sparseCheckout true
+        git remote add origin https://github.com/open-ead/nnheaders
+        echo 'include/nn/os' > .git/info/sparse-checkout
+        echo 'include/nn/fs' >> .git/info/sparse-checkout
+        echo 'include/nn/util' >> .git/info/sparse-checkout
+        echo 'include/nn/util.h' >> .git/info/sparse-checkout
+        echo 'include/nn/types.h' >> .git/info/sparse-checkout
+        echo 'include/nn/os.h'          >> .git/info/sparse-checkout
+        echo 'include/nn/fs.h'          >> .git/info/sparse-checkout
+        echo 'include/nn/account.h'     >> .git/info/sparse-checkout
+        echo 'include/nn/time.h'        >> .git/info/sparse-checkout
+        echo 'include/nn/svc.h'         >> .git/info/sparse-checkout
+        echo 'include/nn/nn_BitTypes.h' >> .git/info/sparse-checkout
+        echo 'include/nn/nn.h'          >> .git/info/sparse-checkout
+        echo 'include/nn/settings.h'    >> .git/info/sparse-checkout
+        git pull origin master
+      silent: true
+    - cp -RL .cache/nnheaders/include/nn include-lib
+  update-lib-vapours:
+    - rm -rf .cache/atmosphere include-lib/vapours
+    - mkdir -p .cache
+    - cmd: |
+        echo '==> updating lib: libvapours (Atmosphere-NX/Atmosphere)'
+        mkdir -p .cache/atmosphere/.git/info
+        cd .cache/atmosphere 
+        git init
+        git config core.sparseCheckout true
+        git remote add origin https://github.com/Atmosphere-NX/Atmosphere
+        echo 'libraries/libvapours/include/vapours/results' > .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/util' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/impl' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/ams' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/freebsd' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/results.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/util.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/assert.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/common.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/includes.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/defines.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/compiler.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/types.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/ams_version.h' >> .git/info/sparse-checkout
+        git pull origin master
+      silent: true
+    - cp -RL .cache/atmosphere/libraries/libvapours/include/vapours include-lib

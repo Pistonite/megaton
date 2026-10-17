@@ -9,7 +9,7 @@ OUTPUT_FORMAT(elf64-littleaarch64)
 OUTPUT_ARCH(aarch64)
 
 /** Entry point*/
-ENTRY(__module_start)
+ENTRY(_start)
 
 PHDRS
 {
@@ -29,6 +29,8 @@ SECTIONS
 
     .text : {
         HIDDEN(__text_start__ = .);
+        KEEP (*(.text.rocrt.init))
+        KEEP (*(.text.rocrt.info))
         KEEP (*(.text.crt0))
         *(.text .text.*)
         HIDDEN(__text_end__ = .);

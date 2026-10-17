@@ -1,0 +1,85 @@
+version: '3'
+
+includes:
+  libcpp:
+    taskfile: ../mega-libcpp
+    dir: ../mega-libcpp
+    internal: true
+
+tasks:
+  build:
+    cmds:
+      - task: libcpp:build
+      - rm -rf target/megaton
+      - mkdir -p target/megaton/lib/mega-libcpp/lib
+      - cp ../mega-libcpp/build/libmegatoncpp.a target/megaton/lib/mega-libcpp/lib
+      - cp -RL ../mega-libcpp/linker target/megaton/lib/mega-libcpp
+      - cp -RL ../mega-libcpp/include target/megaton/lib/mega-libcpp
+      - cp -RL ../mega-libcpp/include-int target/megaton/lib/mega-libcpp
+      - cp -RL ../mega-libcpp/src-user target/megaton/lib/mega-libcpp
+      # build user_rt
+      - mkdir -p target/megaton/none/modtest-empty/o
+      - >
+        $DEVKITPRO/devkitA64/bin/aarch64-none-elf-gcc
+        -I{{.TASK_DIR}}/target/megaton/lib/mega-libcpp/include
+        -I{{.TASK_DIR}}/target/megaton/lib/mega-libcpp/include-int
+        -isystem $DEVKITPRO/libnx/include
+        -march=armv8-a+crc+crypto -mtune=cortex-a57
+        -fPIC -fvisibility=hidden -g -Wall -Werror -ffunction-sections -fdata-sections -O2 
+        -DMEGART_NX_MODULE_NAME_LEN=13
+        -DMEGART_NX_MODULE_NAME="\"modtest-empty\""
+        -DMEGART_TITLE_ID_HEX="\"01007ef00011e000\""
+        -DMEGART_TITLE_ID=0x01007ef00011e000
+        -DMEGART_HEAP_SIZE=0x20000
+        -DMEGART_CWD="\"sdmc:/megaton/modtest-empty\""
+        -o {{.TASK_DIR}}/target/megaton/none/modtest-empty/o/user_rt.c.o
+        -c {{.TASK_DIR}}/target/megaton/lib/mega-libcpp/src-user/user_rt.c
+      # build main.cpp
+      - >
+        $DEVKITPRO/devkitA64/bin/aarch64-none-elf-g++
+        -I{{.TASK_DIR}}/target/megaton/lib/mega-libcpp/include
+        -isystem $DEVKITPRO/libnx/include
+        -std=c++23 -march=armv8-a+crc+crypto -mtune=cortex-a57
+        -fPIC -fvisibility=hidden -g -Wall -Werror -ffunction-sections -fdata-sections -O2
+        -std=c++23 -fno-rtti -fno-exceptions -fno-asynchronous-unwind-tables -fno-unwind-tables
+        -o {{.TASK_DIR}}/target/megaton/none/modtest-empty/o/main.cpp.o
+        -c {{.TASK_DIR}}/src/main.cpp
+      # linking
+      - >
+        $DEVKITPRO/devkitA64/bin/aarch64-none-elf-gcc
+        -specs={{.TASK_DIR}}/target/megaton/lib/mega-libcpp/linker/megaton.specs
+        -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft
+        -fPIC -fvisibility=hidden -g
+        -Wl,-pie
+        -Wl,--shared
+        -Wl,--export-dynamic
+        -Wl,-z,nodynamic-undefined-weak
+        -Wl,--build-id=sha1
+        -Wl,--gc-sections
+        -Wl,--nx-module-name
+        -Wl,-init=_start
+        -Wl,--version-script={{.TASK_DIR}}/target/megaton/lib/mega-libcpp/linker/verfile
+        -Wl,-T,{{.TASK_DIR}}/target/megaton/lib/mega-libcpp/linker/megaton.ld
+        {{.TASK_DIR}}/target/megaton/none/modtest-empty/o/user_rt.c.o
+        {{.TASK_DIR}}/target/megaton/none/modtest-empty/o/main.cpp.o
+        -Wl,--whole-archive
+        {{.TASK_DIR}}/target/megaton/lib/mega-libcpp/lib/libmegatoncpp.a
+        -Wl,--no-whole-archive
+        $DEVKITPRO/libnx/lib/libnx.a
+        -o{{.TASK_DIR}}/target/megaton/none/modtest-empty/modtest-empty.elf
+      # npdm
+      - cp main.npdm.json target/megaton/none/modtest-empty
+      - $DEVKITPRO/tools/bin/npdmtool target/megaton/none/modtest-empty/main.npdm.json target/megaton/none/modtest-empty/main.npdm
+      - $DEVKITPRO/tools/bin/elf2nso target/megaton/none/modtest-empty/modtest-empty.elf target/megaton/none/modtest-empty/modtest-empty.nso
+
+
+
+  upload:
+    cmds:
+      - task: download # to ensure our previous run outputs are downloaded and removed
+      - cargo run -p ftp-tool upload
+
+  download:
+    desc: Download logs and crash reports from console
+    cmds:
+      - cargo run -p ftp-tool download -d

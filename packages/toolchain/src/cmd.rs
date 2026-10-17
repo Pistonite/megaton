@@ -32,6 +32,7 @@ enum SubCmd {
     /// Remove artifacts from building Rust compiler
     Clean(cu::cli::Flags),
     /// Check toolchain installation
+    #[clap(hide = true)]
     Check(cu::cli::Flags),
 }
 

@@ -945,6 +945,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "megaton-packaging"
+version = "0.0.0"
+dependencies = [
+ "flate2",
+ "pistonite-cu",
+ "sha2",
+ "tar",
+]
+
+[[package]]
 name = "megaton-toolchain"
 version = "0.0.0"
 dependencies = [
