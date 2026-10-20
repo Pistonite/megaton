@@ -5,16 +5,19 @@ members = [
     "packages/cli-build",
     "packages/config",
     "packages/docker-build",
-    "packages/lib",
-    "packages/lib/macros",
+    # "packages/lib",
+    # "packages/lib/macros",
     "packages/packaging",
     "packages/toolchain",
-    "packages/test-mod",
+    # "packages/test-mod",
     "packages/ftp",
+    "packages/mega-rs",
+    "packages/mega-rspmacro",
 ]
 
 [workspace.package]
 version = "0.1.0"
+edition = "2024"
 
 
 [workspace.dependencies.cu]

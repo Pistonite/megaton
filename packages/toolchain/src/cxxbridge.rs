@@ -58,3 +58,9 @@ pub fn remove(home: &HomeEnv) -> cu::Result<()> {
     let env = CxxBridgeEnv::resolve(home);
     cu::fs::remove(env.path)
 }
+
+pub fn invoke(home: &HomeEnv, args: Vec<String>) -> cu::Result<()> {
+    let env = CxxBridgeEnv::resolve(home);
+    env.path.command().args(args)
+    .all_inherit().wait_nz()
+}

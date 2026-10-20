@@ -1,0 +1,11 @@
+[package]
+name = "mega-rspmacros"
+version.workspace = true
+edition.workspace = true
+description = "Proc-macro for mega-rs"
+
+[dependencies]
+pm = { workspace = true, features = ["full"] }
+
+[lib]
+proc-macro = true

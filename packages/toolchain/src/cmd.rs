@@ -34,10 +34,29 @@ enum SubCmd {
     /// Check toolchain installation
     #[clap(hide = true)]
     Check(cu::cli::Flags),
+
+    /// Invoke cxxbridge, installs if needed
+    Cxxbridge(CmdCxxBridge)
+}
+
+    /// Invoke cxxbridge, installs if needed
+#[derive(Debug, clap::Parser, AsRef)]
+#[clap(bin_name = "megaton-toolchain cxxbridge")]
+struct CmdCxxBridge {
+        /// Generate binding for this RS file
+        rs_file: Option<String>,
+        /// Generate header instead of CPP
+        #[clap(long)]
+        header: bool,
+        #[clap(flatten)]
+    #[as_ref]
+        common: cu::cli::Flags,
 }
 
 impl Cmd {
     pub fn run(self) -> cu::Result<()> {
+                cu::cli::print_to(cu::cli::Target::Stderr);
+                cu::cli::animate_to(Some(cu::cli::Target::Stderr));
         let home = HomeEnv::resolve()?;
         match self.command {
             SubCmd::Install { keep, clean, .. } => {
@@ -60,6 +79,25 @@ impl Cmd {
     crate::rust::inspect();
                 Ok(())
             }
+            SubCmd::Cxxbridge (CmdCxxBridge{rs_file, header, ..}  ) => {
+                if rs_file.is_none() && !header {
+                    cu::lv::disable_print_time();
+                    cu::cli::print_help::<CmdCxxBridge>(false);
+                    return Ok(());
+                }
+                crate::cxxbridge::install(&home)?;
+                let mut args = Vec::with_capacity(2);
+                if let Some(file) = rs_file {
+                    args.push(file);
+                }
+                if header {
+                    args.push("--header".to_string())
+                }
+                if args.is_empty() {
+                }
+                crate::cxxbridge::invoke(&home, args)?;
+                Ok(())
+            }
         }
     }
 }
@@ -70,6 +108,7 @@ impl AsRef<cu::cli::Flags> for Cmd {
             SubCmd::Remove(args) => args,
             SubCmd::Clean(args) => args,
             SubCmd::Check(args) => args,
+            SubCmd::Cxxbridge( command) => command.as_ref(),
         }
     }
 }
