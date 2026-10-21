@@ -5,7 +5,7 @@ target/megaton/
     Cargo.lock
     mega-rs/
       src/
-        kernel/ # kernel layer, depends on extern "C" _megakernel_ functions
+        hermit/ # hermit kernel layer, depends on extern "C" _megakernel_ functions
       Cargo.toml -> depends on mega-pmacros
     mega-pmacros/
       Cargo.toml
@@ -25,8 +25,9 @@ target/megaton/
         rocrt/
           CMakeLists.txt
         cpp/
+          sysbase/
           CMakeLists.txt
-        kernel/
+        hermit/
           CMakeLists.txt
       CMakeLists.txt
       build.sh

@@ -1,0 +1,28 @@
+# This is for megaton-config to dump clang flags for bindgen
+[module]
+name = "placeholder"
+title-id = 0x0
+nso-name = "subsdk9"
+
+# [megaton]
+# version = "0.1.0"
+
+[build]
+std = false
+sources = [
+    "src",
+]
+# defines = [
+#     "NNSDK"
+# ]
+includes = [
+    "src/include-priv", 
+    "include",
+]
+
+[build.compiler]
+CC = "clang" # emit clang flags since bindgen uses libclang
+
+[build.flags]
+# Without this, the functions aren't visible so no bindings are generated
+c = ["<default>", "-fvisibility=default"]

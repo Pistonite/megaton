@@ -1,0 +1,11 @@
+version: '3'
+
+tasks:
+  generate-hermit:
+    vars:
+      C_FLAGS:
+        sh: cargo run -p megaton-config -- build.flags.resolved.c --format=one-line
+    cmds:
+      - bindgen src/include-priv/megaton/hermit.h -o out.rs -- {{.C_FLAGS}}
+      # - >
+      #   bindgen src/include-priv/megaton/hermit.h -o out.rs --
