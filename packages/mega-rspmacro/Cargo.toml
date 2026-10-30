@@ -1,5 +1,5 @@
 [package]
-name = "mega-rspmacros"
+name = "mega-rspmacro"
 version.workspace = true
 edition.workspace = true
 description = "Proc-macro for mega-rs"

@@ -6,21 +6,22 @@ use crate::config_file::{self, CaptureUnused, ExtendProfile, ProjectTargetEnv, R
 use crate::toolchain::{DEVKITA64_TRIPLE, ToolchainEnv};
 
 /// Config in the `[build]` section
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct BuildConfig {
     /// If STD support is enabled.
     ///
     /// When false, megaton just links rocrt for you. You need
     /// to provide megaton_nnmain
-    #[serde(default = "BuildConfig::default_std")]
-    pub std: bool,
+    #[serde(serialize_with = "BuildConfig::serialize_std")]
+    std: Option<bool>,
 
     /// C++ STD version, should be a string passed to -std
-    #[serde(rename = "std-c++", default = "BuildConfig::default_std_cpp")]
-    pub std_cpp: String,
-    #[serde(rename = "std-c", default = "BuildConfig::default_std_c")]
-    pub std_c: String,
+    #[serde(rename = "std-c++", serialize_with = "BuildConfig::serialize_std_cpp")]
+    std_cpp: Option<String>,
+    /// C STD version, should be a string passed to -std
+    #[serde(serialize_with = "BuildConfig::serialize_std_c")]
+    std_c: Option<String>,
 
     /// C/C++ Source directories
     #[serde(default)]
@@ -62,34 +63,30 @@ pub struct BuildConfig {
     #[serde(flatten, default, skip_serializing)]
     unused: CaptureUnused,
 }
-impl Default for BuildConfig {
-    fn default() -> Self {
-        Self {
-            std: Self::default_std(),
-            std_cpp: Self::default_std_cpp(),
-            std_c: Self::default_std_c(),
-            sources: Default::default(),
-            includes: Default::default(),
-            system_includes: Default::default(),
-            sysroot: Default::default(),
-            defines: Default::default(),
-            ldscripts: Default::default(),
-            objects: Default::default(),
-            compiler: Default::default(),
-            flags: Default::default(),
-            unused: Default::default(),
-        }
-    }
-}
 impl BuildConfig {
-    fn default_std() -> bool {
-        true
+    const DEFAULT_STD: bool = true;
+    const DEFAULT_STD_CPP: &str = "c++23";
+    const DEFAULT_STD_C: &str = "c23";
+    /// Get if STD support is enabled
+    pub fn std_enabled(&self) -> bool {
+        self.std.unwrap_or(Self::DEFAULT_STD)
     }
-    fn default_std_cpp() -> String {
-        "c++23".to_string()
+    fn serialize_std<S: serde::Serializer>(v: &Option<bool>, ser: S) -> Result<S::Ok, S::Error>{
+        ser.serialize_bool(v.unwrap_or(Self::DEFAULT_STD))
     }
-    fn default_std_c() -> String {
-        "c23".to_string()
+    /// Get the cpp std version
+    pub fn std_cpp(&self) -> &str {
+        self.std_cpp.as_deref().unwrap_or(Self::DEFAULT_STD_CPP)
+    }
+    fn serialize_std_cpp<S: serde::Serializer>(v: &Option<String>, ser: S) -> Result<S::Ok, S::Error>{
+        ser.serialize_str(v.as_deref().unwrap_or(Self::DEFAULT_STD_CPP))
+    }
+    /// Get the c std version
+    pub fn std_c(&self) -> &str {
+        self.std_c.as_deref().unwrap_or(Self::DEFAULT_STD_C)
+    }
+    fn serialize_std_c<S: serde::Serializer>(v: &Option<String>, ser: S) -> Result<S::Ok, S::Error>{
+        ser.serialize_str(v.as_deref().unwrap_or(Self::DEFAULT_STD_C))
     }
 }
 
@@ -127,7 +124,7 @@ impl Validate for BuildConfig {
         self.compiler.validate_property(ctx, "compiler")?;
         self.unused.validate(ctx)?;
 
-        if self.std {
+        if self.std_enabled() {
             if !self.compiler.cc_flavor.is_dkp() || !self.compiler.cxx_flavor.is_dkp() {
                 cu::bail!("DevKitA64 toolchain must be used when std is enabled; either remove build.compiler.C and build.compiler.CXX to use DevKitA64, or set build.std = false to disable standard library support.");
             }
@@ -138,6 +135,9 @@ impl Validate for BuildConfig {
 
 impl ExtendProfile for BuildConfig {
     fn extend_profile(&mut self, other: &Self) {
+        config_file::extend_by_overriding_if_some(&mut self.std, other.std.as_ref());
+        config_file::extend_by_overriding_if_some(&mut self.std_cpp, other.std_cpp.as_ref());
+        config_file::extend_by_overriding_if_some(&mut self.std_c, other.std_c.as_ref());
         config_file::extend_by_appending(&mut self.sources, &other.sources);
         config_file::extend_by_appending(&mut self.includes, &other.includes);
         config_file::extend_by_appending(&mut self.system_includes, &other.system_includes);
@@ -369,14 +369,17 @@ impl BuildFlagConfig {
                 out
             }
         );
-        c.push(format!("-std={}", build.std_c));
-        cxx.push(format!("-std={}", build.std_cpp));
+        c.push(format!("-std={}", build.std_c()));
+        cxx.push(format!("-std={}", build.std_cpp()));
         let mut cc_asm = config_file::resolve_default_token(
             vec![],
             self.cc_asm.as_ref().map(|x| x.as_slice()),
             || {
                 let mut out = common.clone();
                 out.extend(DEFAULT_ASM_GCC.iter().map(|x| x.to_string()));
+                if build.compiler.cc_flavor.is_clang() {
+                    out.extend(DEFAULT_C_CLANG.iter().map(|x| x.to_string()));
+                }
                 out
             }
         );
@@ -424,6 +427,10 @@ impl BuildFlagConfig {
             Ok(flag)
         }
 
+        // == NOTE ==
+        // The paths here must be kept consistent with how the library is packed
+        // into the build tool
+
         // includes
         // - user includes first (the ones in Megaton.toml)
         // - then megaton library ones
@@ -436,9 +443,8 @@ impl BuildFlagConfig {
                 flagset.push(flag.clone());
             }
         }
-        // TODO: figure out the megaton library directories
-        for mega_library in ["mega-libcpp"] {
-            let include_path = cu::path!(&(&project.lib_root) / mega_library / "include");
+        if build.std_enabled() {
+            let include_path = cu::path!(&(&project.lib_root) / "mega-cpp" / "include");
             let include_str = cu::check!(include_path.as_utf8(), "megaton include path must be UTF-8; please put the project in another location")?;
             let flag = make_flag("-I", include_str)?;
             for flagset in [&mut c, &mut cxx, &mut cc_asm] {
@@ -482,9 +488,9 @@ impl BuildFlagConfig {
         // - version script
         // - linker scripts
         // - library order
-        let verfile = cu::path!(&(&project.lib_root) / "mega-libcpp" / "linker" / "verfile");
+        let verfile = cu::path!(&(&project.lib_root) / "mega-cpp" / "etc" / "verfile");
         cxx_ld.push(make_flag("-Wl,--version-script=", verfile.as_utf8()?)?);
-        let megaton_linker_script = cu::path!(&(&project.lib_root) / "mega-libcpp" / "linker" / "megaton.ld");
+        let megaton_linker_script = cu::path!(&(&project.lib_root) / "mega-cpp" / "etc" / "megaton.ld");
         cxx_ld.push(make_flag("-Wl,-T,", megaton_linker_script.as_utf8()?)?);
         for linker_script in &build.ldscripts {
             let path_str = cu::check!(linker_script.as_utf8(), "linker script path must be UTF-8")?;
@@ -495,13 +501,15 @@ impl BuildFlagConfig {
             cxx_ld.push(make_flag("", path_str)?);
         }
         let mut cxx_ld_after_obj = vec![];
-        // TODO: figure out what megaton objects/libraries as well as system libraries need to be linked
-        let lib = cu::path!(&(&project.lib_root) / "mega-libcpp" / "lib" / "rocrt0.o");
+        // TODO: figure out what system libraries need to be linked
+        let lib = cu::path!(&(&project.lib_root) / "mega-cpp" / "lib" / "rocrt0.o");
         cxx_ld_after_obj.push(make_flag("", lib.as_utf8()?)?);
-        let lib = cu::path!(&(&project.lib_root) / "mega-libcpp" / "lib" / "rocrt1.o");
+        let lib = cu::path!(&(&project.lib_root) / "mega-cpp" / "lib" / "rocrt.o");
         cxx_ld_after_obj.push(make_flag("", lib.as_utf8()?)?);
-        let lib = cu::path!(&(&project.lib_root) / "mega-libcpp" / "lib" / "libmegatoncpp.a");
-        cxx_ld_after_obj.push(make_flag("", lib.as_utf8()?)?);
+        if build.std_enabled() {
+            let lib = cu::path!(&(&project.lib_root) / "mega-cpp" / "lib" / "libmegacpp.a");
+            cxx_ld_after_obj.push(make_flag("", lib.as_utf8()?)?);
+        }
 
         cxx_ld_after_obj.push(make_flag("-o", project.out_elf.as_utf8()?)?);
         

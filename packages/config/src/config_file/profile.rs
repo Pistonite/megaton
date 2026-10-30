@@ -39,13 +39,19 @@ impl<T: ExtendProfile> Profile<T> {
     /// extended with the profile with the given name.
     ///
     /// Err if the profile does not exist
-    pub fn get_profile(&self, name: &str, desc: &str) -> cu::Result<T> {
-        let mut base = self.base.clone();
-        if name != BASE_PROFILE {
-            let profile = cu::check!(self.profiles.0.get(name), "{desc} profile '{name}' does not exist")?;
-            base.extend_profile(profile);
+    pub fn get_profile(&self, name: &str, desc: &str, optional: bool) -> cu::Result<&T> {
+        if name == BASE_PROFILE {
+            return Ok(&self.base);
         }
-        Ok(base)
+        match self.profiles.0.get(name) {
+            None => {
+                if optional {
+                    return Ok(&self.base);
+                }
+                cu::bail!("{desc} profile '{name}' does not exist");
+            }
+            Some(config) => Ok(&config)
+        }
     }
 }
 
@@ -64,9 +70,14 @@ impl<T: ExtendProfile> Validate for Profile<T> {
 
 impl<T: Resolve + ExtendProfile> Resolve for Profile<T> {
     fn resolve(&mut self, project: &ProjectTargetEnv, toolchain: Option<&ToolchainEnv>) -> cu::Result<()> {
+        let base_unresolved = self.base.clone();
         cu::check!(self.base.resolve(project, toolchain), "failed to resolve config for profile \"none\"")?;
         for (name, config) in &mut self.profiles.0 {
-            cu::check!(config.resolve(project, toolchain), "failed to resolve config for profile \"{name}\"")?;
+            // resolve must happen after extension
+            let mut extended = base_unresolved.clone();
+            extended.extend_profile(config);
+            cu::check!(extended.resolve(project, toolchain), "failed to resolve config for profile \"{name}\"")?;
+            *config = extended;
         }
         Ok(())
     }

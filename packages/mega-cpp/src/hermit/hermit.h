@@ -10,6 +10,8 @@ extern "C" {
 #endif // __cplusplus
 
 void _megahermit_abort();
+void _megahermit_stub1();
+void _megahermit_stub2();
 
 
 #ifdef __cplusplus

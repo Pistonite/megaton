@@ -141,12 +141,12 @@ impl Config {
         Ok(profile)
     }
     /// Get the resolved build config based on the profile
-    pub fn build_config(&self) -> cu::Result<BuildConfig> {
-        self.build.get_profile(&self.project.profile, "build")
+    pub fn build_config(&self) -> cu::Result<&BuildConfig> {
+        self.build.get_profile(&self.project.profile, "build", false)
     }
     /// Get the resolved ftp config based on the profile
-    pub fn ftp_config(&self) -> cu::Result<FtpConfig> {
-        self.ftp.get_profile(&self.project.profile, "ftp")
+    pub fn ftp_config(&self) -> cu::Result<&FtpConfig> {
+        self.ftp.get_profile(&self.project.profile, "ftp", true)
     }
     /// Turn the config into a JSON blob after profile selection
     pub fn to_json(&self) -> cu::Result<json::Value> {

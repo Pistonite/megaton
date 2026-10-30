@@ -1,8 +1,8 @@
 [package]
-name = "mega-rs"
+name = "megaton"
 edition.workspace = true
 version.workspace = true
 description = "Rust switch modding library"
 
 [dependencies]
-
+mega-rspmacro.path = "../mega-rspmacro"

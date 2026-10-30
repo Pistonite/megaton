@@ -2,13 +2,11 @@
 [module]
 name = "placeholder"
 title-id = 0x0
-nso-name = "subsdk9"
-
-# [megaton]
-# version = "0.1.0"
+default-profile = ""
+allow-base-profile = false
 
 [build]
-std = false
+std = false # don't include flags to link megaton std library support
 sources = [
     "src",
 ]
@@ -20,9 +18,13 @@ includes = [
     "include",
 ]
 
-[build.compiler]
+[build.profiles.megaton_cmake.compiler]
+
+[build.profiles.megaton_cmake.flags]
+
+[build.profiles.rust_bindgen.compiler]
 CC = "clang" # emit clang flags since bindgen uses libclang
 
-[build.flags]
+[build.profiles.rust_bindgen.flags]
 # Without this, the functions aren't visible so no bindings are generated
 c = ["<default>", "-fvisibility=default"]

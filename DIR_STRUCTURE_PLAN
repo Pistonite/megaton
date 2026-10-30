@@ -7,7 +7,7 @@ target/megaton/
       src/
         hermit/ # hermit kernel layer, depends on extern "C" _megakernel_ functions
       Cargo.toml -> depends on mega-pmacros
-    mega-pmacros/
+    mega-rspmacro/
       Cargo.toml
     mega-cpp/
       build/ # cmake files
@@ -21,10 +21,12 @@ target/megaton/
         rust.h
       src-user/ # sources compiled with user definitions
       src/ # source (for building lib for fast iteration)
+        lib/
+          nnsdk/
         include-priv/ # private includes
         rocrt/
           CMakeLists.txt
-        cpp/
+        megacpp/
           sysbase/
           CMakeLists.txt
         hermit/
