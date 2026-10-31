@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
     "packages/cli",
-    "packages/cli-build",
     "packages/config",
     "packages/docker-build",
     # "packages/lib",
@@ -30,7 +29,11 @@ package = "pistonite-pm"
 version = "0.3.0"
 
 [workspace.dependencies]
+mega-rspmacro.path = "packages/mega-rspmacro"
+megaton-packaging.path = "packages/packaging"
+megaton-toolchain.path = "packages/toolchain"
 megaton-config.path = "packages/config"
+
 static_assertions = "1.1.0"
 hermit-abi = "0.5.2"
 flate2 = "1.1.9"

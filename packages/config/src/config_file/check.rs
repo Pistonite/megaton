@@ -9,7 +9,7 @@ use crate::toolchain::ToolchainEnv;
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct CheckConfig {
-    /// Symbols to ignore
+    /// Symbols to ignore (i.e. assume defined)
     #[serde(default)]
     pub symbols: Vec<String>,
     /// Paths to *.syms file (output of objdump) that contains dynamic symbols accessible by the module

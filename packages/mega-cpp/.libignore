@@ -1,3 +1,4 @@
 /Taskfile.yml
 /build
 /.cache
+/Megaton.toml

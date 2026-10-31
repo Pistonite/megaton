@@ -57,7 +57,13 @@ tasks:
     desc: Build the library
     cmds:
       - task: cmake-gen
+      - mkdir -p include-rs/cxx && cargo run -p megaton-toolchain -- cxxbridge --header > include-rs/cxx/rust.h
       - bash build.sh
+
+  clean:
+    desc: Clean output
+    cmds:
+      - rm -rf .cache build include-rs/cxx
     
 
     

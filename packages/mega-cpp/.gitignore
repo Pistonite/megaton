@@ -1,5 +1,7 @@
 /build
 /.cache
 /.clang-tidy
+/include-rs/cxx/rust.h
 /lib
 /etc/flags.cmake
+

@@ -11,14 +11,14 @@ includes:
   docker-build:    { taskfile: packages/docker-build,     dir: packages/docker-build,    internal: true }
   docs:            { taskfile: packages/docs,             dir: packages/docs,            internal: true }
   lib:             { taskfile: packages/lib,              dir: packages/lib,             internal: true }
-  toolchain-build: { taskfile: packages/toolchain-build,  dir: packages/toolchain-build,  internal: true }
+  # toolchain-build: { taskfile: packages/toolchain-build,  dir: packages/toolchain-build,  internal: true }
 
 tasks:
   install:
     - rm -rf packages/mono-dev
     - rm -rf mono-dev
     - git clone https://github.com/Pistonight/mono-dev --depth 1
-    - '{{.TASK_EXE}} install-ci'
+    # - '{{.TASK_EXE}} install-ci'
 
   install-ci:
     - task: docs:install

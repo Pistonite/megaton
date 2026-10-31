@@ -1,8 +1,8 @@
 [package]
 name = "megaton-toolchain"
 description = "The megaton toolchain command"
-version = "0.0.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 license = "MIT"
 publish = false
 

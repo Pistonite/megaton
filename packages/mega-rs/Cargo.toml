@@ -5,4 +5,4 @@ version.workspace = true
 description = "Rust switch modding library"
 
 [dependencies]
-mega-rspmacro.path = "../mega-rspmacro"
+mega-rspmacro.workspace = true

@@ -1,0 +1,37 @@
+version: '3'
+
+includes:
+  mega-cpp:
+    taskfile: ../mega-cpp
+    dir: ../mega-cpp
+    internal: true
+
+  cargo:
+    taskfile: ../../mono-dev/task/cargo.yaml
+    internal: true
+    optional: true
+
+
+tasks:
+  make:
+    desc: Create the megatonlib package and build the CLI
+    cmds:
+      - task: mega-cpp:make
+      - cargo run -p megaton-packaging --features packaging-script
+
+  check:
+    - task: cargo:clippy-all
+    - task: cargo:fmt-check
+
+  fix:
+    - task: cargo:fmt-fix
+
+  test-unpack:
+    desc: Test unpacking the packed megatonlib
+    cmds:
+      - cargo run -p megaton-packaging --example megatonlib_unpack_test
+
+    
+
+
+
