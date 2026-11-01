@@ -450,6 +450,13 @@ impl BuildFlagConfig {
             for flagset in [&mut c, &mut cxx, &mut cc_asm] {
                 flagset.push(flag.clone());
             }
+
+            // generated headers
+            let include_str = cu::check!(project.out_inc.as_utf8(), "megaton generated include path must be UTF-8; please put the project in another location")?;
+            let flag = make_flag("-I", include_str)?;
+            for flagset in [&mut c, &mut cxx, &mut cc_asm] {
+                flagset.push(flag.clone());
+            }
         }
         for include in &build.system_includes {
             let include_str = cu::check!(include.as_utf8(), "(in build.system-includes) system include path must be UTF-8")?;

@@ -37,7 +37,7 @@ impl AsProfileFlag for Cmd {
 }
 
 impl Cmd {
-    pub fn run(self, dir: Option<&str>) -> cu::Result<()> {
+    pub async fn run(self, dir: Option<&str>) -> cu::Result<()> {
         let toolchain = ToolchainEnv::resolve()?;
         let config = Config::new_from_project_dir(dir, ConfigLoadOpts { 
             resolve: true, validate: true, cli_profile: self.profile.as_deref(), toolchain: Some(&toolchain) })?;
@@ -71,17 +71,23 @@ impl Cmd {
                 if rust_project.has_build_script {
                     // run the build script since that may generate rust files that need to run
                     // cxxbridge over
-                    rust::run_build_script(&config, &toolchain, rust_env)?;
+                    rust::run_build_script(&config, &toolchain, rust_env).await?;
                 }
             } else {
                 // cargo will handle running the build script :)
-                rust::run_build_full(&config, &toolchain, rust_env)?;
+                rust::run_build_full(&config, &toolchain, rust_env).await?;
             }
             if let Some(handle) = cxx_version_check_handle {
                 // ensure cxx version validity
-                handle.join()??;
+                handle.co_join().await??;
                 // generate sources and headers from cxx macros in the rust source
-                rust::run_cxxbridge()
+                // this runs even during configure - since those files need
+                // to be included in the generated compile_commands.json for language
+                // services to work
+                rust::run_cxxbridge(&config, &toolchain, &rust_project).await?;
+
+                // TODO: create compile manager, add sources to it
+                // and let it compile
             }
 
 

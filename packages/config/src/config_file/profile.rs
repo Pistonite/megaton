@@ -70,15 +70,21 @@ impl<T: ExtendProfile> Validate for Profile<T> {
 
 impl<T: Resolve + ExtendProfile> Resolve for Profile<T> {
     fn resolve(&mut self, project: &ProjectTargetEnv, toolchain: Option<&ToolchainEnv>) -> cu::Result<()> {
-        let base_unresolved = self.base.clone();
-        cu::check!(self.base.resolve(project, toolchain), "failed to resolve config for profile \"none\"")?;
-        for (name, config) in &mut self.profiles.0 {
-            // resolve must happen after extension
-            let mut extended = base_unresolved.clone();
-            extended.extend_profile(config);
-            cu::check!(extended.resolve(project, toolchain), "failed to resolve config for profile \"{name}\"")?;
-            *config = extended;
+        // only need to resolve the selected profile
+        let profile = &project.profile;
+        if profile == BASE_PROFILE {
+            cu::check!(self.base.resolve(project, toolchain), "failed to resolve config for base profile")?;
+            return Ok(());
         }
+        let Some(config) = self.profiles.0.get_mut(profile) else {
+            // profile not found, no need to resolve it
+            return Ok(());
+        };
+        let mut extended = self.base.clone();
+        // resolve must happen after extension
+        extended.extend_profile(config);
+        cu::check!(extended.resolve(project, toolchain), "failed to resolve config for profile \"{profile}\"")?;
+        *config = extended;
         Ok(())
     }
 }

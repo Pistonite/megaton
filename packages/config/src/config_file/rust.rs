@@ -12,14 +12,21 @@ pub struct RustConfig {
     /// or is not "Cargo.toml"
     enabled: Option<bool>,
 
+    /// Path to Cargo.toml
     #[serde(default = "RustConfig::default_manifest_path")]
     pub cargo_manifest: PathBuf,
 
+    /// Suffix for generated headers, added to the rust file name (i.e. for .h it will become .rs.h)
     #[serde(default = "RustConfig::default_header_suffix")]
     pub header_suffix: String,
 
-    #[serde(default = "RustConfig::default_sources")]
-    pub sources: Vec<PathBuf>,
+    /// Source directory to recursively scan for rust files to run cxxbridge. Not used
+    /// by Cargo build.
+    ///
+    /// There can only be one because the relative paths within this directory
+    /// is used to generate the include directory structure
+    #[serde(default = "RustConfig::default_source")]
+    pub source: PathBuf,
 
     #[serde(flatten, default, skip_serializing)]
     unused: CaptureUnused,
@@ -30,7 +37,7 @@ impl Default for RustConfig {
         Self {
             cargo_manifest: Self::default_manifest_path(),
             header_suffix: Self::default_header_suffix(),
-            sources: Self::default_sources(),
+            source: Self::default_source(),
             enabled: Default::default(),
             unused: Default::default(),
         }
@@ -60,9 +67,7 @@ impl RustConfig {
             }
         }
         self.cargo_manifest = resolved_manifest;
-        for s in &mut self.sources {
-            *s = project.root.join(&*s);
-        }
+        self.source = project.root.join(&self.source);
     }
     pub fn enabled(&self) -> bool {
         self.enabled.unwrap_or_default()
@@ -75,8 +80,8 @@ fn default_header_suffix() -> String {
     String::from(".h")
 }
 
-fn default_sources() -> Vec<PathBuf> {
-    vec![PathBuf::from("src")]
+fn default_source() -> PathBuf {
+    PathBuf::from("src")
 }
     }
 

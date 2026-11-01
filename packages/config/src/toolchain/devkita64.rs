@@ -20,9 +20,15 @@ pub struct DevKitA64Env {
     /// Archiver path
     #[serde(rename = "AR")]
     pub ar: String,
+    /// Linker path
+    #[serde(rename = "LD")]
+    pub ld: String,
     /// Objdump path
     #[serde(rename = "OBJDUMP")]
     pub objdump: String,
+    /// Objcopy path
+    #[serde(rename = "OBJCOPY")]
+    pub objcopy: String,
     /// Npdmtool path
     #[serde(rename = "NPDMTOOL")]
     pub npdmtool: String,
@@ -89,7 +95,9 @@ impl DevKitA64Env {
         let cxx = cu::path!(&dka64_bin / format!("{DEVKITA64_TRIPLE}-g++"));
         let asm = cu::path!(&dka64_bin / format!("{DEVKITA64_TRIPLE}-as"));
         let ar = cu::path!(&dka64_bin / format!("{DEVKITA64_TRIPLE}-ar"));
+        let ld = cu::path!(&dka64_bin / format!("{DEVKITA64_TRIPLE}-ld"));
         let objdump = cu::path!(&dka64_bin / format!("{DEVKITA64_TRIPLE}-objdump"));
+        let objcopy = cu::path!(&dka64_bin / format!("{DEVKITA64_TRIPLE}-objcopy"));
         let npdmtool = cu::path!(&tools_bin / "npdmtool");
         let elf2nso = cu::path!(&tools_bin / "elf2nso");
 
@@ -101,7 +109,9 @@ impl DevKitA64Env {
             cxx: cxx.into_utf8()?,
             asm: asm.into_utf8()?,
             ar: ar.into_utf8()?,
+            ld: ld.into_utf8()?,
             objdump: objdump.into_utf8()?,
+            objcopy: objcopy.into_utf8()?,
             npdmtool: npdmtool.into_utf8()?,
             elf2nso: elf2nso.into_utf8()?,
             c_includes,
