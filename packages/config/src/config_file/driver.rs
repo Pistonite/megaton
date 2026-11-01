@@ -169,7 +169,13 @@ impl Validate for Config {
         self.rust.validate_property(ctx, "rust")?;
         self.build.validate_property(ctx, "build")?;
         self.ftp.validate_property(ctx, "ftp")?;
-        self.unused.validate(ctx)
+        self.unused.validate(ctx)?;
+
+        if self.rust.enabled() && !self.build_config()?.std_enabled() {
+            cu::bail!("build.std must be enabled when Rust is enabled; if Rust should not be enabled, explicitly set rust.enabled = false");
+        }
+
+        Ok(())
     }
 }
 

@@ -28,6 +28,12 @@ pub struct ProjectTargetEnv {
     pub out_nso: PathBuf,
     /// The output npdm path
     pub out_npdm: PathBuf,
+    /// Output generated source paths
+    pub out_src: PathBuf,
+    /// Output generated include paths
+    pub out_inc: PathBuf,
+    /// Output object paths
+    pub out_objects: PathBuf,
 }
 
 impl ProjectTargetEnv {
@@ -45,6 +51,9 @@ impl ProjectTargetEnv {
         let out_elf = cu::path!(&output_root / format!("{name}.elf"));
         let out_nso = cu::path!(&output_root / format!("{name}.nso"));
         let out_npdm = cu::path!(&output_root / "main.npdm");
+        let out_src = cu::path!(&output_root / "src");
+        let out_inc = cu::path!(&output_root / "inc");
+        let out_objects = cu::path!(&output_root / "o");
         Self {
             profile,
             module_name: name.to_string(),
@@ -58,6 +67,9 @@ impl ProjectTargetEnv {
             out_elf,
             out_nso,
             out_npdm,
+            out_src,
+            out_inc,
+            out_objects,
         }
     }
 }

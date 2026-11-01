@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use cu::pre::*;
 
 pub static MEGATON_TOOLCHAIN_NAME: &str = "megaton";
+pub static MEGATON_TOOLCHAIN_SELECTOR: &str = "+megaton";
 
 #[derive(Debug, Serialize)]
 pub struct RustEnv {

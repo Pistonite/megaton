@@ -2,10 +2,17 @@
 // Copyright (c) 2026 Megaton contributors
 
 use cu::pre::*;
+use semver::Version;
+
 use megaton_config::toolchain::{CxxBridgeEnv, HomeEnv};
 
 /// The "blessed" cxxbridge-cmd version to use
 pub static BLESSED_VERSION: &str = "1.0.197";
+
+/// Get the blessed cxx version as a semver
+pub fn blessed_semver() -> Version {
+    Version::parse(BLESSED_VERSION).expect("failed to parse blessed cxx version")
+}
 
 pub fn inspect(home: &HomeEnv) {
     let env = CxxBridgeEnv::resolve(home);

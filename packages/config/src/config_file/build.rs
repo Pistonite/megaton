@@ -326,7 +326,7 @@ pub struct BuildFlagConfig {
     cargo: Option<Vec<String>>,
 
     #[serde(skip_deserializing)]
-    resolved: BuildFlags,
+    pub resolved: BuildFlags,
 
     #[serde(flatten, default, skip_serializing)]
     unused: CaptureUnused,
@@ -400,7 +400,7 @@ impl BuildFlagConfig {
             }
         );
         let cargo = config_file::resolve_default_token(
-            vec![],
+            vec!["--target-dir".to_string(), project.target_root.as_utf8()?.to_string()],
             self.cargo.as_ref().map(|x| x.as_slice()),
             || {
                 DEFAULT_CARGO.iter().map(|x| x.to_string()).collect()

@@ -1,0 +1,28 @@
+[package]
+name = "megaton-buildtool"
+version.workspace = true
+edition.workspace = true
+license = "MIT"
+description = "Megaton buildtool"
+publish = false
+
+[dependencies.cu]
+workspace = true
+features = ["cli", "process", "prompt", "toml", "json", "fs", "coroutine-heavy", "derive"]
+
+[dependencies]
+serde.workspace = true
+tokio.workspace = true
+flate2.workspace = true
+tar.workspace = true
+walkdir.workspace = true
+rustc-hash.workspace = true
+depfile.workspace = true
+regex.workspace = true
+cargo_metadata.workspace = true
+semver.workspace = true
+semver.features = ["serde"]
+
+megaton-toolchain.workspace = true
+megaton-packaging.workspace = true
+megaton-config.workspace = true

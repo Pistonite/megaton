@@ -2,5 +2,5 @@
 // Copyright (c) 2026 Megaton contributors
 
 pub mod cmd;
-mod cxxbridge;
+pub mod cxxbridge;
 mod rust;

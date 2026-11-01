@@ -8,5 +8,6 @@ publish = false
 
 [dependencies]
 cu = { workspace = true, features = ["process", "print", "prompt", "toml", "json", "cli"] }
+semver.workspace = true
 
 megaton-config.workspace = true
