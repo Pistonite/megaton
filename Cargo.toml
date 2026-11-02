@@ -22,7 +22,7 @@ edition = "2024"
 
 [workspace.dependencies.cu]
 package = "pistonite-cu"
-version = "0.9.5"
+version = "0.9.8"
 # path = "../../../cu/packages/copper"
 
 [workspace.dependencies.pm]

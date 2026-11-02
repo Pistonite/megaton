@@ -4,14 +4,20 @@
 use std::ffi::OsStr;
 use std::path::Path;
 
-use crate::config::Flags;
-use crate::env::Environment;
+use megaton_config::config_file::{BuildConfig, Config};
+use megaton_config::toolchain::ToolchainEnv;
 
+/// Source language type
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SourceType {
+    /// C Source
     C,
+    /// C++ Source
     Cpp,
-    Assembly,
+    /// Assembly Source without preprocessing
+    Asm,
+    /// Assembly Source with preprocessing
+    AsmPre,
 }
 
 impl SourceType {
@@ -22,32 +28,44 @@ impl SourceType {
             | [b'c' | b'C', b'+', b'+']
             | [b'c' | b'C', b'x' | b'X', b'x' | b'X']
             | [b'c' | b'C', b'c' | b'C'] => Some(Self::Cpp),
-            [b's' | b'S'] | [b'a' | b'A', b's' | b'S', b'm' | b'M'] => Some(Self::Assembly),
+            [b's'] | [b'a' | b'A', b's' | b'S', b'm' | b'M'] => Some(Self::Asm),
+            [b'S'] => Some(Self::AsmPre),
             _ => None,
         }
     }
 
     #[inline]
-    pub fn get_compiler(self, env: &Environment) -> &Path {
+    pub fn get_compiler(self, config: &BuildConfig) -> &str {
         match self {
-            SourceType::C => env.cc(),
-            SourceType::Cpp => env.cxx(),
-            SourceType::Assembly => env.cc(),
+            SourceType::C => config.compiler.cc(),
+            SourceType::Cpp => config.compiler.cxx(),
+            SourceType::Asm => config.compiler.cc(),
+            SourceType::AsmPre => config.compiler.cc(),
         }
     }
 
     #[inline]
-    pub fn get_flags(self, flags: &Flags) -> &Vec<String> {
+    pub fn get_flags(self, config: &BuildConfig) -> &Vec<String> {
         match self {
-            SourceType::C => &flags.cflags,
-            SourceType::Cpp => &flags.cxxflags,
-            SourceType::Assembly => &flags.sflags,
+            SourceType::C => &config.flags.resolved.c,
+            SourceType::Cpp => &config.flags.resolved.cxx,
+            SourceType::Asm => &config.flags.resolved.cc_asm,
+            SourceType::AsmPre => &config.flags.resolved.cc_asm
+        }
+    }
+    #[inline]
+    pub fn get_clangd_compat_flags(self, config: &BuildConfig) -> &Vec<String> {
+        match self {
+            SourceType::C => &config.flags.resolved.compdb.c,
+            SourceType::Cpp => &config.flags.resolved.compdb.cxx,
+            SourceType::Asm => &config.flags.resolved.compdb.cc_asm,
+            SourceType::AsmPre => &config.flags.resolved.compdb.cc_asm
         }
     }
 
     #[inline]
     pub fn uses_depfile(self) -> bool {
-        matches!(self, Self::C | Self::Cpp)
+        matches!(self, Self::C | Self::Cpp | Self::AsmPre)
     }
 }
 
@@ -80,11 +98,11 @@ mod tests {
 
     #[test]
     fn assembly_extensions() {
-        assert_eq!(ext("s"), Some(SourceType::Assembly));
-        assert_eq!(ext("S"), Some(SourceType::Assembly));
-        assert_eq!(ext("asm"), Some(SourceType::Assembly));
-        assert_eq!(ext("ASM"), Some(SourceType::Assembly));
-        assert_eq!(ext("Asm"), Some(SourceType::Assembly));
+        assert_eq!(ext("s"), Some(SourceType::Asm));
+        assert_eq!(ext("S"), Some(SourceType::AsmPre));
+        assert_eq!(ext("asm"), Some(SourceType::Asm));
+        assert_eq!(ext("ASM"), Some(SourceType::Asm));
+        assert_eq!(ext("Asm"), Some(SourceType::Asm));
     }
 
     #[test]

@@ -460,33 +460,42 @@ impl BuildFlagConfig {
         }
         for include in &build.system_includes {
             let include_str = cu::check!(include.as_utf8(), "(in build.system-includes) system include path must be UTF-8")?;
-            let flag = make_flag("-isystem", include_str)?;
+            let flag = make_flag("", include_str)?;
             for flagset in [&mut c, &mut cxx, &mut cc_asm] {
+                flagset.push("-isystem".to_string());
                 flagset.push(flag.clone());
             }
         }
 
+        // Add dkp includes explicitly for clangd compile_commands.json
         let mut compdb_c = c.clone();
         let mut compdb_cxx = cxx.clone();
         let mut compdb_cc_asm = cc_asm.clone();
         if build.compiler.cc_flavor.is_dkp() {
+            compdb_c.push("--target=aarch64-none-elf".to_string());
+            compdb_cc_asm.push("--target=aarch64-none-elf".to_string());
             if let Some(tc) = toolchain {
                 for include in &tc.devkita64.c_includes {
-                    let flag = make_flag("-isystem", include)?;
+                    let flag = make_flag("", include)?;
+                    compdb_c.push("-isystem".to_string());
                     compdb_c.push(flag.clone());
+                    compdb_cc_asm.push("-isystem".to_string());
                     compdb_cc_asm.push(flag);
                 }
             }
         }
         if build.compiler.cxx_flavor.is_dkp() {
+            compdb_cxx.push("--target=aarch64-none-elf".to_string());
             if let Some(tc) = toolchain {
                 for include in &tc.devkita64.c_includes {
-                    let flag = make_flag("-isystem", include)?;
-                    compdb_cxx.push(flag.clone());
+                    let flag = make_flag("", include)?;
+                    compdb_cxx.push("-isystem".to_string());
+                    compdb_cxx.push(flag);
                 }
                 for include in &tc.devkita64.cpp_includes {
-                    let flag = make_flag("-isystem", include)?;
-                    compdb_cxx.push(flag.clone());
+                    let flag = make_flag("", include)?;
+                    compdb_cxx.push("-isystem".to_string());
+                    compdb_cxx.push(flag);
                 }
             }
         }

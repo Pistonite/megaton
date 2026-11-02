@@ -1,13 +1,12 @@
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use cargo_metadata::MetadataCommand;
 use cu::pre::*;
 use semver::Version;
 
-use megaton_config::{config_file::{Config, RustConfig}, toolchain::{MEGATON_TOOLCHAIN_SELECTOR, RustEnv, ToolchainEnv}};
+use megaton_config::config_file::Config;
+use megaton_config::toolchain::{MEGATON_TOOLCHAIN_SELECTOR, RustEnv, ToolchainEnv};
 use megaton_toolchain::cxxbridge;
 
 use crate::path_hash;
@@ -20,6 +19,8 @@ pub struct RustProject {
     pub has_build_script: bool,
     /// Output archive path
     pub output_path: PathBuf,
+    /// The output object path with rust output linked with the hermit kernel
+    pub linked_path: PathBuf,
     /// Namespace of the include (same as the crate name)
     pub include_namespace: String,
 }
@@ -42,20 +43,20 @@ pub fn resolve_project(config: &Config) -> cu::Result<RustProject> {
     let crate_name = cu::check!(crate_name, "failed to resolve crate name; ensure package.name exists in Cargo.toml")?;
 
     // resolve output .a file path from cargo
-    let output_path = {
         let lib_name = manifest.get("lib").and_then(|x| x.as_table())
         .and_then(|x| x.get("name")).and_then(|x| x.as_str());
-        let archive_name = match lib_name {
+        let archive_base = match lib_name {
             None => {
-                format!("lib{}.a", crate_name.replace("-", "_"))
+                crate_name.replace("-", "_")
             }
             Some(name) => {
-                format!("lib{name}.a")
+                name.to_string()
             }
-        };
-        // cargo flag would include --target-dir to direct to the same target directory
-        cu::path!(&(&config.project.target_root) / "aarch64-unknown-hermit" / "release" / archive_name)
     };
+        let archive_name = format!("lib{archive_base}.a");
+        // cargo flag would include --target-dir to direct to the same target directory
+        let output_path = cu::path!(&(&config.project.target_root) / "aarch64-unknown-hermit" / "release" / archive_name);
+        let linked_path = cu::path!(&(&config.project.output_root) / format!("lib{archive_base}_hermit.o"));
 
     let dependencies = cu::check!(manifest.get("dependencies").and_then(|x| x.as_table()), "cannot find [dependencies] in Cargo.toml")?;
 
@@ -116,7 +117,9 @@ pub fn resolve_project(config: &Config) -> cu::Result<RustProject> {
     }
 
     Ok(RustProject { 
-        has_cxx, has_build_script, output_path, include_namespace: crate_name.to_string() })
+        has_cxx, has_build_script, output_path, 
+        linked_path,
+        include_namespace: crate_name.to_string() })
 }
 
 /// Run `cargo metadata` to check cxx version
@@ -322,4 +325,163 @@ pub async fn run_cxxbridge(config: &Config, toolchain: &ToolchainEnv, project: &
     bar.done_with_message(&format!("processed {} files with cxxbridge attributes", src_cc_paths.len()));
 
     Ok(src_cc_paths)
+}
+
+/// Link the staticlib compiled from rust code with the hermit kernel
+/// objects to produce a single object with hermit syscalls internalized
+#[cu::context("failed to link rust staticlib with hermit kernel objects")]
+pub async fn link_hermit_kernel(
+    config: &Config,
+    toolchain: &ToolchainEnv,
+    rust_project: &RustProject,
+) -> cu::Result<()> {
+    // find hermit objects
+    let hermit_object_dir = cu::path!(&(&config.project.lib_root) / "mega-cpp"/"lib" / "hermit");
+    let mut objects = vec![];
+    for entry in cu::fs::read_dir(&hermit_object_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        if path.extension().is_some_and(|x| x.as_encoded_bytes() == b".o") {
+            objects.push(path);
+        }
+    }
+    cu::debug!("found hermit objects: {objects:?}");
+
+    let archive_path = &rust_project.output_path;
+    let linked_path = &rust_project.linked_path;
+
+    let is_up_to_date = is_linked_up_to_date(
+        linked_path,
+        archive_path,
+        &objects
+    );
+
+    if is_up_to_date {
+        return Ok(());
+    }
+
+    // use a temp linked path so if something fails before
+    // we localize the object, it does not count as a successful object
+    let temp_linked_path = linked_path.with_added_extension(".temp");
+
+    // ld -r -o output.o hermit.o ... --whole-archive librust.a --no-whole-archive
+    let ld = Path::new(&toolchain.devkita64.ld);
+    let (child, stdout, stderr) = ld.command()
+    .add(cu::args!["-r", "-o", &temp_linked_path])
+    .args(&objects)
+        .add(cu::args!["--whole-archive", archive_path, "--no-whole-archive"])
+        .stdout(cu::pio::buffer())
+        .stderr(cu::pio::buffer())
+        .stdin_null()
+        .co_spawn().await?;
+    let result = child.co_wait_nz().await;
+    if let Ok(stderr) = stderr.co_join().await.flatten() {
+        cu::print!("{}", String::from_utf8_lossy(&stderr));
+    }
+    if let Err(e) = result {
+        if let Ok(stdout) = stdout.co_join().await.flatten() {
+            cu::error!("{}", String::from_utf8_lossy(&stdout));
+        }
+        return Err(e);
+    }
+
+    // objcopy --localize-symbols=hermit.txt object.o
+    let hermit_syscall_file = cu::path!(&(&config.project.lib_root) / "mega-cpp"/"etc" / "hermit_syscalls.txt").into_utf8()?;
+    if hermit_syscall_file.contains('"') {
+        cu::bail!("library file cannot contain quotes - please move the project to another location");
+    }
+    let localize_symbol_flag = if hermit_syscall_file.contains(' ') {
+        format!("--localize-symbols=\"{hermit_syscall_file}\"")
+    } else {
+        format!("--localize-symbols={hermit_syscall_file}")
+    };
+
+    let objcopy = Path::new(&toolchain.devkita64.objcopy);
+    let (child, stdout, stderr) = objcopy.command().arg(localize_symbol_flag)
+        .arg(&temp_linked_path)
+        .stdout(cu::pio::buffer())
+        .stderr(cu::pio::buffer())
+        .stdin_null()
+        .co_spawn().await?;
+    let result = child.co_wait_nz().await;
+    if let Err(e) = result {
+        if let Ok(stderr) = stderr.co_join().await.flatten() {
+            cu::error!("{}", String::from_utf8_lossy(&stderr));
+        }
+        if let Ok(stdout) = stdout.co_join().await.flatten() {
+            cu::error!("{}", String::from_utf8_lossy(&stdout));
+        }
+        cu::rethrow!(e, "failed to localize hermit symbols");
+    }
+
+    cu::fs::copy(&temp_linked_path, linked_path)?;
+    if let Err(e) = cu::fs::remove(&temp_linked_path) {
+        cu::debug!("failed to remove temp file: {}: {e:?}", temp_linked_path.display());
+    }
+
+    Ok(())
+}
+
+/// Check if the hermit-linked rust object is up-to-date
+fn is_linked_up_to_date(
+    linked_path: &Path,
+    archive_path: &Path,
+    hermit_objects: &[PathBuf]
+) -> bool {
+    if !linked_path.exists() {
+        cu::debug!("need to relink rust with hermit kernel: output does not exist");
+        return false;
+    }
+    let linked_mtime = match cu::fs::get_mtime(linked_path) {
+        Err(e) => {
+            cu::warn!("failed to get mtime of hermit-linked rust object: {e:?}");
+            return false;
+        }
+        Ok(None) => {
+            cu::debug!("need to relink rust with hermit kernel: output does not exist");
+            return false;
+        }
+        Ok(Some(t)) => t
+    };
+    let archive_mtime = match cu::fs::get_mtime(archive_path) {
+        Err(e) => {
+            cu::warn!("failed to get mtime of rust static archive: {e:?}");
+            return false;
+        }
+        Ok(None) => {
+            cu::warn!("failed to get mtime of rust static archive: archive does not exist: {}", archive_path.display());
+            return false;
+        }
+        Ok(Some(t)) => t
+    };
+
+    if archive_mtime > linked_mtime {
+        cu::debug!("need to relink rust with hermit kernel: rust static archive changed");
+        return false;
+    }
+
+    for obj in hermit_objects {
+        match cu::fs::get_mtime(obj) {
+            Err(e) => {
+                cu::warn!("failed to get mtime of hermit object: {e:?}");
+                return false;
+            }
+            Ok(None) => {
+                cu::warn!("failed to get mtime of hermit object: file does not exist: {}", obj.display());
+                return false;
+            }
+            Ok(Some(t)) => {
+                if t > linked_mtime {
+                    cu::debug!("need to relink rust with hermit kernel: hermit object {} changed", obj.display());
+                    return false;
+                }
+            }
+        };
+    }
+
+    cu::debug!("hermit-linked rust object is up-to-date");
+    true
 }

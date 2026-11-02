@@ -8,7 +8,7 @@ publish = false
 
 [dependencies.cu]
 workspace = true
-features = ["cli", "process", "prompt", "toml", "json", "fs", "coroutine-heavy", "derive"]
+features = ["cli", "process", "prompt", "toml", "json", "fs", "coroutine-heavy", "derive", "parse-impl"]
 
 [dependencies]
 serde.workspace = true
