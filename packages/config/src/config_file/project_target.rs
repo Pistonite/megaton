@@ -32,6 +32,8 @@ pub struct ProjectTargetEnv {
     pub out_src: PathBuf,
     /// Output generated include paths
     pub out_inc: PathBuf,
+    /// Output generated libraries
+    pub out_lib: PathBuf,
     /// Output object paths
     pub out_objects: PathBuf,
 }
@@ -53,6 +55,7 @@ impl ProjectTargetEnv {
         let out_npdm = cu::path!(&output_root / "main.npdm");
         let out_src = cu::path!(&output_root / "src");
         let out_inc = cu::path!(&output_root / "inc");
+        let out_lib = cu::path!(&output_root / "lib");
         let out_objects = cu::path!(&output_root / "o");
         Self {
             profile,
@@ -69,6 +72,7 @@ impl ProjectTargetEnv {
             out_npdm,
             out_src,
             out_inc,
+            out_lib,
             out_objects,
         }
     }

@@ -4,12 +4,13 @@ use std::sync::Arc;
 use cu::pre::*;
 
 use megaton_config::cmd::AsProfileFlag;
-use megaton_config::config_file::{Config, ConfigLoadOpts, FtpConfig};
+use megaton_config::config_file::{Config, ConfigLoadOpts};
 use megaton_config::toolchain::ToolchainEnv;
 use megaton_packaging as packaging;
 
 use crate::compile_mgr::CompileMgr;
 use crate::rust;
+use crate::linking;
 
 /// The `build` subcommand
 #[derive(Debug, clap::Parser)]
@@ -68,13 +69,22 @@ impl Cmd {
             /// cxx generated sources to be compiled
             pub cxx_sources: Vec<PathBuf>,
             /// single .o object linked with hermit kernel
-            pub object: Option<String>,
+            pub rust_hermit_object: Option<String>,
             /// the task to produce the .o object above
-            pub hermit_link_task: Option<cu::co::Handle<cu::Result<()>>>
+            pub hermit_link_task: Option<cu::co::Handle<cu::Result<bool>>>,
+
+            /// Task to build libgcc_nounwind.a
+            pub libgcc_nounwind_task: Option<cu::co::Handle<cu::Result<()>>>
         }
         impl Drop for Tasks<'_> {
             fn drop(&mut self) {
                 if let Some(t) = self.hermit_link_task.take() {
+                    self.zombie_tasks.push(cu::co::spawn(async move {
+                        t.co_join().await??;
+                        cu::Ok(())
+                    }));
+                }
+                if let Some(t) = self.libgcc_nounwind_task.take() {
                     self.zombie_tasks.push(t);
                 }
             }
@@ -82,9 +92,19 @@ impl Cmd {
         let mut tasks = Tasks {
             zombie_tasks,
             cxx_sources: vec![],
-            object: None,
-            hermit_link_task: None
+            rust_hermit_object: None,
+            hermit_link_task: None,
+            libgcc_nounwind_task: None
         };
+
+        // build libgcc_nounwind since it's required for linking later
+        if config.build_config()?.std_enabled() {
+            let config = config.clone();
+            let toolchain = toolchain.clone();
+            tasks.libgcc_nounwind_task = Some(cu::co::spawn(async move {
+                linking::build_libgcc_nounwind(&config, &toolchain).await
+            }));
+        }
 
 
         // build rust if needed
@@ -126,7 +146,7 @@ impl Cmd {
                 // services to work
                 tasks.cxx_sources = rust::run_cxxbridge(&config, &toolchain, &rust_project).await?;
             }
-            tasks.object = Some(rust_project.linked_path.as_utf8()?.to_string());
+            tasks.rust_hermit_object = Some(rust_project.linked_path.as_utf8()?.to_string());
             if !self.configure {
                 let config = config.clone();
                 let toolchain = toolchain.clone();
@@ -139,18 +159,21 @@ impl Cmd {
 
         let configure_only = self.configure;
         let rust_cxx_sources = std::mem::take(&mut tasks.cxx_sources);
-        let result = cu::cli::ctrlc_frame().co_execute(move |ctrlc| async move {
-            let mut compile_mgr = CompileMgr::new(configure_only, &config)?;
-            let result = drive_compile_mgr(&mut compile_mgr, &config, ctrlc, rust_cxx_sources).await;
-            if !configure_only {
-                let compile_result = compile_mgr.finish_compiling().await;
+        let result = {
+            let config = config.clone();
+            cu::cli::ctrlc_frame().co_execute(move |ctrlc| async move {
+                let mut compile_mgr = CompileMgr::new(configure_only, &config)?;
+                let result = drive_compile_mgr(&mut compile_mgr, &config, ctrlc, rust_cxx_sources).await;
+                if !configure_only {
+                    let compile_result = compile_mgr.finish_compiling().await;
+                    result?;
+                    compile_result?;
+                    return Ok(compile_mgr);
+                }
                 result?;
-                compile_result?;
-                return Ok(compile_mgr);
-            }
-            result?;
-            cu::Ok(compile_mgr)
-        }).await?;
+                cu::Ok(compile_mgr)
+            }).await?
+        };
 
         let Some(mut compile_mgr) = result else {
             cu::bail!("interrupted by ctrl-c");
@@ -162,8 +185,21 @@ impl Cmd {
             return Ok(())
         }
 
+        let mut relink_needed = compile_mgr.is_any_object_compiled();
         let mut compiled_objects = compile_mgr.into_objects();
         // compile_mgr is dropped, entering linking step
+
+        let bar = cu::progress(format!("linking {}.elf", config.project.module_name)).spawn();
+        compiled_objects.sort();
+
+        if let Some(task) = tasks.hermit_link_task.take() {
+            let changed = task.co_join().await??;
+            relink_needed |= changed;
+        };
+
+        linking::link_elf(&config, relink_needed, 
+            &compiled_objects, tasks.rust_hermit_object.as_deref());
+
 
 
         todo!()

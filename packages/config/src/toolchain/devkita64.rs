@@ -39,6 +39,33 @@ pub struct DevKitA64Env {
     pub c_includes: Vec<String>,
     /// System include paths for CXX
     pub cpp_includes: Vec<String>,
+
+    /// PIC libraries
+    pub libs: DevKitA64PicLibs,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DevKitA64PicLibs {
+    // the link order is the same as how the libs are listed here
+    #[serde(rename = "stdc++exp")]
+    pub stdcppexp: String,
+    #[serde(rename = "stdc++")]
+    pub stdcpp: String,
+
+    /// math lib
+    pub m: String,
+
+    // -Wl,--start-group
+
+    pub sysbase: String,
+    /// C lib
+    pub c: String,
+    // the gcc contains unwind objects which need to be excluded,
+    // this is the original library path. During library unpack,
+    // we use AR to remove the objects we don't want
+    // and save it as a new archive in the output directory
+    pub gcc: String,
+    // -Wl,--start-group
 }
 
 impl DevKitA64Env {
@@ -103,6 +130,18 @@ impl DevKitA64Env {
 
         let (c_includes, cpp_includes) = get_includes(&dka64, &version)?;
 
+        // libraries
+        let gcc_lib= cu::path!(&dka64 / "lib" / "gcc" / "aarch64-none-elf" / version / "pic" / "libgcc.a");
+        let other_lib_dir = cu::path!(&dka64 / "aarch64-none-elf" / "lib" / "pic");
+        let libs = DevKitA64PicLibs { 
+            stdcppexp: other_lib_dir.join("libstdc++exp.a").into_utf8()?,
+            stdcpp: other_lib_dir.join("libstdc++.a").into_utf8()?,
+            m: other_lib_dir.join("libm.a").into_utf8()?,
+            sysbase: other_lib_dir.join("libsysbase.a").into_utf8()?,
+            c: other_lib_dir.join("libc.a").into_utf8()?,
+            gcc: gcc_lib.into_utf8()?
+        };
+
         Ok(Self {
             version,
             cc: cc.into_utf8()?,
@@ -116,6 +155,7 @@ impl DevKitA64Env {
             elf2nso: elf2nso.into_utf8()?,
             c_includes,
             cpp_includes,
+            libs
         })
 
     }

@@ -407,14 +407,6 @@ impl BuildFlagConfig {
             }
         );
 
-        // defines
-        for define in &build.defines {
-            let flag = format!("-D{define}");
-            for flagset in [&mut c, &mut cxx, &mut cc_asm] {
-                flagset.push(flag.clone());
-            }
-        }
-
         fn make_flag(prefix: &str, p: &str) -> cu::Result<String> {
             if p.contains('"') {
                 cu::bail!("path cannot contain quotes; paths are quoted automatically if needed when converted to flags: '{p}'");
@@ -425,6 +417,23 @@ impl BuildFlagConfig {
                 format!("{prefix}{p}")
             };
             Ok(flag)
+        }
+
+        // sysroot
+        if let Some(sysroot) = &build.sysroot {
+            let sysroot_str = cu::check!(sysroot.as_utf8(), "(in build.sysroot) sysroot path must be UTF-8")?;
+            let flag = make_flag("--sysroot=", sysroot_str)?;
+            for flagset in [&mut c, &mut cxx, &mut cc_asm, &mut cxx_ld] {
+                flagset.push(flag.clone());
+            }
+        }
+
+        // defines
+        for define in &build.defines {
+            let flag = format!("-D{define}");
+            for flagset in [&mut c, &mut cxx, &mut cc_asm] {
+                flagset.push(flag.clone());
+            }
         }
 
         // == NOTE ==
@@ -518,14 +527,16 @@ impl BuildFlagConfig {
         }
         let mut cxx_ld_after_obj = vec![];
         // TODO: figure out what system libraries need to be linked
-        let lib = cu::path!(&(&project.lib_root) / "mega-cpp" / "lib" / "rocrt0.o");
-        cxx_ld_after_obj.push(make_flag("", lib.as_utf8()?)?);
-        let lib = cu::path!(&(&project.lib_root) / "mega-cpp" / "lib" / "rocrt.o");
-        cxx_ld_after_obj.push(make_flag("", lib.as_utf8()?)?);
-        if build.std_enabled() {
-            let lib = cu::path!(&(&project.lib_root) / "mega-cpp" / "lib" / "libmegacpp.a");
-            cxx_ld_after_obj.push(make_flag("", lib.as_utf8()?)?);
-        }
+        // TODO: move these to the linking module, as we need to check the modification time
+        // of library objects/archives
+        // let lib = cu::path!(&(&project.lib_root) / "mega-cpp" / "lib" / "rocrt0.o");
+        // cxx_ld_after_obj.push(make_flag("", lib.as_utf8()?)?);
+        // let lib = cu::path!(&(&project.lib_root) / "mega-cpp" / "lib" / "rocrt.o");
+        // cxx_ld_after_obj.push(make_flag("", lib.as_utf8()?)?);
+        // if build.std_enabled() {
+        //     let lib = cu::path!(&(&project.lib_root) / "mega-cpp" / "lib" / "libmegacpp.a");
+        //     cxx_ld_after_obj.push(make_flag("", lib.as_utf8()?)?);
+        // }
 
         cxx_ld_after_obj.push(make_flag("-o", project.out_elf.as_utf8()?)?);
         
@@ -659,13 +670,18 @@ static DEFAULT_LINKER: &[&str] = &[
     // include eh_frame_hdr for exceptions
     "-Wl,–eh-frame-hdr",
     // do not export symbols from archives
-    "-Wl,–exclude-libs,ALL",
+    "-Wl,-–exclude-libs,ALL",
     "-Wl,--gc-sections",
     "-Wl,--nx-module-name",
     // _init/_fini are the defaults, (called by nnrtld)
     // include anyway so it's not black magic
     "-Wl,-init=_init",
     "-Wl,-fini=_fini",
+
+    // force symbols to be undefined to pull them in from the correct
+    // library (libsysbase instead of libc)
+    "-Wl,-u,abort",
+    "-Wl,-u,__assert_func",
 ];
 
 pub static DEFAULT_RUST: &[&str] = &[];

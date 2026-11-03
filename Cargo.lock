@@ -795,6 +795,7 @@ dependencies = [
  "rustc-hash",
  "semver",
  "serde",
+ "sha2",
  "tar",
  "tokio",
  "walkdir",

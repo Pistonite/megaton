@@ -10,7 +10,7 @@ use megaton_config::config_file::{BuildConfig, Config};
 
 use crate::compile_commands::{CompileCommand, CompileDatabase};
 use crate::source_type::SourceType;
-use crate::path_hash;
+use crate::hashing;
 
 pub struct CompileMgr {
     /// Only generate configuration, don't compile/link
@@ -41,6 +41,8 @@ pub struct CompileMgr {
     handles: Vec<cu::co::Handle<cu::Result<String>>>,
     /// Output objects that need to be linked
     objects: Vec<String>,
+    /// If any object is freshly compiled
+    objects_changed: bool,
     /// If no more compile can start
     objects_submitted: bool,
 }
@@ -71,6 +73,7 @@ impl CompileMgr {
             pool: cu::co::pool(-1),
             handles: Default::default(),
             objects: Default::default(),
+            objects_changed: false,
             objects_submitted: false
         })
     }
@@ -106,7 +109,7 @@ impl CompileMgr {
             return Ok(());
         };
 
-        let out_base_path = path_hash::hashed_output_path(file, &self.object_dir)?;
+        let out_base_path = hashing::hashed_output_path(file, &self.object_dir)?;
         let obj_path = out_base_path.with_added_extension(".o");
         let dep_path = out_base_path.with_added_extension(".d");
 
@@ -170,6 +173,8 @@ impl CompileMgr {
             self.objects.push(obj_str);
             return Ok(());
         }
+
+        self.objects_changed = true;
 
         let file_display = file_display.to_string();
         let compiler = PathBuf::from(compiler);
@@ -261,6 +266,10 @@ impl CompileMgr {
         self.compile_database.save_clangd_compat_merge_with(&self.clangd_compile_commands_json_path)?;
         self.compile_database.save()?;
         Ok(())
+    }
+
+    pub fn is_any_object_compiled(&self) -> bool {
+        self.objects_changed
     }
 
     pub fn into_objects(self) -> Vec<String> {

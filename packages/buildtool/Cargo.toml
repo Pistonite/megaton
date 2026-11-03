@@ -22,6 +22,7 @@ regex.workspace = true
 cargo_metadata.workspace = true
 semver.workspace = true
 semver.features = ["serde"]
+sha2.workspace = true
 
 megaton-toolchain.workspace = true
 megaton-packaging.workspace = true

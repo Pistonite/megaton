@@ -13,8 +13,9 @@ target/megaton/
       build/ # cmake files
       etc/ # other files
       lib/ # prebuilt archives
+        hermit/
+          hermit_objects.o
         libmegacpp.a
-        libmegakernel.a # _megakernel_* functions
         megarocrt.o
       include/ # public includes
         megaton/
@@ -37,6 +38,9 @@ target/megaton/
     <module>.elf
     <module>.nso
     main.npdm
+    lib/ # libraries
+      libgcc_nounwind.a
+      libgcc.a.sha256
     o/ # objects
     src/ # generated source
     inc/ # generated includes

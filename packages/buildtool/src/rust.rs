@@ -9,7 +9,7 @@ use megaton_config::config_file::Config;
 use megaton_config::toolchain::{MEGATON_TOOLCHAIN_SELECTOR, RustEnv, ToolchainEnv};
 use megaton_toolchain::cxxbridge;
 
-use crate::path_hash;
+use crate::hashing;
 
 #[derive(Debug)]
 pub struct RustProject {
@@ -247,7 +247,7 @@ pub async fn run_cxxbridge(config: &Config, toolchain: &ToolchainEnv, project: &
             }
             inc_root.join(inc_path)
         };
-        let src_cc_path = path_hash::hashed_output_path(entry.path(), &config.project.out_src)?;
+        let src_cc_path = hashing::hashed_output_path(entry.path(), &config.project.out_src)?;
         let input_path = entry.path().to_path_buf();
 
         let cxxbridge = toolchain.cxxbridge.path.clone();
@@ -329,12 +329,14 @@ pub async fn run_cxxbridge(config: &Config, toolchain: &ToolchainEnv, project: &
 
 /// Link the staticlib compiled from rust code with the hermit kernel
 /// objects to produce a single object with hermit syscalls internalized
+///
+/// Return `true` if the output is updated (meaning re-linking the final output is needed)
 #[cu::context("failed to link rust staticlib with hermit kernel objects")]
 pub async fn link_hermit_kernel(
     config: &Config,
     toolchain: &ToolchainEnv,
     rust_project: &RustProject,
-) -> cu::Result<()> {
+) -> cu::Result<bool> {
     // find hermit objects
     let hermit_object_dir = cu::path!(&(&config.project.lib_root) / "mega-cpp"/"lib" / "hermit");
     let mut objects = vec![];
@@ -360,8 +362,11 @@ pub async fn link_hermit_kernel(
     );
 
     if is_up_to_date {
-        return Ok(());
+        return Ok(false);
     }
+
+    // sort here so if it's up-to-date then we don't need to sort
+    objects.sort();
 
     // use a temp linked path so if something fails before
     // we localize the object, it does not count as a successful object
@@ -422,7 +427,7 @@ pub async fn link_hermit_kernel(
         cu::debug!("failed to remove temp file: {}: {e:?}", temp_linked_path.display());
     }
 
-    Ok(())
+    Ok(true)
 }
 
 /// Check if the hermit-linked rust object is up-to-date
