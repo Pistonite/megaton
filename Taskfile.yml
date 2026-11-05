@@ -6,11 +6,24 @@ includes:
     optional: true
     flatten: true
 
+  # cli (megaton-cmd)
   # cli:             { taskfile: packages/cli,              dir: packages/cli,             internal: true }
+  buildtool: { taskfile: packages/buildtool, dir: packages/buildtool, internal: true }
+  ftp:       { taskfile: packages/ftp,       dir: packages/ftp,       internal: true }
+  toolchain: { taskfile: packages/toolchain, dir: packages/toolchain, internal: true }
+  packaging: { taskfile: packages/packaging, dir: packages/packaging, internal: true }
+  config:    { taskfile: packages/config,    dir: packages/config,    internal: true }
+
+  # libraries
+  mega-cpp:      { taskfile: packages/mega-cpp,      dir: packages/mega-cpp,      internal: true }
+  mega-rs:       { taskfile: packages/mega-rs,       dir: packages/mega-rs,       internal: true }
+  mega-rspmacro: { taskfile: packages/mega-rspmacro, dir: packages/mega-rspmacro, internal: true }
+
+  # other
+  docs:          { taskfile: packages/docs,             dir: packages/docs,            internal: true }
+
+  # todo:
   # docker-build:    { taskfile: packages/docker-build,     dir: packages/docker-build,    internal: true }
-  # docs:            { taskfile: packages/docs,             dir: packages/docs,            internal: true }
-  # lib:             { taskfile: packages/lib,              dir: packages/lib,             internal: true }
-  # toolchain-build: { taskfile: packages/toolchain-build,  dir: packages/toolchain-build,  internal: true }
 
 tasks:
   install:
