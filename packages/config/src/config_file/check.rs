@@ -12,13 +12,16 @@ pub struct CheckConfig {
     /// Symbols to ignore (i.e. assume defined)
     #[serde(default)]
     pub symbols: Vec<String>,
-    /// Paths to *.syms file (output of objdump) that contains dynamic symbols accessible by the module
+
+    /// Paths to symbol dump file that contains dynamic symbols accessible by the module.
+    ///
+    /// Supports both `objdump -T` (including `llvm-objdump`) and `llvm-nm --dynamic`
     #[serde(default)]
     pub symbol_files: Vec<PathBuf>,
 
-    /// 
+    /// Regex patterns to disallow in the output of `objdump -d`
     #[serde(default)]
-    pub disallowed_instructions: Vec<String>,
+    pub disallowed_instructions: Vec<cu::Regex>,
 
     #[serde(flatten, default, skip_serializing)]
     unused: CaptureUnused,

@@ -2,10 +2,8 @@
 // Copyright (c) 2026 Megaton contributors
 
 use std::ffi::OsStr;
-use std::path::Path;
 
-use megaton_config::config_file::{BuildConfig, Config};
-use megaton_config::toolchain::ToolchainEnv;
+use megaton_config::config_file::BuildConfig;
 
 /// Source language type
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

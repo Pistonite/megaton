@@ -649,9 +649,9 @@ static DEFAULT_LINKER: &[&str] = &[
     "-Wl,-z,nodynamic-undefined-weak",
     "-Wl,--build-id=sha1",
     // include eh_frame_hdr for exceptions
-    "-Wl,–eh-frame-hdr",
+    "-Wl,--eh-frame-hdr",
     // do not export symbols from archives
-    "-Wl,-–exclude-libs,ALL",
+    "-Wl,--exclude-libs,ALL",
     "-Wl,--gc-sections",
     "-Wl,--nx-module-name",
     // _init/_fini are the defaults, (called by nnrtld)

@@ -13,9 +13,10 @@ use crate::compile_mgr::CompileMgr;
 use crate::rust;
 use crate::linking;
 use crate::npdm;
+use crate::nso;
 
 /// The `build` subcommand
-#[derive(Debug, clap::Parser)]
+#[derive(Debug, clap::Parser, AsRef)]
 pub struct Cmd {
     /// The profile for selecting what to build
     #[clap(short = 'p', long)]
@@ -34,6 +35,7 @@ pub struct Cmd {
     no_check: bool,
 
     #[clap(flatten)]
+    #[as_ref]
     common: cu::cli::Flags,
 }
 
@@ -44,21 +46,30 @@ impl AsProfileFlag for Cmd {
 }
 
 impl Cmd {
-    pub async fn run(self, dir: Option<&str>) -> cu::Result<()> {
-        let mut zombie_tasks = vec![];
-        let result = self.run_internal(dir, &mut zombie_tasks).await;
-        if !zombie_tasks.is_empty() {
-            cu::hint!("waiting for tasks to finish...");
-            for task in zombie_tasks {
-                let _ = task.co_join_maybe_aborted().await;
-            }
-        }
-        result
-    }
-    async fn run_internal(self, dir: Option<&str>, zombie_tasks: &mut Vec<cu::co::Handle<cu::Result<()>>>) -> cu::Result<()> {
+    pub fn run(self, dir: Option<&str>) -> cu::Result<()> {
+        // config/toolchain must be resolved outside of async runtime
+        // because they are blocking
         let toolchain = Arc::new(ToolchainEnv::resolve()?);
         let config = Arc::new(Config::new_from_project_dir(dir, ConfigLoadOpts { 
             resolve: true, validate: true, cli_profile: self.profile.as_deref(), toolchain: Some(&toolchain) })?);
+
+        let task = cu::co::spawn(async move {
+            let mut zombie_tasks = vec![];
+            let result = self.run_internal(config, toolchain,  &mut zombie_tasks).await;
+            if !zombie_tasks.is_empty() {
+                cu::debug!("waiting for tasks to finish...");
+                for task in zombie_tasks {
+                    let _ = task.co_join_maybe_aborted().await;
+                }
+            }
+            result
+        });
+
+        task.join().flatten()
+    }
+    async fn run_internal(self, config: Arc<Config>, toolchain: Arc<ToolchainEnv>, zombie_tasks: &mut Vec<cu::co::Handle<cu::Result<()>>>) -> cu::Result<()> {
+
+        cu::info!("building {} (profile '{}')", config.project.module_name, config.project.profile);
 
         if !self.no_lib_unpack {
             // unpack megatonlib
@@ -78,7 +89,8 @@ impl Cmd {
             pub libgcc_nounwind_task: Option<cu::co::Handle<cu::Result<()>>>,
             /// Task to load the checker
             pub checker_load_task: Option<cu::co::Handle<cu::Result<Checker>>>,
-            pub npdm_task: Option<cu::co::Handle<cu::Result<()>>>
+            pub npdm_task: Option<cu::co::Handle<cu::Result<()>>>,
+            pub compile_database_task: Option<cu::co::Handle<cu::Result<()>>>
         }
         impl Drop for Tasks<'_> {
             fn drop(&mut self) {
@@ -100,6 +112,9 @@ impl Cmd {
                 if let Some(t) = self.npdm_task.take() {
                     self.zombie_tasks.push(t);
                 }
+                if let Some(t) = self.compile_database_task.take() {
+                    self.zombie_tasks.push(t);
+                }
             }
         }
         let mut tasks = Tasks {
@@ -110,6 +125,7 @@ impl Cmd {
             libgcc_nounwind_task: None,
             checker_load_task: None,
             npdm_task: None,
+            compile_database_task: None,
         };
 
         // build libgcc_nounwind since it's required for linking later
@@ -201,11 +217,18 @@ impl Cmd {
         }
 
         let mut relink_needed = compile_mgr.is_any_object_compiled();
-        let mut compiled_objects = compile_mgr.into_objects();
-        // compile_mgr is dropped, entering linking step
+        let mut compiled_objects = compile_mgr.take_objects();
 
-        let bar = cu::progress(format!("linking {}.elf", config.project.module_name)).spawn();
+        // compile_mgr is moved, entering linking step
+        tasks.compile_database_task = Some(cu::co::spawn_blocking(move || {
+            compile_mgr.save_compile_database()
+        }));
+
+        let bar = cu::progress("linking").spawn();
         compiled_objects.sort();
+
+        let no_check_file_path = 
+                config.project.output_root.join(".no_check");
 
         // preload checker
         if !self.no_check {
@@ -219,7 +242,9 @@ impl Cmd {
             // write a .no_check file in the output directory.
             // if this file exists, check will force to run even if the output
             // elf didn't change, if --no-check is not specified
-            if let Err(e) = cu::fs::write(config.project.output_root.join(".no_check"), "this file exists to ensure check runs the next time") {
+            if let Err(e) = cu::fs::write(
+                &no_check_file_path
+                , "this file exists to ensure check runs the next time") {
                 cu::warn!("failed to write .no_check file: {e:?}");
                 cu::warn!("check might be skipped next time without --no-check if build is successful!");
             };
@@ -228,6 +253,10 @@ impl Cmd {
         if let Some(task) = tasks.hermit_link_task.take() {
             let changed = task.co_join().await??;
             relink_needed |= changed;
+        };
+
+        if let Some(task) = tasks.libgcc_nounwind_task.take() {
+            task.co_join().await??;
         };
 
         let link_task = {
@@ -255,14 +284,51 @@ impl Cmd {
         };
 
         let did_link = link_task.co_join().await??;
+        let mut should_run_elf_to_nso = did_link;
+
+        if did_link {
+            bar.done();
+        } else {
+            bar.done_with_message(&format!("linking: {}.elf is up-to-date", config.project.module_name));
+        }
 
         if let Some(task) = tasks.checker_load_task.take() {
             let checker = task.co_join().await??;
+            let mut should_check = did_link;
+            let has_no_check_file = no_check_file_path.is_file();
+            if !should_check && no_check_file_path.is_file() {
+                should_check = true;
+            }
+            should_run_elf_to_nso = checker.check(&config, &toolchain, should_check).await?;
+            if has_no_check_file {
+                if let Err(e) = cu::fs::remove(no_check_file_path) {
+                    cu::warn!("{e:?}");
+                }
+            }
         }
 
+        if self.no_check {
+            cu::hint!("skipped elf checks because --no-check is specified");
+        }
 
+        if should_run_elf_to_nso {
+            nso::elf_to_nso(&config, &toolchain).await?;
+            cu::info!("built {}.nso (profile '{}')", config.project.module_name, config.project.profile);
+        } else {
+            cu::info!("{}.nso is up-to-date (profile '{}')", config.project.module_name, config.project.profile);
+        }
 
-        todo!()
+        if let Some(task) = tasks.npdm_task.take() {
+            task.co_join().await??;
+        }
+
+        if let Some(task) = tasks.compile_database_task.take() {
+            if let Err(e) = task.co_join().await.flatten() {
+                cu::warn!("failed to save compile database: {e:?}");
+            }
+        }
+
+        Ok(())
     }
 }
 

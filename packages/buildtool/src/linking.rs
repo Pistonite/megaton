@@ -6,6 +6,7 @@ use megaton_config::toolchain::ToolchainEnv;
 use megaton_config::config_file::{BuildConfig, Config};
 
 use crate::hashing;
+use crate::printing;
 
 /// Build our libgcc_nounwind.a, which is libgcc with the unwind symbols excluded
 /// (since we use the nnsdk ones)
@@ -58,6 +59,9 @@ pub async fn build_libgcc_nounwind(config: &Config, toolchain: &ToolchainEnv) ->
     }
 
     cu::fs::copy(&temp_output_path, &output_path)?;
+    if let Err(e) = cu::fs::write(sha256_path, libgcc_original_sha256) {
+        cu::warn!("{e:?}");
+    };
     cu::debug!("built {}", output_path.display());
     Ok(())
 }
@@ -132,8 +136,10 @@ pub async fn link_elf(
         dependencies.push(libs.sysbase.clone());
         arguments.push(libs.c.clone());
         dependencies.push(libs.c.clone());
-        arguments.push(libs.gcc.clone());
-        dependencies.push(libs.gcc.clone());
+
+        let gcc_nounwind = get_libgcc_nounwind_path(config).into_utf8()?;
+        arguments.push(gcc_nounwind.clone());
+        dependencies.push(gcc_nounwind);
         
         arguments.push("-Wl,--end-group".to_string());
     }
@@ -141,27 +147,32 @@ pub async fn link_elf(
     arguments.push("-o".to_string());
     arguments.push(config.project.out_elf.clone().into_utf8()?);
 
+    let link_command_path = config.project.output_root.join("link_command.json");
+    let link_command = LinkCommand {arguments};
+    if let Err(e) = cu::fs::write_json_pretty(&link_command_path, &link_command) {
+        cu::warn!("failed to write link_command.json: {e:?}");
+    }
+
     if !is_link_needed {
-        is_link_needed = !is_elf_up_to_date(config, &arguments, &dependencies);
+        is_link_needed = !is_elf_up_to_date(config, &link_command_path, &link_command.arguments, &dependencies);
         if !is_link_needed {
-            cu::hint!("{}.elf is already up-to-date", config.project.module_name);
             return Ok(false);
         }
     }
 
     let (child, stdout,stderr) = Path::new(cxx_ld).command()
-        .args(arguments)
+        .args(&link_command.arguments[1..])
         .stdout(cu::pio::buffer())
         .stderr(cu::pio::buffer())
         .stdin_null()
         .co_spawn().await?;
     let result = child.co_wait_nz().await;
     if let Err(e) = result {
-        if let Ok(stderr) = stderr.co_join().await.flatten() {
-            cu::print!("{}", String::from_utf8_lossy(&stderr));
+        if let Some(stderr) = printing::join_stdstream(stderr).await {
+            cu::error!("{stderr}");
         }
-        if let Ok(stdout) = stdout.co_join().await.flatten() {
-            cu::print!("{}", String::from_utf8_lossy(&stdout));
+        if let Some(stdout) = printing::join_stdstream(stdout).await {
+            cu::print!("{stdout}");
         }
         return Err(e);
     }
@@ -172,6 +183,7 @@ pub async fn link_elf(
 
 fn is_elf_up_to_date(
     config: &Config,
+    link_command_path: &Path,
     arguments: &[String],
     dependencies: &[String]
 ) -> bool {
@@ -184,8 +196,7 @@ fn is_elf_up_to_date(
         Ok(Some(x)) => x
     };
 
-    let link_command_path = config.project.output_root.join("link_command.json");
-    let Ok(command) = cu::fs::read_string(&link_command_path) else {
+    let Ok(command) = cu::fs::read_string(link_command_path) else {
         cu::debug!("need to relink: link_command.json is not readable");
         return false;
     };

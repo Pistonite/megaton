@@ -54,7 +54,6 @@ impl Resolve for FtpConfig {
         let resolved = config_file::resolve_default_token(vec![], self.uploads.as_deref(), || {
             vec![FtpUploadTask::Npdm, FtpUploadTask::Nso]
         });
-        cu::debug!("{resolved:?}");
         self.resolved.uploads = resolved
             .into_iter()
             .filter_map(|x| x.into_task(project))

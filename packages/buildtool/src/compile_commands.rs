@@ -25,7 +25,19 @@ impl CompileDatabase {
     #[cu::context("failed to load compile database from {}", path.display())]
     pub fn load(path: &Path) -> cu::Result<Self> {
         let raw_commands = {
-            let reader = cu::fs::reader(path)?;
+            let reader = match cu::fs::reader(path) {
+                Ok(x) => x,
+                Err(e) => {
+                    if !path.exists() {
+                        return Ok(Self {
+                            dirty: false,
+                            path: path.to_path_buf(),
+                            commands: Default::default()
+                        });
+                    }
+                    return Err(e);
+                }
+            };
             json::read::<Vec<CompileCommand>>(reader)?
         };
         let old_len = raw_commands.len();
@@ -44,10 +56,6 @@ impl CompileDatabase {
         Ok(Self {
             dirty, path: path.to_path_buf(), commands
         })
-    }
-
-    pub fn is_dirty(&self) -> bool {
-        self.dirty
     }
 
     #[cu::context("failed to save compile database to {}", self.path.display())]
@@ -88,7 +96,7 @@ impl CompileDatabase {
         }
 
         if clangd_compdb.dirty {
-            let mut writer  = cu::fs::buf_writer(&self.path)?;
+            let mut writer  = cu::fs::buf_writer(path)?;
             let mut ser = json::ser::Serializer::pretty(&mut writer);
             let mut ser_seq = ser.serialize_seq(None)?;
             for command in clangd_compdb.commands.values() {
@@ -98,7 +106,7 @@ impl CompileDatabase {
             writer.flush()?;
             drop(writer);
 
-            cu::debug!("saved clangd-compatible compile database is up-to-date");
+            cu::debug!("saved clangd-compatible compile database");
         } else {
             cu::debug!("clangd-compatible compile database is up-to-date, skipping save");
         }

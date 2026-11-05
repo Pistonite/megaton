@@ -5,8 +5,6 @@ members = [
     # "packages/cli",
     "packages/config",
     # "packages/docker-build",
-    # "packages/lib",
-    # "packages/lib/macros",
     "packages/packaging",
     "packages/toolchain",
     # "packages/test-mod",

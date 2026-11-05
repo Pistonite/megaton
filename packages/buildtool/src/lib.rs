@@ -1,4 +1,4 @@
-mod cmd;
+pub mod cmd;
 mod rust;
 mod hashing;
 mod compile_mgr;
@@ -7,3 +7,5 @@ mod source_type;
 mod linking;
 mod checking;
 mod npdm;
+mod nso;
+mod printing;

@@ -37,8 +37,11 @@ fn unpack_megatonlib_if_needed_imp(path: &Path) -> cu::Result<()> {
     let gz = GzDecoder::new(MEGATONLIB_TARGZ);
     let mut tar = Archive::new(gz);
 
+    let bar = cu::progress("unpacking megaton library").spawn();
+
     cu::check!(tar.unpack(path), "failed to extract megatonlib tar archive")?;
     cu::fs::write(sha256_path, MEGATONLIB_TARGZ_SHA256)?;
+    bar.done();
 
     cu::debug!("megatonlib extracted");
     Ok(())

@@ -6,11 +6,10 @@ includes:
     optional: true
     flatten: true
 
-  cli:             { taskfile: packages/cli,              dir: packages/cli,             internal: true }
-  cli-build:       { taskfile: packages/cli-build,        dir: packages/cli-build,       internal: true }
-  docker-build:    { taskfile: packages/docker-build,     dir: packages/docker-build,    internal: true }
-  docs:            { taskfile: packages/docs,             dir: packages/docs,            internal: true }
-  lib:             { taskfile: packages/lib,              dir: packages/lib,             internal: true }
+  # cli:             { taskfile: packages/cli,              dir: packages/cli,             internal: true }
+  # docker-build:    { taskfile: packages/docker-build,     dir: packages/docker-build,    internal: true }
+  # docs:            { taskfile: packages/docs,             dir: packages/docs,            internal: true }
+  # lib:             { taskfile: packages/lib,              dir: packages/lib,             internal: true }
   # toolchain-build: { taskfile: packages/toolchain-build,  dir: packages/toolchain-build,  internal: true }
 
 tasks:
@@ -29,35 +28,35 @@ tasks:
       - task: cargo-binstall
         vars:
           PACKAGES: lisensor mdbook shwoop layered-crate
-
-  test:
-    - task: cli:test
-
-  check:
-    - task: check-non-dkp
-    - task: check-dkp
-  check-non-dkp:
-    - lisensor
-    - task: toolchain-build:check
-    - task: cli-build:check
-    - task: docker-build:check
-    - task: cli:check
-    - task: lib:check-rs
-  check-dkp:
-    - task: lib:configure
-    - task: lib:check-c
-
-  build:
-    - task: build-non-dkp
-    - task: build-dkp
-  build-non-dkp:
-    - task: cli:build
-    - task: docs:build
-    - task: lib:build-rs
-  build-dkp:
-    - task: lib:configure
-    - task: lib:build-c
-
-  upgrade:
-    - cargo upgrade
-
+  #
+  # test:
+  #   - task: cli:test
+  #
+  # check:
+  #   - task: check-non-dkp
+  #   - task: check-dkp
+  # check-non-dkp:
+  #   - lisensor
+  #   - task: toolchain-build:check
+  #   - task: cli-build:check
+  #   - task: docker-build:check
+  #   - task: cli:check
+  #   - task: lib:check-rs
+  # check-dkp:
+  #   - task: lib:configure
+  #   - task: lib:check-c
+  #
+  # build:
+  #   - task: build-non-dkp
+  #   - task: build-dkp
+  # build-non-dkp:
+  #   - task: cli:build
+  #   - task: docs:build
+  #   - task: lib:build-rs
+  # build-dkp:
+  #   - task: lib:configure
+  #   - task: lib:build-c
+  #
+  # upgrade:
+  #   - cargo upgrade
+  #

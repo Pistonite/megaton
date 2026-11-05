@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use cu::pre::*;
 use semver::VersionReq;
 
-use crate::config_file::{self, BASE_PROFILE, BuildConfig, CaptureUnused, FtpConfig, MegatonConfig, ModuleConfig, Profile, ProjectTargetEnv, Resolve, RustConfig, Validate, ValidateCtx};
+use crate::config_file::{self, BASE_PROFILE, BuildConfig, CaptureUnused, CheckConfig, FtpConfig, MegatonConfig, ModuleConfig, Profile, ProjectTargetEnv, Resolve, RustConfig, Validate, ValidateCtx};
 use crate::toolchain::ToolchainEnv;
 
 /// The Megaton.toml config file
@@ -28,7 +28,9 @@ pub struct Config {
     #[serde(default)]
     build: Profile<BuildConfig>,
 
-    // TODO - [check]
+    /// `[check]` section
+    #[serde(default)]
+    check: Profile<CheckConfig>,
     
     /// `[ftp]` section
     #[serde(default)]
@@ -94,6 +96,7 @@ impl Config {
         self.module.resolve(&self.project);
         self.rust.resolve(&self.project);
         cu::check!(self.build.resolve(&self.project, toolchain), "failed to resolve build config")?;
+        cu::check!(self.check.resolve(&self.project, toolchain), "failed to resolve check config")?;
         cu::check!(self.ftp.resolve(&self.project, toolchain), "failed to resolve ftp config")?;
         Ok(())
     }
@@ -144,6 +147,10 @@ impl Config {
     pub fn build_config(&self) -> cu::Result<&BuildConfig> {
         self.build.get_profile(&self.project.profile, "build", false)
     }
+    /// Get the resolved check config based on the profile
+    pub fn check_config(&self) -> cu::Result<&CheckConfig> {
+        self.check.get_profile(&self.project.profile, "check", true)
+    }
     /// Get the resolved ftp config based on the profile
     pub fn ftp_config(&self) -> cu::Result<&FtpConfig> {
         self.ftp.get_profile(&self.project.profile, "ftp", true)
@@ -151,6 +158,7 @@ impl Config {
     /// Turn the config into a JSON blob after profile selection
     pub fn to_json(&self) -> cu::Result<json::Value> {
         let build = self.build_config()?;
+        let check = self.check_config()?;
         let ftp = self.ftp_config()?;
         Ok(json!({
             "project": self.project,
@@ -158,6 +166,7 @@ impl Config {
             "megaton": self.megaton,
             "rust": self.rust,
             "build": build,
+            "check": check,
             "ftp": ftp,
         }))
     }
@@ -168,6 +177,7 @@ impl Validate for Config {
         self.megaton.validate_property(ctx, "megaton")?;
         self.rust.validate_property(ctx, "rust")?;
         self.build.validate_property(ctx, "build")?;
+        self.check.validate_property(ctx, "check")?;
         self.ftp.validate_property(ctx, "ftp")?;
         self.unused.validate(ctx)?;
 

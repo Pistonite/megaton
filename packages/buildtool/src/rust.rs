@@ -370,7 +370,7 @@ pub async fn link_hermit_kernel(
 
     // use a temp linked path so if something fails before
     // we localize the object, it does not count as a successful object
-    let temp_linked_path = linked_path.with_added_extension(".temp");
+    let temp_linked_path = linked_path.with_added_extension("temp");
 
     // ld -r -o output.o hermit.o ... --whole-archive librust.a --no-whole-archive
     let ld = Path::new(&toolchain.devkita64.ld);

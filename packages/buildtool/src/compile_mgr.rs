@@ -11,6 +11,7 @@ use megaton_config::config_file::{BuildConfig, Config};
 use crate::compile_commands::{CompileCommand, CompileDatabase};
 use crate::source_type::SourceType;
 use crate::hashing;
+use crate::printing;
 
 pub struct CompileMgr {
     /// Only generate configuration, don't compile/link
@@ -77,10 +78,6 @@ impl CompileMgr {
             objects_submitted: false
         })
     }
-
-    pub fn build_config(&self) -> &BuildConfig {
-        &self.build_config
-    }
 }
 
 impl CompileMgr {
@@ -110,8 +107,8 @@ impl CompileMgr {
         };
 
         let out_base_path = hashing::hashed_output_path(file, &self.object_dir)?;
-        let obj_path = out_base_path.with_added_extension(".o");
-        let dep_path = out_base_path.with_added_extension(".d");
+        let obj_path = out_base_path.with_added_extension("o");
+        let dep_path = out_base_path.with_added_extension("d");
 
         // create compile command
         let compiler = source_type.get_compiler(&self.build_config);
@@ -213,12 +210,12 @@ impl CompileMgr {
                 }
             };
             // always print stderr since there might be warnings
-            if let Ok(stderr) = stderr.co_join().await.flatten() {
-                cu::print!("{}", String::from_utf8_lossy(&stderr));
+            if let Some(stderr) = printing::join_stdstream(stderr).await {
+                cu::error!("{stderr}");
             }
             if let Err(e) = result {
-                if let Ok(stdout) = stdout.co_join().await.flatten() {
-                    cu::print!("{}", String::from_utf8_lossy(&stdout));
+                if let Some(stdout) = printing::join_stdstream(stdout).await {
+                    cu::print!("{stdout}");
                 }
                 return Err(e);
             }
@@ -238,7 +235,9 @@ impl CompileMgr {
         }
         self.objects_submitted = true;
         let count = self.handles.len(); 
-        self.bar.set_total(count as u64);
+        if count != 0 {
+            self.bar.set_total(count as u64);
+        }
         self.objects.reserve(count);
 
         let mut set = cu::co::set(std::mem::take(&mut self.handles));
@@ -272,8 +271,8 @@ impl CompileMgr {
         self.objects_changed
     }
 
-    pub fn into_objects(self) -> Vec<String> {
-        self.objects
+    pub fn take_objects(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.objects)
     }
 }
 
@@ -289,11 +288,14 @@ fn check_up_to_date(
 ) -> bool {
     // compile commands check (do this first because this is in-memory only check)
     let Some(old_command) = compile_database.get(&command.file) else {
+        compile_database.update(Cow::Owned(command));
         cu::debug!("need to compile {}: compile database entry does not exist", obj_path.display());
         return false;
     };
     if old_command != &command {
         cu::debug!("need to compile {}: compile command changed", obj_path.display());
+        cu::debug!("old_command: {old_command:#?}");
+        cu::debug!("new_command: {command:#?}");
         compile_database.update(Cow::Owned(command));
         return false;
     }
