@@ -5,3 +5,5 @@ mod compile_mgr;
 mod compile_commands;
 mod source_type;
 mod linking;
+mod checking;
+mod npdm;

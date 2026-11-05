@@ -52,7 +52,7 @@ pub struct BuildConfig {
     /// These are linked directly after the compiled objects, right before
     /// linking libraries
     #[serde(default)]
-    pub objects: Vec<PathBuf>, // TODO - maybe we need an object graph?
+    pub objects: Vec<PathBuf>,
 
     #[serde(default)]
     pub compiler: BuildCompilerConfig,
@@ -407,22 +407,10 @@ impl BuildFlagConfig {
             }
         );
 
-        fn make_flag(prefix: &str, p: &str) -> cu::Result<String> {
-            if p.contains('"') {
-                cu::bail!("path cannot contain quotes; paths are quoted automatically if needed when converted to flags: '{p}'");
-            }
-            let flag = if p.contains(' ') {
-                format!("{prefix}\"{p}\"")
-            } else {
-                format!("{prefix}{p}")
-            };
-            Ok(flag)
-        }
-
         // sysroot
         if let Some(sysroot) = &build.sysroot {
             let sysroot_str = cu::check!(sysroot.as_utf8(), "(in build.sysroot) sysroot path must be UTF-8")?;
-            let flag = make_flag("--sysroot=", sysroot_str)?;
+            let flag = make_build_flag("--sysroot=", sysroot_str)?;
             for flagset in [&mut c, &mut cxx, &mut cc_asm, &mut cxx_ld] {
                 flagset.push(flag.clone());
             }
@@ -447,7 +435,7 @@ impl BuildFlagConfig {
         // - dkp ones are only added to compdb if compiler is dkp
         for include in &build.includes {
             let include_str = cu::check!(include.as_utf8(), "(in build.includes) include path must be UTF-8")?;
-            let flag = make_flag("-I", include_str)?;
+            let flag = make_build_flag("-I", include_str)?;
             for flagset in [&mut c, &mut cxx, &mut cc_asm] {
                 flagset.push(flag.clone());
             }
@@ -455,21 +443,21 @@ impl BuildFlagConfig {
         if build.std_enabled() {
             let include_path = cu::path!(&(&project.lib_root) / "mega-cpp" / "include");
             let include_str = cu::check!(include_path.as_utf8(), "megaton include path must be UTF-8; please put the project in another location")?;
-            let flag = make_flag("-I", include_str)?;
+            let flag = make_build_flag("-I", include_str)?;
             for flagset in [&mut c, &mut cxx, &mut cc_asm] {
                 flagset.push(flag.clone());
             }
 
             // generated headers
             let include_str = cu::check!(project.out_inc.as_utf8(), "megaton generated include path must be UTF-8; please put the project in another location")?;
-            let flag = make_flag("-I", include_str)?;
+            let flag = make_build_flag("-I", include_str)?;
             for flagset in [&mut c, &mut cxx, &mut cc_asm] {
                 flagset.push(flag.clone());
             }
         }
         for include in &build.system_includes {
             let include_str = cu::check!(include.as_utf8(), "(in build.system-includes) system include path must be UTF-8")?;
-            let flag = make_flag("", include_str)?;
+            let flag = make_build_flag("", include_str)?;
             for flagset in [&mut c, &mut cxx, &mut cc_asm] {
                 flagset.push("-isystem".to_string());
                 flagset.push(flag.clone());
@@ -485,7 +473,7 @@ impl BuildFlagConfig {
             compdb_cc_asm.push("--target=aarch64-none-elf".to_string());
             if let Some(tc) = toolchain {
                 for include in &tc.devkita64.c_includes {
-                    let flag = make_flag("", include)?;
+                    let flag = make_build_flag("", include)?;
                     compdb_c.push("-isystem".to_string());
                     compdb_c.push(flag.clone());
                     compdb_cc_asm.push("-isystem".to_string());
@@ -497,12 +485,12 @@ impl BuildFlagConfig {
             compdb_cxx.push("--target=aarch64-none-elf".to_string());
             if let Some(tc) = toolchain {
                 for include in &tc.devkita64.c_includes {
-                    let flag = make_flag("", include)?;
+                    let flag = make_build_flag("", include)?;
                     compdb_cxx.push("-isystem".to_string());
                     compdb_cxx.push(flag);
                 }
                 for include in &tc.devkita64.cpp_includes {
-                    let flag = make_flag("", include)?;
+                    let flag = make_build_flag("", include)?;
                     compdb_cxx.push("-isystem".to_string());
                     compdb_cxx.push(flag);
                 }
@@ -514,37 +502,18 @@ impl BuildFlagConfig {
         // - linker scripts
         // - library order
         let verfile = cu::path!(&(&project.lib_root) / "mega-cpp" / "etc" / "verfile");
-        cxx_ld.push(make_flag("-Wl,--version-script=", verfile.as_utf8()?)?);
+        cxx_ld.push(make_build_flag("-Wl,--version-script=", verfile.as_utf8()?)?);
         let megaton_linker_script = cu::path!(&(&project.lib_root) / "mega-cpp" / "etc" / "megaton.ld");
-        cxx_ld.push(make_flag("-Wl,-T,", megaton_linker_script.as_utf8()?)?);
+        cxx_ld.push(make_build_flag("-Wl,-T,", megaton_linker_script.as_utf8()?)?);
         for linker_script in &build.ldscripts {
             let path_str = cu::check!(linker_script.as_utf8(), "linker script path must be UTF-8")?;
-            cxx_ld.push(make_flag("-Wl,-T,", path_str)?);
+            cxx_ld.push(make_build_flag("-Wl,-T,", path_str)?);
         }
-        for object in &build.objects {
-            let path_str = cu::check!(object.as_utf8(), "object path must be UTF-8")?;
-            cxx_ld.push(make_flag("", path_str)?);
-        }
-        let mut cxx_ld_after_obj = vec![];
-        // TODO: figure out what system libraries need to be linked
-        // TODO: move these to the linking module, as we need to check the modification time
-        // of library objects/archives
-        // let lib = cu::path!(&(&project.lib_root) / "mega-cpp" / "lib" / "rocrt0.o");
-        // cxx_ld_after_obj.push(make_flag("", lib.as_utf8()?)?);
-        // let lib = cu::path!(&(&project.lib_root) / "mega-cpp" / "lib" / "rocrt.o");
-        // cxx_ld_after_obj.push(make_flag("", lib.as_utf8()?)?);
-        // if build.std_enabled() {
-        //     let lib = cu::path!(&(&project.lib_root) / "mega-cpp" / "lib" / "libmegacpp.a");
-        //     cxx_ld_after_obj.push(make_flag("", lib.as_utf8()?)?);
-        // }
-
-        cxx_ld_after_obj.push(make_flag("-o", project.out_elf.as_utf8()?)?);
         
         self.resolved.c = c;
         self.resolved.cxx = cxx;
         self.resolved.cc_asm = cc_asm;
         self.resolved.cxx_ld = cxx_ld;
-        self.resolved.cxx_ld_after_obj = cxx_ld_after_obj;
         self.resolved.rustflags = rustflags.join(" ");
         self.resolved.cargo = cargo;
         self.resolved.compdb.c = compdb_c;
@@ -588,8 +557,6 @@ pub struct BuildFlags {
     pub cc_asm: Vec<String>,
     /// Resolved linker flags
     pub cxx_ld: Vec<String>,
-    /// Resolved linker flags after objects (i.e. archives and -l libraries)
-    pub cxx_ld_after_obj: Vec<String>,
     /// Resolved RUSTFLAGS
     pub rustflags: String,
     /// Resolved Cargo flags
@@ -610,6 +577,20 @@ pub struct CompdbFlags {
     /// Resolved flags passed to the GCC driver for compatibility with compile_commands.json
     pub cc_asm: Vec<String>,
 }
+
+/// Make a build flag by quoting the path `p` if needed, then prepend `prefix`
+pub fn make_build_flag(prefix: &str, p: &str) -> cu::Result<String> {
+    if p.contains('"') {
+        cu::bail!("path cannot contain quotes; paths are quoted automatically if needed when converted to flags: '{p}'");
+    }
+    let flag = if p.contains(' ') {
+        format!("{prefix}\"{p}\"")
+    } else {
+        format!("{prefix}{p}")
+    };
+    Ok(flag)
+}
+
 
 /// Default common flags, works for both GCC/Clang
 static DEFAULT_COMMON: &[&str] = &[

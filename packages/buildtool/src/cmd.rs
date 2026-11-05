@@ -8,9 +8,11 @@ use megaton_config::config_file::{Config, ConfigLoadOpts};
 use megaton_config::toolchain::ToolchainEnv;
 use megaton_packaging as packaging;
 
+use crate::checking::Checker;
 use crate::compile_mgr::CompileMgr;
 use crate::rust;
 use crate::linking;
+use crate::npdm;
 
 /// The `build` subcommand
 #[derive(Debug, clap::Parser)]
@@ -72,9 +74,11 @@ impl Cmd {
             pub rust_hermit_object: Option<String>,
             /// the task to produce the .o object above
             pub hermit_link_task: Option<cu::co::Handle<cu::Result<bool>>>,
-
             /// Task to build libgcc_nounwind.a
-            pub libgcc_nounwind_task: Option<cu::co::Handle<cu::Result<()>>>
+            pub libgcc_nounwind_task: Option<cu::co::Handle<cu::Result<()>>>,
+            /// Task to load the checker
+            pub checker_load_task: Option<cu::co::Handle<cu::Result<Checker>>>,
+            pub npdm_task: Option<cu::co::Handle<cu::Result<()>>>
         }
         impl Drop for Tasks<'_> {
             fn drop(&mut self) {
@@ -87,6 +91,15 @@ impl Cmd {
                 if let Some(t) = self.libgcc_nounwind_task.take() {
                     self.zombie_tasks.push(t);
                 }
+                if let Some(t) = self.checker_load_task.take() {
+                    self.zombie_tasks.push(cu::co::spawn(async move {
+                        t.co_join().await??;
+                        cu::Ok(())
+                    }));
+                }
+                if let Some(t) = self.npdm_task.take() {
+                    self.zombie_tasks.push(t);
+                }
             }
         }
         let mut tasks = Tasks {
@@ -94,7 +107,9 @@ impl Cmd {
             cxx_sources: vec![],
             rust_hermit_object: None,
             hermit_link_task: None,
-            libgcc_nounwind_task: None
+            libgcc_nounwind_task: None,
+            checker_load_task: None,
+            npdm_task: None,
         };
 
         // build libgcc_nounwind since it's required for linking later
@@ -192,13 +207,58 @@ impl Cmd {
         let bar = cu::progress(format!("linking {}.elf", config.project.module_name)).spawn();
         compiled_objects.sort();
 
+        // preload checker
+        if !self.no_check {
+            tasks.checker_load_task = {
+                let config = config.clone();
+                Some(cu::co::spawn(async move {
+                    Checker::load(&config).await
+                }))
+            };
+        } else {
+            // write a .no_check file in the output directory.
+            // if this file exists, check will force to run even if the output
+            // elf didn't change, if --no-check is not specified
+            if let Err(e) = cu::fs::write(config.project.output_root.join(".no_check"), "this file exists to ensure check runs the next time") {
+                cu::warn!("failed to write .no_check file: {e:?}");
+                cu::warn!("check might be skipped next time without --no-check if build is successful!");
+            };
+        }
+
         if let Some(task) = tasks.hermit_link_task.take() {
             let changed = task.co_join().await??;
             relink_needed |= changed;
         };
 
-        linking::link_elf(&config, relink_needed, 
-            &compiled_objects, tasks.rust_hermit_object.as_deref());
+        let link_task = {
+            let config = config.clone();
+            let toolchain = toolchain.clone();
+            let rust_hermit_object = tasks.rust_hermit_object.clone();
+            cu::co::spawn(async move {
+                let build_config = config.build_config()?;
+                linking::link_elf(&config, 
+                    build_config,
+                    &toolchain,
+                    relink_needed, 
+                    &compiled_objects, 
+                    rust_hermit_object.as_deref()
+                ).await
+            })
+        };
+
+        tasks.npdm_task = {
+            let config = config.clone();
+            let toolchain = toolchain.clone();
+            Some(cu::co::spawn(async move {
+                npdm::create_npdm_file(&config, &toolchain).await
+            }))
+        };
+
+        let did_link = link_task.co_join().await??;
+
+        if let Some(task) = tasks.checker_load_task.take() {
+            let checker = task.co_join().await??;
+        }
 
 
 

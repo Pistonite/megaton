@@ -65,7 +65,7 @@ pub struct DevKitA64PicLibs {
     // we use AR to remove the objects we don't want
     // and save it as a new archive in the output directory
     pub gcc: String,
-    // -Wl,--start-group
+    // -Wl,--end-group
 }
 
 impl DevKitA64Env {
