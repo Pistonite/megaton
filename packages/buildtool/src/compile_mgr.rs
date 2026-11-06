@@ -56,6 +56,9 @@ impl CompileMgr {
         let compile_database =
             CompileDatabase::load(&config.project.output_root.join("compile_cache.json"))?;
 
+        // create the output directory for compiler to emit files
+        cu::fs::make_dir(&config.project.out_objects)?;
+
         Ok(Self {
             configure_only,
             build_config,
