@@ -1,26 +1,38 @@
 [workspace]
 resolver = "2"
 members = [
-    "packages/cli",
-    "packages/cli-build",
-    "packages/docker-build",
-    "packages/lib",
-    "packages/lib/macros",
-    "packages/toolchain-build",
-    "packages/test-mod",
+    "packages/buildtool",
+    # "packages/cli",
+    "packages/config",
+    # "packages/docker-build",
+    "packages/packaging",
+    "packages/toolchain",
+    # "packages/test-mod",
+    "packages/ftp",
+    "packages/mega-rs",
+    "packages/mega-rspmacro",
 ]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
 
 
 [workspace.dependencies.cu]
 package = "pistonite-cu"
-version = "0.9.0"
+version = "0.9.8"
 # path = "../../../cu/packages/copper"
 
 [workspace.dependencies.pm]
 package = "pistonite-pm"
-version = "0.2.7"
+version = "0.3.0"
 
 [workspace.dependencies]
+mega-rspmacro.path = "packages/mega-rspmacro"
+megaton-packaging.path = "packages/packaging"
+megaton-toolchain.path = "packages/toolchain"
+megaton-config.path = "packages/config"
+
 static_assertions = "1.1.0"
 hermit-abi = "0.5.2"
 flate2 = "1.1.9"
@@ -29,8 +41,9 @@ sha2 = "0.11.0"
 serde = "1"
 tokio = "1"
 walkdir = "2.5.0"
-fxhash = "0.2.1"
 depfile = "0.1.1"
 regex = "1.13.0"
 cargo_metadata = "0.23.1"
 semver = "1.0.28"
+suppaftp = "11.0.0"
+rustc-hash = "2.1.3"

@@ -1,0 +1,20 @@
+[module]
+name = "modtest-empty"
+title-id = 0x01007ef00011e000
+nso-name = "subsdk9"
+
+[megaton]
+version = "0.1.0"
+
+[build]
+sources = [
+    "src",
+]
+defines = [
+    "NNSDK"
+]
+
+includes = [
+    "src", 
+    "include",
+]

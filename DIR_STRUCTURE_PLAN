@@ -1,0 +1,52 @@
+target/megaton/
+  lib/ # all lib files (extracted from tarball)
+    .sha256
+    Cargo.toml # workspace
+    Cargo.lock
+    mega-rs/
+      src/
+        hermit/ # hermit kernel layer, depends on extern "C" _megakernel_ functions
+      Cargo.toml -> depends on mega-pmacros
+    mega-rspmacro/
+      Cargo.toml
+    mega-cpp/
+      build/ # cmake files
+      etc/ # other files
+      lib/ # prebuilt archives
+        hermit/
+          hermit_objects.o
+        libmegacpp.a
+        megarocrt.o
+      include/ # public includes
+        megaton/
+        rust.h
+      src-user/ # sources compiled with user definitions
+      src/ # source (for building lib for fast iteration)
+        lib/
+          nnsdk/
+        include-priv/ # private includes
+        rocrt/
+          CMakeLists.txt
+        megacpp/
+          sysbase/
+          CMakeLists.txt
+        hermit/
+          CMakeLists.txt
+      CMakeLists.txt
+      build.sh
+  <profile>/<module>/ # output root
+    <module>.elf
+    <module>.nso
+    main.npdm
+    lib/ # libraries
+      libgcc_nounwind.a
+      libgcc.a.sha256
+    o/ # objects
+    src/ # generated source
+    inc/ # generated includes
+    
+      
+      
+
+    
+

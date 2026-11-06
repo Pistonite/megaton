@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 cu = { workspace = true, features = ["fs"] }
 
-megaton-toolchain-build.path = "../toolchain-build"
+megaton-toolchain.path = "../toolchain"
 megaton-cli-build.path = "../cli-build"
 
 [[bin]]

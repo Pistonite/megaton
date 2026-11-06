@@ -1,0 +1,95 @@
+version: '3'
+
+includes:
+  ccpp:
+    taskfile: ../../mono-dev/task/ccpp.yaml
+    internal: true
+    optional: true
+
+tasks:
+  rs-bindgen:
+    desc: Generate binding for megaton rust library
+    vars:
+      C_FLAGS:
+        sh: cargo run -p megaton-config -- -p rust_bindgen build.flags.resolved.c --format=one-line
+      HEADERS: >
+        src/hermit/hermit.h
+    cmds:
+      - silent: true
+        cmd: |
+          mkdir -p build
+          echo '' > build/rust_bindgen.h
+          for header in "{{.HEADERS}}"; do
+            echo '#include "'"$(realpath $header)"'"' >> build/rust_bindgen.h
+          done
+      - bindgen build/rust_bindgen.h -o ../mega-rs/src/megacpp_sys_gen.rs -- {{.C_FLAGS}}
+
+  cmake-gen:
+    desc: Generate CMake flags
+    cmds:
+      - silent: true
+        cmd: |
+          mkdir -p build etc
+          echo 'dumping flags from megaton config-dump'
+          c_flags="$(cargo run -p megaton-config -- -p megaton_cmake build.flags.resolved.c --format=one-line)"
+          cxx_flags="$(cargo run --quiet -p megaton-config -- -p megaton_cmake build.flags.resolved.cxx --format=one-line)"
+          as_flags="$(cargo run --quiet -p megaton-config -- -p megaton_cmake build.flags.resolved.cc-asm --format=one-line)"
+          output='build/flags.cmake'
+          echo '# Generated flags from megaton config-dump' > $output
+          echo 'set(MEGATON_LIB_GENERATED_C_FLAGS' >> $output
+          for flag in "$c_flags"; do
+            echo "  $flag" >> $output
+          done
+          echo ')' >> $output
+          echo 'set(MEGATON_LIB_GENERATED_CXX_FLAGS' >> $output
+          for flag in "$cxx_flags"; do
+            echo "  $flag" >> $output
+          done
+          echo ')' >> $output
+          echo 'set(MEGATON_LIB_GENERATED_AS_FLAGS' >> $output
+          for flag in "$as_flags"; do
+            echo "  $flag" >> $output
+          done
+          echo ')' >> $output
+          output2=etc/flags.cmake
+          if ! cmp -s <(tr -d '\r' < "$output") <(tr -d '\r' < "$output2"); then
+            cp "$output" "$output2"
+            echo 'etc/flags.cmake generated'
+          else
+            echo 'etc/flags.cmake is up-to-date'
+          fi
+
+  configure:
+    desc: Configure CMake
+    cmds:
+      - task: cmake-gen
+      - cmake -G Ninja -B build
+
+  make:
+    desc: Build the library
+    cmds:
+      - task: cmake-gen
+      - mkdir -p include-rs/cxx && cargo run -p megaton-toolchain -- cxxbridge --header > include-rs/cxx/rust.h
+      - bash build.sh
+
+  check:
+    - task: ccpp:clang-tidy
+      vars:
+        BUILD: build
+        HEADER: ^include/
+        ADD_CHECKS: >
+          -bugprone-reserved-identifier,
+
+    - task: ccpp:fmt-check
+      vars:
+        SOURCE: src src-user include
+
+  fix:
+    - task: ccpp:fmt-fix
+      vars:
+        SOURCE: src src-user include
+
+  clean:
+    desc: Clean output
+    cmds:
+      - rm -rf .cache build include-rs/cxx lib

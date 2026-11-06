@@ -1,0 +1,14 @@
+[package]
+name = "megaton-ftp"
+version = "0.0.0"
+description = "ftp utility for uploading/downloading files"
+edition = "2024"
+publish = false
+
+[dependencies]
+cu = { workspace = true, features = [ "cli", "fs", "coroutine-heavy", "derive", "toml" ] }
+suppaftp = { workspace = true, features = ["tokio-rustls-aws-lc-rs"] }
+serde.workspace = true
+tokio.workspace = true
+
+megaton-config.workspace = true

@@ -1,0 +1,19 @@
+version: '3'
+
+tasks:
+  build:
+    cmds:
+      # FIXME: buildtool needs to build user_rt
+      - cargo run -p megaton-buildtool
+
+
+
+  upload:
+    cmds:
+      - task: download # to ensure our previous run outputs are downloaded and removed
+      - cargo run -p megaton-ftp upload
+
+  download:
+    desc: Download logs and crash reports from console
+    cmds:
+      - cargo run -p megaton-ftp download -d

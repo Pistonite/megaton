@@ -1,0 +1,70 @@
+diff --git a/bootstrap.megaton.toml b/bootstrap.megaton.toml
+new file mode 100644
+index 00000000000..de7356f0462
+--- /dev/null
++++ b/bootstrap.megaton.toml
+@@ -0,0 +1,41 @@
++change-id = 160100
++# ^ do not edit and keep this the first line, the make-patch script updates it before baking the patch
++# using the compiler profile, since it usually builds the fastest (compared to others)
++profile = 'compiler'
++
++# llvm configs
++# even though it's faster to download ci-llvm, in my experience
++# it will just fail
++llvm.download-ci-llvm = false
++{{MEGATON_LLVM_TARGETS_KEY_VALUE}}
++
++# build configs
++build.compiler-docs = false
++build.extended = false
++# stage 2 compiler will be newer, but doubly slow to build
++# (basically fresh built from stage 1 compiler)
++build.build-stage = 1
++build.host = ['{{MEGATON_HOST_TRIPLE}}']
++build.target = ['{{MEGATON_HOST_TRIPLE}}', 'aarch64-unknown-hermit']
++
++# install configs
++install.prefix = '{{MEGATON_INSTALL_PREFIX}}'
++install.sysconfdir = '{{MEGATON_INSTALL_SYSCONFDIR}}'
++
++# rust build configs
++rust.debug-logging = false
++rust.debug-assertions = false
++rust.debuginfo-level = 0
++rust.frame-pointers = false
++rust.download-rustc = false
++rust.incremental = false
++# reducing this will make the built compiler faster,
++# but will make building the compiler slow, which is not what we want
++# (since the mod is usually small and pretty fast to build anyway)
++rust.codegen-units = 16
++# https://github.com/rust-lang/rust/blob/master/bootstrap.example.toml
++# anything other than 1 "occasionally have bugs"
++rust.codegen-units-std = 1
++# we need the hash to check when rebuild is needed
++rust.omit-git-hash = false
++{{MEGATON_RUST_LTO_KEY_VALUE}}
+diff --git a/compiler/rustc_target/src/spec/targets/aarch64_unknown_hermit.rs b/compiler/rustc_target/src/spec/targets/aarch64_unknown_hermit.rs
+index 4ecbb73f7a4..78ad84a4f19 100644
+--- a/compiler/rustc_target/src/spec/targets/aarch64_unknown_hermit.rs
++++ b/compiler/rustc_target/src/spec/targets/aarch64_unknown_hermit.rs
+@@ -4,7 +4,8 @@ pub(crate) fn target() -> Target {
+     Target {
+         llvm_target: "aarch64-unknown-hermit".into(),
+         metadata: TargetMetadata {
+-            description: Some("ARM64 Hermit".into()),
++            // megaton: target patch
++            description: Some("ARM64 Hermit (+Megaton Patch)".into()),
+             tier: Some(3),
+             host_tools: Some(false),
+             std: Some(true),
+@@ -16,6 +17,8 @@ pub(crate) fn target() -> Target {
+             features: "+v8a,+strict-align,+neon".into(),
+             max_atomic_width: Some(128),
+             stack_probes: StackProbeType::Inline,
++            // megaton: nnmusl TLS
++            tls_model: crate::spec::TlsModel::GeneralDynamic,
+             ..base::hermit::opts()
+         },
+     }

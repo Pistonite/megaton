@@ -1,0 +1,13 @@
+[package]
+name = "mega-kernel"
+version = "0.0.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+description = "Megaton-specific implementation of the Hermit Unikernel ABI"
+publish = false
+
+[workspace]
+
+[dependencies]
+static_assertions = "1.1.0"
+hermit-abi = "0.5.2"

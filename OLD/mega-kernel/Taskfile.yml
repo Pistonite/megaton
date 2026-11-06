@@ -1,0 +1,69 @@
+version: '3'
+
+tasks:
+  update-lib:
+    - rm -rf atmosphere nnheaders include/vapours include/nn
+    - mkdir -p include
+    - cmd: |
+        echo '==> updating from atmosphere/libvapours'
+        mkdir -p atmosphere/.git/info
+        cd atmosphere 
+        git init
+        git config core.sparseCheckout true
+        git remote add origin https://github.com/Atmosphere-NX/Atmosphere
+        echo 'libraries/libvapours/include/vapours/results' > .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/util' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/impl' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/ams' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/freebsd' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/results.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/util.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/assert.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/common.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/includes.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/defines.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/compiler.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/types.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/ams_version.h' >> .git/info/sparse-checkout
+        git pull origin master
+      silent: true
+    - cmd: |
+        echo '==> updating from open-ead/nnheaders'
+        mkdir -p nnheaders/.git/info
+        cd nnheaders 
+        git init
+        git config core.sparseCheckout true
+        git remote add origin https://github.com/open-ead/nnheaders
+        echo 'include/nn' > .git/info/sparse-checkout
+        git pull origin master
+      silent: true
+    - cp -RL atmosphere/libraries/libvapours/include/vapours include
+    - cp -RL nnheaders/include/nn include
+    
+  build-bind:
+    - > 
+      bindgen src-cpp/kernel2.hpp -o src/sys/binding.rs
+      --allowlist-function _megakernel_.*
+      --allowlist-type nn.*
+      --
+      -std=c++23
+      -fno-rtti -fno-exceptions -fno-asynchronous-unwind-tables -fno-unwind-tables
+      -fPIC
+      -Wno-main
+      -I{{.TASK_DIR}}/include
+      -DNNSDK -DSWITCH -D__SWITCH__
+      
+    # - cbindgen > src-cpp/kernel.h
+  gen-result:
+    desc: Generate src/sys/nn_result_gen.rs from the vendored vapours result headers
+    cmds:
+      - python3 scripts/nn-result-gen.py
+
+  configure:
+    desc: (Re)-configure ninja build and generate compile_commands.json
+    cmds:
+      - cmake -G Ninja -B build -S .
+
+  build-cpp:
+    cmds:
+      - ninja -C build

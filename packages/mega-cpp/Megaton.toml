@@ -1,0 +1,30 @@
+# This is for megaton-config to dump clang flags for bindgen
+[module]
+name = "placeholder"
+title-id = 0x0
+default-profile = ""
+allow-base-profile = false
+
+[build]
+std = false # don't include flags to link megaton std library support
+sources = [
+    "src",
+]
+# defines = [
+#     "NNSDK"
+# ]
+includes = [
+    "src/include-priv", 
+    "include",
+]
+
+[build.profiles.megaton_cmake.compiler]
+
+[build.profiles.megaton_cmake.flags]
+
+[build.profiles.rust_bindgen.compiler]
+CC = "clang" # emit clang flags since bindgen uses libclang
+
+[build.profiles.rust_bindgen.flags]
+# Without this, the functions aren't visible so no bindings are generated
+c = ["<default>", "-fvisibility=default"]

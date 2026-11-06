@@ -165,52 +165,6 @@ impl Environment {
     }
 }
 
-// FIXME: remove if not needed
-// fn get_dkp_version(devkita64: &Path, cc: &Path) -> cu::Result<Option<String>> {
-//     // /opt/devkitpro/devkitA64/aarch64-none-elf/include/c++/
-//     let cpp_path = {
-//         let mut p = devkita64.join("aarch64-none-elf");
-//         p.extend(["include", "c++"]);
-//         p
-//     };
-//     let readdir = cu::check!(cu::fs::read_dir(&cpp_path), "failed to read c++ include paths from devkitpro")?;
-//     let mut candidate = None;
-//     for entry in readdir {
-//         let entry = match entry {
-//             Err(e) => {
-//                 cu::warn!("error reading some entry from devkitpro c++ include path: {e:?}");
-//                 continue;
-//             }
-//             Ok(x) => x
-//         };
-//         let version = match entry.file_name().into_utf8() {
-//             Err(e) => {
-//                 cu::warn!("ignoring non-utf8 while reading devkitpro c++ version: {e:?}");
-//                 continue;
-//             }
-//             Ok(x) => x
-//         };
-//         match candidate {
-//             None => {
-//                 candidate = Some(version);
-//             }
-//             Some(x) => {
-//             }
-//         }
-//
-//
-//     }
-//
-//     // let dir = readdir.filter_map(|x| x.ok()).collect::<Vec<_>>();
-//     //
-//     // if dir.len() == 1 {
-//     //     Ok(dir[0].file_name().display().to_string())
-//     // } else {
-//     //     // Fallback: query gcc for version
-//     //     get_cc_version(cc)
-//     // }
-// }
-
 #[cu::context("failed to get devkitpro compiler version (path: '{}')", cc_path.display())]
 fn get_cc_version(cc_path: &Path) -> cu::Result<String> {
     let (child, _, output) = cc_path
