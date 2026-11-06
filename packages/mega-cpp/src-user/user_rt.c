@@ -11,10 +11,7 @@ struct module_name_t {
 /** module name needs to put at nx-module-name section according to the libnx linker script */
 __attribute__((section(".nx-module-name"))) __attribute__((used))
 const struct module_name_t S_NX_MODULE_NAME = {
-    .unknown = 0,
-    .name_len = MEGART_NX_MODULE_NAME_LEN,
-    .name = MEGART_NX_MODULE_NAME
-};
+    .unknown = 0, .name_len = MEGART_NX_MODULE_NAME_LEN, .name = MEGART_NX_MODULE_NAME};
 
 static char S_FAKE_HEAP[MEGART_HEAP_SIZE] = {0};
 char* _megart_fake_heap_start() {

@@ -1,4 +1,3 @@
-
 //! Default-extend behavior for arrays in configs
 //!
 //! The default token `<default>` means:
@@ -40,7 +39,10 @@ const _: () = {
 };
 
 /// Extend by the default token behavior
-pub fn extend_by_default_token<T: DefaultToken + Clone>(current: &mut Option<Vec<T>>, incoming_extend: Option<&Vec<T>>) {
+pub fn extend_by_default_token<T: DefaultToken + Clone>(
+    current: &mut Option<Vec<T>>,
+    incoming_extend: Option<&Vec<T>>,
+) {
     let Some(incoming_extend) = incoming_extend else {
         return;
     };
@@ -66,7 +68,8 @@ pub fn extend_by_default_token<T: DefaultToken + Clone>(current: &mut Option<Vec
 /// Resolve the default tokens in `values` into `output`
 pub fn resolve_default_token<T: DefaultToken + Clone, F: FnOnce() -> Vec<T>>(
     mut output: Vec<T>,
-    values: Option<&[T]>, resolve_fn: F
+    values: Option<&[T]>,
+    resolve_fn: F,
 ) -> Vec<T> {
     enum ResolveState<T, F: FnOnce() -> Vec<T>> {
         Pending(F),
@@ -80,14 +83,14 @@ pub fn resolve_default_token<T: DefaultToken + Clone, F: FnOnce() -> Vec<T>>(
                     match &default_values {
                         ResolveState::Pending(_) => {
                             let resolved = match default_values {
-                                ResolveState::Pending(f) => {f()},
-                                _ => unreachable!()
+                                ResolveState::Pending(f) => f(),
+                                _ => unreachable!(),
                             };
                             output.extend_from_slice(&resolved);
                             default_values = ResolveState::Resolved(resolved);
                         }
                         ResolveState::Resolved(resolved) => {
-                            output.extend_from_slice(&resolved);
+                            output.extend_from_slice(resolved);
                         }
                     }
                 } else {

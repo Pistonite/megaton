@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 
 use cu::pre::*;
 
-use megaton_config::toolchain::ToolchainEnv;
 use megaton_config::config_file::{BuildConfig, Config};
+use megaton_config::toolchain::ToolchainEnv;
 
 use crate::hashing;
 use crate::printing;
@@ -33,20 +33,29 @@ pub async fn build_libgcc_nounwind(config: &Config, toolchain: &ToolchainEnv) ->
     }
 
     if up_to_date && output_path.is_file() {
-        cu::debug!("libgcc.a.sha256 is up-to-date and output exists, skipping building libgcc_nounwind.a");
+        cu::debug!(
+            "libgcc.a.sha256 is up-to-date and output exists, skipping building libgcc_nounwind.a"
+        );
         return Ok(());
     }
 
     let temp_output_path = config.project.out_lib.join("libgcc_nounwind.a.temp");
-    cu::fs::copy(&libgcc_original_path, &temp_output_path)?;
+    cu::fs::copy(libgcc_original_path, &temp_output_path)?;
 
     let ar = &toolchain.devkita64.ar;
-    let (child,stdout,stderr) = Path::new(ar).command()
-        .add(cu::args!["d", &temp_output_path, "unwind-dw2.o", "unwind-dw2-fde.o"])
+    let (child, stdout, stderr) = Path::new(ar)
+        .command()
+        .add(cu::args![
+            "d",
+            &temp_output_path,
+            "unwind-dw2.o",
+            "unwind-dw2-fde.o"
+        ])
         .stdout(cu::pio::buffer())
         .stderr(cu::pio::buffer())
         .stdin_null()
-        .co_spawn().await?;
+        .co_spawn()
+        .await?;
     let result = child.co_wait_nz().await;
     if let Err(e) = result {
         if let Ok(stderr) = stderr.co_join().await.flatten() {
@@ -101,7 +110,8 @@ pub async fn link_elf(
     let lib = cu::path!(&(&config.project.lib_root) / "mega-cpp" / "lib");
     for o in ["rocrt.o", "rocrt0.o"] {
         let crt_o = cu::check!(
-            lib.join(o).into_utf8(), "library object paths must be utf-8; please move the project to another location"
+            lib.join(o).into_utf8(),
+            "library object paths must be utf-8; please move the project to another location"
         )?;
         arguments.push(crt_o.clone());
         dependencies.push(crt_o);
@@ -109,7 +119,10 @@ pub async fn link_elf(
 
     // extra objects
     for o in &build_config.objects {
-        let o_str = cu::check!(o.as_utf8(), "extra object paths must be utf-8; please move the project to another location")?;
+        let o_str = cu::check!(
+            o.as_utf8(),
+            "extra object paths must be utf-8; please move the project to another location"
+        )?;
         arguments.push(o_str.to_string());
         dependencies.push(o_str.to_string());
     }
@@ -117,7 +130,10 @@ pub async fn link_elf(
     // libraries
     if build_config.std_enabled() {
         // lib megaton first - dependent on C/C++ libs
-        let libmegacpp_a = cu::check!(lib.join("libmegacpp.a").into_utf8(), "library path must be utf-8; please move the project to another location")?;
+        let libmegacpp_a = cu::check!(
+            lib.join("libmegacpp.a").into_utf8(),
+            "library path must be utf-8; please move the project to another location"
+        )?;
         arguments.push(libmegacpp_a.clone());
         dependencies.push(libmegacpp_a);
         // C++ libs
@@ -140,7 +156,7 @@ pub async fn link_elf(
         let gcc_nounwind = get_libgcc_nounwind_path(config).into_utf8()?;
         arguments.push(gcc_nounwind.clone());
         dependencies.push(gcc_nounwind);
-        
+
         arguments.push("-Wl,--end-group".to_string());
     }
 
@@ -148,24 +164,31 @@ pub async fn link_elf(
     arguments.push(config.project.out_elf.clone().into_utf8()?);
 
     let link_command_path = config.project.output_root.join("link_command.json");
-    let link_command = LinkCommand {arguments};
+    let link_command = LinkCommand { arguments };
     if let Err(e) = cu::fs::write_json_pretty(&link_command_path, &link_command) {
         cu::warn!("failed to write link_command.json: {e:?}");
     }
 
     if !is_link_needed {
-        is_link_needed = !is_elf_up_to_date(config, &link_command_path, &link_command.arguments, &dependencies);
+        is_link_needed = !is_elf_up_to_date(
+            config,
+            &link_command_path,
+            &link_command.arguments,
+            &dependencies,
+        );
         if !is_link_needed {
             return Ok(false);
         }
     }
 
-    let (child, stdout,stderr) = Path::new(cxx_ld).command()
+    let (child, stdout, stderr) = Path::new(cxx_ld)
+        .command()
         .args(&link_command.arguments[1..])
         .stdout(cu::pio::buffer())
         .stderr(cu::pio::buffer())
         .stdin_null()
-        .co_spawn().await?;
+        .co_spawn()
+        .await?;
     let result = child.co_wait_nz().await;
     if let Err(e) = result {
         if let Some(stderr) = printing::join_stdstream(stderr).await {
@@ -185,15 +208,15 @@ fn is_elf_up_to_date(
     config: &Config,
     link_command_path: &Path,
     arguments: &[String],
-    dependencies: &[String]
+    dependencies: &[String],
 ) -> bool {
     let elf_mtime = match cu::fs::get_mtime(&config.project.out_elf) {
         Err(_) | Ok(None) => {
             // output probably doesn't exist
             cu::debug!("need to relink: output elf is missing or not accessible");
             return false;
-        },
-        Ok(Some(x)) => x
+        }
+        Ok(Some(x)) => x,
     };
 
     let Ok(command) = cu::fs::read_string(link_command_path) else {
@@ -218,7 +241,7 @@ fn is_elf_up_to_date(
                 cu::warn!("link dependency not found: {dep}");
                 return false;
             }
-            Ok(Some(mtime)) => mtime
+            Ok(Some(mtime)) => mtime,
         };
         if mtime > elf_mtime {
             cu::debug!("need to relink: dependency changed: {dep}");

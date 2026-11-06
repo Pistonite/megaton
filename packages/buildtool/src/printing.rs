@@ -1,4 +1,3 @@
-
 pub async fn join_stdstream(handle: cu::co::Handle<cu::Result<Vec<u8>>>) -> Option<String> {
     let Ok(bytes) = handle.co_join().await.flatten() else {
         return None;

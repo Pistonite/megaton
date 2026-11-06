@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 use cu::pre::*;
 use tokio::sync::mpsc;
 
-use megaton_config::toolchain::ToolchainEnv;
 use megaton_config::config_file::Config;
+use megaton_config::toolchain::ToolchainEnv;
 
 pub struct Checker {
-    defined_dynamic_symbols: BTreeSet<String>
+    defined_dynamic_symbols: BTreeSet<String>,
 }
 
 impl Checker {
@@ -26,9 +26,7 @@ impl Checker {
             for file in &check_config.symbol_files {
                 let send = send.clone();
                 let file = file.clone();
-                let handle = pool.spawn(async move {
-                    load_symbol_list(&file, send).await
-                });
+                let handle = pool.spawn(async move { load_symbol_list(&file, send).await });
                 handles.push(handle);
             }
             drop(send);
@@ -42,11 +40,14 @@ impl Checker {
             }
         }
 
-        Ok(Checker { defined_dynamic_symbols })
+        Ok(Checker {
+            defined_dynamic_symbols,
+        })
     }
 
     /// Return if the ELF is fresh, meaning the NSO is not up-to-date
-    pub async fn check(self, 
+    pub async fn check(
+        self,
         config: &Config,
         toolchain: &ToolchainEnv,
         mut should_check: bool,
@@ -55,9 +56,8 @@ impl Checker {
         if !should_check {
             let nso_path = &config.project.out_nso;
             // only check if up-to-date if we are not already going to run check anyway
-            let up_to_date = 
-            is_elf_check_up_to_date(elf_path, nso_path, &config.project.config_path)
-        ?;
+            let up_to_date =
+                is_elf_check_up_to_date(elf_path, nso_path, &config.project.config_path)?;
             if !up_to_date {
                 should_check = true;
             }
@@ -75,11 +75,7 @@ impl Checker {
             let elf_path = elf_path.clone();
             let defined_dynamic_symbols = self.defined_dynamic_symbols;
             cu::co::spawn(async move {
-                get_undefined_symbols(
-                    &objdump,
-                    &defined_dynamic_symbols,
-                    &elf_path,
-                ).await
+                get_undefined_symbols(&objdump, &defined_dynamic_symbols, &elf_path).await
             })
         };
 
@@ -88,11 +84,7 @@ impl Checker {
             let elf_path = elf_path.clone();
             let disallowed_instructions = config.check_config()?.disallowed_instructions.clone();
             cu::co::spawn(async move {
-                check_disallowed_instructions(
-                    &objdump,
-                    &elf_path,
-                    &disallowed_instructions
-                ).await
+                check_disallowed_instructions(&objdump, &elf_path, &disallowed_instructions).await
             })
         };
 
@@ -101,7 +93,7 @@ impl Checker {
         match undefined_symbols.co_join().await.flatten() {
             Err(e) => {
                 cu::error!("undefined symbols check failed: {e:?}");
-                has_error =true;
+                has_error = true;
             }
             Ok(undefined_symbols) => {
                 if !undefined_symbols.is_empty() {
@@ -122,7 +114,7 @@ impl Checker {
         match disallowed_instructions_errors.co_join().await.flatten() {
             Err(e) => {
                 cu::error!("disallowed instructions check failed: {e:?}");
-                has_error =true;
+                has_error = true;
             }
             Ok(errors) => {
                 if !errors.is_empty() {
@@ -149,7 +141,6 @@ impl Checker {
     }
 }
 
-
 #[cu::context("failed to check if elf check is up-to-date")]
 fn is_elf_check_up_to_date(
     elf_path: &Path,
@@ -165,7 +156,7 @@ fn is_elf_check_up_to_date(
             cu::debug!("need to run check: nso not found");
             return Ok(false);
         }
-        Ok(Some(x)) => x
+        Ok(Some(x)) => x,
     };
 
     let Some(elf_mtime) = cu::fs::get_mtime(elf_path)? else {
@@ -187,7 +178,7 @@ fn is_elf_check_up_to_date(
     }
 
     cu::debug!("elf check is up-to-date");
-    return Ok(true)
+    return Ok(true);
 }
 
 #[cu::context("failed to load symbol file '{}'", path.display())]
@@ -205,7 +196,10 @@ async fn load_symbol_list(path: &Path, sender: mpsc::UnboundedSender<String>) ->
         if line.is_empty() {
             continue;
         }
-        if line.starts_with("DYNAMIC SYMBOL TABLE") || line.contains("file format ") || line.contains("no symbols"){
+        if line.starts_with("DYNAMIC SYMBOL TABLE")
+            || line.contains("file format ")
+            || line.contains("no symbols")
+        {
             is_objdump_format = true;
             break;
         }
@@ -239,15 +233,16 @@ async fn load_symbol_list(path: &Path, sender: mpsc::UnboundedSender<String>) ->
 async fn get_undefined_symbols(
     objdump: &Path,
     defined_dynamic_symbols: &BTreeSet<String>,
-    elf_path: &Path
+    elf_path: &Path,
 ) -> cu::Result<Vec<String>> {
-    let (child, mut stdout) = 
-    objdump.command()
-    .add(cu::args!["-T", elf_path])
+    let (child, mut stdout) = objdump
+        .command()
+        .add(cu::args!["-T", elf_path])
         .stdout(cu::pio::co_lines())
         .stderr(cu::lv::E)
         .stdin_null()
-        .co_spawn().await?;
+        .co_spawn()
+        .await?;
 
     let mut undefined_dynamic = vec![];
     let mut has_error = false;
@@ -261,7 +256,10 @@ async fn get_undefined_symbols(
             }
         };
         let line = line.trim();
-        if line.starts_with("DYNAMIC SYMBOL TABLE") || line.contains("file format ")|| line.contains("no symbols"){
+        if line.starts_with("DYNAMIC SYMBOL TABLE")
+            || line.contains("file format ")
+            || line.contains("no symbols")
+        {
             continue;
         }
         let Some(symbol) = parse_line(line, true) else {
@@ -288,11 +286,12 @@ async fn get_undefined_symbols(
 fn parse_line(line: &str, is_objdump_format: bool) -> Option<&str> {
     if is_objdump_format {
         if let Some(symbol) = parse_objdump_format_line(line) {
-            return Some(symbol)
-        }parse_llvm_nm_format_line(line)
+            return Some(symbol);
+        }
+        parse_llvm_nm_format_line(line)
     } else {
         if let Some(symbol) = parse_llvm_nm_format_line(line) {
-            return Some(symbol)
+            return Some(symbol);
         }
         parse_objdump_format_line(line)
     }
@@ -304,7 +303,7 @@ fn parse_llvm_nm_format_line(line: &str) -> Option<&str> {
         return None;
     }
     let i = line.rfind(' ')?;
-    let sym = line[i+1..].trim();
+    let sym = line[i + 1..].trim();
     if sym.is_empty() {
         return None;
     }
@@ -316,7 +315,7 @@ fn parse_objdump_format_line(line: &str) -> Option<&str> {
         return None;
     }
     let i = line.rfind(' ')?;
-    let sym = line[i+1..].trim();
+    let sym = line[i + 1..].trim();
     if sym.is_empty() {
         return None;
     }
@@ -327,37 +326,39 @@ fn parse_objdump_format_line(line: &str) -> Option<&str> {
 async fn check_disallowed_instructions(
     objdump: &Path,
     elf_path: &Path,
-    disallowed_instructions: &[cu::Regex]
+    disallowed_instructions: &[cu::Regex],
 ) -> cu::Result<Vec<String>> {
-    let (child, mut stdout) = 
-    objdump.command()
-    .add(cu::args!["-d", elf_path])
+    let (child, mut stdout) = objdump
+        .command()
+        .add(cu::args!["-d", elf_path])
         .stdout(cu::pio::co_lines())
         .stderr(cu::lv::E)
         .stdin_null()
-        .co_spawn().await?;
+        .co_spawn()
+        .await?;
 
     let mut disallowed_instructions_errors = vec![];
     let mut has_error = false;
-        while let Some(line) = stdout.next().await {
-            let line = match line {
-                Ok(x) => x,
-                Err(e) => {
-                    cu::error!("error reading objdump -d output: {e:?}");
-                    has_error = true;
-                    break;
-                }
-            };
-            let Some((addr, insn)) = parse_objdump_assembly(&line) else {
-                continue;
-            };
+    while let Some(line) = stdout.next().await {
+        let line = match line {
+            Ok(x) => x,
+            Err(e) => {
+                cu::error!("error reading objdump -d output: {e:?}");
+                has_error = true;
+                break;
+            }
+        };
+        let Some((addr, insn)) = parse_objdump_assembly(&line) else {
+            continue;
+        };
 
         for pattern in disallowed_instructions {
             if pattern.is_match(insn) {
-                disallowed_instructions_errors.push(format!("{addr}: {insn} // pattern: {pattern}"));
+                disallowed_instructions_errors
+                    .push(format!("{addr}: {insn} // pattern: {pattern}"));
             }
         }
-        }
+    }
     if has_error {
         cu::warn!("io error occured; check result might be false");
     }

@@ -29,7 +29,8 @@ impl ToolchainEnv {
         Ok(Self {
             devkita64,
             rust,
-            home, cxxbridge
+            home,
+            cxxbridge,
         })
     }
 
@@ -42,7 +43,8 @@ impl ToolchainEnv {
         Ok(ToolchainEnvPartial {
             devkita64,
             rust,
-            home, cxxbridge
+            home,
+            cxxbridge,
         })
     }
 

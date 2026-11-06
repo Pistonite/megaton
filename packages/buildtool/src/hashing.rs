@@ -9,7 +9,11 @@ use sha2::{Digest, Sha256};
 /// Get a collision resistant output path in `out_dir` for the input `path`,
 /// in the form of `out_dir/<file_base>_<hash>.<ext>`
 pub fn hashed_output_path(path: &Path, out_dir: &Path) -> cu::Result<PathBuf> {
-    let file_base = cu::check!(path.file_stem(), "cannot hash path without a file name: '{}'", path.display())?;
+    let file_base = cu::check!(
+        path.file_stem(),
+        "cannot hash path without a file name: '{}'",
+        path.display()
+    )?;
 
     let mut hasher = FxHasher::default();
     hasher.write(path.as_os_str().as_encoded_bytes());
@@ -33,7 +37,11 @@ pub async fn co_file_sha256(path: &Path) -> cu::Result<String> {
     // larger than the reader's internal buffer, so reads go straight to the file
     let mut buf = vec![0u8; 64 * 1024];
     loop {
-        let n = cu::check!(reader.read(&mut buf).await, "failed to read file '{}'", path.display())?;
+        let n = cu::check!(
+            reader.read(&mut buf).await,
+            "failed to read file '{}'",
+            path.display()
+        )?;
         if n == 0 {
             break;
         }

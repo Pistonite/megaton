@@ -3,7 +3,10 @@ use std::path::PathBuf;
 use cu::pre::*;
 use semver::VersionReq;
 
-use crate::config_file::{self, BASE_PROFILE, BuildConfig, CaptureUnused, CheckConfig, FtpConfig, MegatonConfig, ModuleConfig, Profile, ProjectTargetEnv, Resolve, RustConfig, Validate, ValidateCtx};
+use crate::config_file::{
+    self, BASE_PROFILE, BuildConfig, CaptureUnused, CheckConfig, FtpConfig, MegatonConfig,
+    ModuleConfig, Profile, ProjectTargetEnv, Resolve, RustConfig, Validate, ValidateCtx,
+};
 use crate::toolchain::ToolchainEnv;
 
 /// The Megaton.toml config file
@@ -31,7 +34,7 @@ pub struct Config {
     /// `[check]` section
     #[serde(default)]
     check: Profile<CheckConfig>,
-    
+
     /// `[ftp]` section
     #[serde(default)]
     ftp: Profile<FtpConfig>,
@@ -40,7 +43,10 @@ pub struct Config {
     unused: CaptureUnused,
 }
 impl Config {
-    pub fn new_from_project_dir(root_dir: Option<&str>, opts: ConfigLoadOpts<'_,'_>) -> cu::Result<Self> {
+    pub fn new_from_project_dir(
+        root_dir: Option<&str>,
+        opts: ConfigLoadOpts<'_, '_>,
+    ) -> cu::Result<Self> {
         let paths = ProjectPaths::resolve(root_dir)?;
         let content = cu::fs::read_string(&paths.config_path)?;
         let mut config = cu::check!(
@@ -48,7 +54,12 @@ impl Config {
             "failed to parse Megaton.toml"
         )?;
         if opts.resolve {
-            config.resolve(paths.root, paths.config_path, opts.cli_profile, opts.toolchain)?;
+            config.resolve(
+                paths.root,
+                paths.config_path,
+                opts.cli_profile,
+                opts.toolchain,
+            )?;
         } else {
             config.project.profile = BASE_PROFILE.to_string();
         }
@@ -62,13 +73,16 @@ impl Config {
             module: ModuleConfig::new_no_megaton_toml(),
             ..Default::default()
         };
-        if let Ok(v) = VersionReq::parse(
-            env!("CARGO_PKG_VERSION")
-        ) {
+        if let Ok(v) = VersionReq::parse(env!("CARGO_PKG_VERSION")) {
             config.megaton.version = Some(v);
         }
         if opts.resolve {
-            config.resolve(PathBuf::new(), PathBuf::new(), opts.cli_profile, opts.toolchain)?;
+            config.resolve(
+                PathBuf::new(),
+                PathBuf::new(),
+                opts.cli_profile,
+                opts.toolchain,
+            )?;
         } else {
             config.project.profile = BASE_PROFILE.to_string();
         }
@@ -80,7 +94,13 @@ impl Config {
         Ok(config)
     }
     #[cu::context("error resolving config")]
-    fn resolve(&mut self, root: PathBuf, config_path: PathBuf, cli_profile: Option<&str>, toolchain: Option<&ToolchainEnv>) -> cu::Result<()> {
+    fn resolve(
+        &mut self,
+        root: PathBuf,
+        config_path: PathBuf,
+        cli_profile: Option<&str>,
+        toolchain: Option<&ToolchainEnv>,
+    ) -> cu::Result<()> {
         let profile = self.select_profile(cli_profile)?;
         let target_root = cu::path!(&root / (self.module.target_dir) / "megaton");
         let project = ProjectTargetEnv::new(
@@ -95,9 +115,18 @@ impl Config {
         self.project = project;
         self.module.resolve(&self.project);
         self.rust.resolve(&self.project);
-        cu::check!(self.build.resolve(&self.project, toolchain), "failed to resolve build config")?;
-        cu::check!(self.check.resolve(&self.project, toolchain), "failed to resolve check config")?;
-        cu::check!(self.ftp.resolve(&self.project, toolchain), "failed to resolve ftp config")?;
+        cu::check!(
+            self.build.resolve(&self.project, toolchain),
+            "failed to resolve build config"
+        )?;
+        cu::check!(
+            self.check.resolve(&self.project, toolchain),
+            "failed to resolve check config"
+        )?;
+        cu::check!(
+            self.ftp.resolve(&self.project, toolchain),
+            "failed to resolve ftp config"
+        )?;
         Ok(())
     }
     /// Select profile based on command line and config
@@ -108,20 +137,24 @@ impl Config {
         'b: 'a, // lifetime: cli should live longer since that's parsed before config
     {
         let is_specified_in_cli = cli_profile.is_some();
-        let profile =match cli_profile {
+        let profile = match cli_profile {
             None => {
-            if self.module.default_profile.as_ref().is_some_and(|x| x.is_empty()) {
-                cu::bail!(
-                    "a profile must be selected from the command line (--profile PROFILE); required by module.default-profile = \"\""
-                );
-            }
+                if self
+                    .module
+                    .default_profile
+                    .as_ref()
+                    .is_some_and(|x| x.is_empty())
+                {
+                    cu::bail!(
+                        "a profile must be selected from the command line (--profile PROFILE); required by module.default-profile = \"\""
+                    );
+                }
                 BASE_PROFILE
             }
-            Some(p) => p
+            Some(p) => p,
         };
         let profile = if profile == BASE_PROFILE {
-            self
-                .module
+            self.module
                 .default_profile
                 .as_deref()
                 .unwrap_or(BASE_PROFILE)
@@ -131,9 +164,13 @@ impl Config {
 
         if !self.module.allow_base_profile && profile == BASE_PROFILE {
             if is_specified_in_cli {
-                cu::bail!("the base profile (\"{BASE_PROFILE}\") is not allowed; please specify a profile from the command line (--profile PROFILE); required by module.allow-base-profile = false");
+                cu::bail!(
+                    "the base profile (\"{BASE_PROFILE}\") is not allowed; please specify a profile from the command line (--profile PROFILE); required by module.allow-base-profile = false"
+                );
             } else {
-                cu::bail!("the base profile (\"{BASE_PROFILE}\") is not allowed; required by module.allow-base-profile = false");
+                cu::bail!(
+                    "the base profile (\"{BASE_PROFILE}\") is not allowed; required by module.allow-base-profile = false"
+                );
             }
         }
 
@@ -145,7 +182,8 @@ impl Config {
     }
     /// Get the resolved build config based on the profile
     pub fn build_config(&self) -> cu::Result<&BuildConfig> {
-        self.build.get_profile(&self.project.profile, "build", false)
+        self.build
+            .get_profile(&self.project.profile, "build", false)
     }
     /// Get the resolved check config based on the profile
     pub fn check_config(&self) -> cu::Result<&CheckConfig> {
@@ -182,7 +220,9 @@ impl Validate for Config {
         self.unused.validate(ctx)?;
 
         if self.rust.enabled() && !self.build_config()?.std_enabled() {
-            cu::bail!("build.std must be enabled when Rust is enabled; if Rust should not be enabled, explicitly set rust.enabled = false");
+            cu::bail!(
+                "build.std must be enabled when Rust is enabled; if Rust should not be enabled, explicitly set rust.enabled = false"
+            );
         }
 
         Ok(())
@@ -197,7 +237,7 @@ pub struct ConfigLoadOpts<'a, 'b> {
     /// The CLI --profile selection
     pub cli_profile: Option<&'a str>,
     /// Optionally resolved toolchain environment
-    pub toolchain: Option<&'b ToolchainEnv>
+    pub toolchain: Option<&'b ToolchainEnv>,
 }
 
 /// Project environment

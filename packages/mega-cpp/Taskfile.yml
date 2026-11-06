@@ -1,5 +1,11 @@
 version: '3'
 
+includes:
+  ccpp:
+    taskfile: ../../mono-dev/task/ccpp.yaml
+    internal: true
+    optional: true
+
 tasks:
   rs-bindgen:
     desc: Generate binding for megaton rust library
@@ -53,6 +59,12 @@ tasks:
             echo 'etc/flags.cmake is up-to-date'
           fi
 
+  configure:
+    desc: Configure CMake
+    cmds:
+      - task: cmake-gen
+      - cmake -G Ninja -B build
+
   make:
     desc: Build the library
     cmds:
@@ -60,14 +72,24 @@ tasks:
       - mkdir -p include-rs/cxx && cargo run -p megaton-toolchain -- cxxbridge --header > include-rs/cxx/rust.h
       - bash build.sh
 
+  check:
+    - task: ccpp:clang-tidy
+      vars:
+        BUILD: build
+        HEADER: ^include/
+        ADD_CHECKS: >
+          -bugprone-reserved-identifier,
+
+    - task: ccpp:fmt-check
+      vars:
+        SOURCE: src src-user include
+
+  fix:
+    - task: ccpp:fmt-fix
+      vars:
+        SOURCE: src src-user include
+
   clean:
     desc: Clean output
     cmds:
-      - rm -rf .cache build include-rs/cxx
-    
-
-    
-          
-      # - bindgen src/include-priv/megaton/hermit.h -o out.rs -- {{.C_FLAGS}}
-      # - >
-      #   bindgen src/include-priv/megaton/hermit.h -o out.rs --
+      - rm -rf .cache build include-rs/cxx lib

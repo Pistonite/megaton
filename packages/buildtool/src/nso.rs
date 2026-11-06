@@ -12,8 +12,14 @@ pub async fn elf_to_nso(config: &Config, toolchain: &ToolchainEnv) -> cu::Result
     let nso_path = &config.project.out_nso;
     let elf2nso = &toolchain.devkita64.elf2nso;
 
-    Path::new(elf2nso).command().args([elf_path, nso_path])
-        .stdin_null().stdout(cu::lv::D).stderr(cu::lv::E).co_wait_nz().await?;
+    Path::new(elf2nso)
+        .command()
+        .args([elf_path, nso_path])
+        .stdin_null()
+        .stdout(cu::lv::D)
+        .stderr(cu::lv::E)
+        .co_wait_nz()
+        .await?;
 
     cu::debug!("nso created");
     Ok(())

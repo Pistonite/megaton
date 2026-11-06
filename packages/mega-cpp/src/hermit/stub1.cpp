@@ -1,3 +1,2 @@
 
-void _megahermit_stub2() {
-}
+void _megahermit_stub2() {}

@@ -76,14 +76,14 @@ impl RustConfig {
         PathBuf::from("Cargo.toml")
     }
 
-fn default_header_suffix() -> String {
-    String::from(".h")
-}
-
-fn default_source() -> PathBuf {
-    PathBuf::from("src")
-}
+    fn default_header_suffix() -> String {
+        String::from(".h")
     }
+
+    fn default_source() -> PathBuf {
+        PathBuf::from("src")
+    }
+}
 
 impl Validate for RustConfig {
     fn validate(&self, ctx: &mut ValidateCtx) -> cu::Result<()> {

@@ -10,10 +10,10 @@ use megaton_packaging as packaging;
 
 use crate::checking::Checker;
 use crate::compile_mgr::CompileMgr;
-use crate::rust;
 use crate::linking;
 use crate::npdm;
 use crate::nso;
+use crate::rust;
 
 /// The `build` subcommand
 #[derive(Debug, clap::Parser, AsRef)]
@@ -50,12 +50,21 @@ impl Cmd {
         // config/toolchain must be resolved outside of async runtime
         // because they are blocking
         let toolchain = Arc::new(ToolchainEnv::resolve()?);
-        let config = Arc::new(Config::new_from_project_dir(dir, ConfigLoadOpts { 
-            resolve: true, validate: true, cli_profile: self.profile.as_deref(), toolchain: Some(&toolchain) })?);
+        let config = Arc::new(Config::new_from_project_dir(
+            dir,
+            ConfigLoadOpts {
+                resolve: true,
+                validate: true,
+                cli_profile: self.profile.as_deref(),
+                toolchain: Some(&toolchain),
+            },
+        )?);
 
         let task = cu::co::spawn(async move {
             let mut zombie_tasks = vec![];
-            let result = self.run_internal(config, toolchain,  &mut zombie_tasks).await;
+            let result = self
+                .run_internal(config, toolchain, &mut zombie_tasks)
+                .await;
             if !zombie_tasks.is_empty() {
                 cu::debug!("waiting for tasks to finish...");
                 for task in zombie_tasks {
@@ -67,9 +76,17 @@ impl Cmd {
 
         task.join().flatten()
     }
-    async fn run_internal(self, config: Arc<Config>, toolchain: Arc<ToolchainEnv>, zombie_tasks: &mut Vec<cu::co::Handle<cu::Result<()>>>) -> cu::Result<()> {
-
-        cu::info!("building {} (profile '{}')", config.project.module_name, config.project.profile);
+    async fn run_internal(
+        self,
+        config: Arc<Config>,
+        toolchain: Arc<ToolchainEnv>,
+        zombie_tasks: &mut Vec<cu::co::Handle<cu::Result<()>>>,
+    ) -> cu::Result<()> {
+        cu::info!(
+            "building {} (profile '{}')",
+            config.project.module_name,
+            config.project.profile
+        );
 
         if !self.no_lib_unpack {
             // unpack megatonlib
@@ -90,7 +107,7 @@ impl Cmd {
             /// Task to load the checker
             pub checker_load_task: Option<cu::co::Handle<cu::Result<Checker>>>,
             pub npdm_task: Option<cu::co::Handle<cu::Result<()>>>,
-            pub compile_database_task: Option<cu::co::Handle<cu::Result<()>>>
+            pub compile_database_task: Option<cu::co::Handle<cu::Result<()>>>,
         }
         impl Drop for Tasks<'_> {
             fn drop(&mut self) {
@@ -137,18 +154,24 @@ impl Cmd {
             }));
         }
 
-
         // build rust if needed
         if config.rust.enabled() {
-            let rust_env = cu::check!(toolchain.rust.as_ref(), "rust tools are not installed - please install rust on your system")?;
+            let rust_env = cu::check!(
+                toolchain.rust.as_ref(),
+                "rust tools are not installed - please install rust on your system"
+            )?;
             if rust_env.megaton.is_none() {
-                cu::bail!("megaton rust toolchain is not installed - please run `megaton toolchain install`");
+                cu::bail!(
+                    "megaton rust toolchain is not installed - please run `megaton toolchain install`"
+                );
             }
             let rust_project = Arc::new(rust::resolve_project(&config)?);
             cu::debug!("resolved rust project: {rust_project:?}");
             let cxx_version_check_handle = if rust_project.has_cxx {
                 if !toolchain.cxxbridge.is_installed() {
-                    cu::bail!("cxx dependency is found but cxxbridge-cmd is not installed with megaton - please run `megaton toolchain cxxbridge`")
+                    cu::bail!(
+                        "cxx dependency is found but cxxbridge-cmd is not installed with megaton - please run `megaton toolchain cxxbridge`"
+                    )
                 }
                 // spawn cargo-metadata to check cxx version
                 let manifest_path = config.rust.cargo_manifest.clone();
@@ -192,18 +215,21 @@ impl Cmd {
         let rust_cxx_sources = std::mem::take(&mut tasks.cxx_sources);
         let result = {
             let config = config.clone();
-            cu::cli::ctrlc_frame().co_execute(move |ctrlc| async move {
-                let mut compile_mgr = CompileMgr::new(configure_only, &config)?;
-                let result = drive_compile_mgr(&mut compile_mgr, &config, ctrlc, rust_cxx_sources).await;
-                if !configure_only {
-                    let compile_result = compile_mgr.finish_compiling().await;
+            cu::cli::ctrlc_frame()
+                .co_execute(move |ctrlc| async move {
+                    let mut compile_mgr = CompileMgr::new(configure_only, &config)?;
+                    let result =
+                        drive_compile_mgr(&mut compile_mgr, &config, ctrlc, rust_cxx_sources).await;
+                    if !configure_only {
+                        let compile_result = compile_mgr.finish_compiling().await;
+                        result?;
+                        compile_result?;
+                        return Ok(compile_mgr);
+                    }
                     result?;
-                    compile_result?;
-                    return Ok(compile_mgr);
-                }
-                result?;
-                cu::Ok(compile_mgr)
-            }).await?
+                    cu::Ok(compile_mgr)
+                })
+                .await?
         };
 
         let Some(mut compile_mgr) = result else {
@@ -213,7 +239,7 @@ impl Cmd {
             compile_mgr.save_compile_database()?;
             let _ = compile_mgr.finish_compiling().await;
             cu::info!("compile database saved");
-            return Ok(())
+            return Ok(());
         }
 
         let mut relink_needed = compile_mgr.is_any_object_compiled();
@@ -227,26 +253,26 @@ impl Cmd {
         let bar = cu::progress("linking").spawn();
         compiled_objects.sort();
 
-        let no_check_file_path = 
-                config.project.output_root.join(".no_check");
+        let no_check_file_path = config.project.output_root.join(".no_check");
 
         // preload checker
         if !self.no_check {
             tasks.checker_load_task = {
                 let config = config.clone();
-                Some(cu::co::spawn(async move {
-                    Checker::load(&config).await
-                }))
+                Some(cu::co::spawn(async move { Checker::load(&config).await }))
             };
         } else {
             // write a .no_check file in the output directory.
             // if this file exists, check will force to run even if the output
             // elf didn't change, if --no-check is not specified
             if let Err(e) = cu::fs::write(
-                &no_check_file_path
-                , "this file exists to ensure check runs the next time") {
+                &no_check_file_path,
+                "this file exists to ensure check runs the next time",
+            ) {
                 cu::warn!("failed to write .no_check file: {e:?}");
-                cu::warn!("check might be skipped next time without --no-check if build is successful!");
+                cu::warn!(
+                    "check might be skipped next time without --no-check if build is successful!"
+                );
             };
         }
 
@@ -265,13 +291,15 @@ impl Cmd {
             let rust_hermit_object = tasks.rust_hermit_object.clone();
             cu::co::spawn(async move {
                 let build_config = config.build_config()?;
-                linking::link_elf(&config, 
+                linking::link_elf(
+                    &config,
                     build_config,
                     &toolchain,
-                    relink_needed, 
-                    &compiled_objects, 
-                    rust_hermit_object.as_deref()
-                ).await
+                    relink_needed,
+                    &compiled_objects,
+                    rust_hermit_object.as_deref(),
+                )
+                .await
             })
         };
 
@@ -289,7 +317,10 @@ impl Cmd {
         if did_link {
             bar.done();
         } else {
-            bar.done_with_message(&format!("linking: {}.elf is up-to-date", config.project.module_name));
+            bar.done_with_message(&format!(
+                "linking: {}.elf is up-to-date",
+                config.project.module_name
+            ));
         }
 
         if let Some(task) = tasks.checker_load_task.take() {
@@ -313,9 +344,17 @@ impl Cmd {
 
         if should_run_elf_to_nso {
             nso::elf_to_nso(&config, &toolchain).await?;
-            cu::info!("built {}.nso (profile '{}')", config.project.module_name, config.project.profile);
+            cu::info!(
+                "built {}.nso (profile '{}')",
+                config.project.module_name,
+                config.project.profile
+            );
         } else {
-            cu::info!("{}.nso is up-to-date (profile '{}')", config.project.module_name, config.project.profile);
+            cu::info!(
+                "{}.nso is up-to-date (profile '{}')",
+                config.project.module_name,
+                config.project.profile
+            );
         }
 
         if let Some(task) = tasks.npdm_task.take() {

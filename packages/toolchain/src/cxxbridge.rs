@@ -29,8 +29,10 @@ pub fn install(home: &HomeEnv) -> cu::Result<()> {
     let env = CxxBridgeEnv::resolve(home);
     if env.is_installed() {
         if env.version != BLESSED_VERSION {
-            let current  = &env.version;
-            cu::debug!("cxxbridge-cmd version {current} doesn't match blessed version {BLESSED_VERSION}, reinstalling");
+            let current = &env.version;
+            cu::debug!(
+                "cxxbridge-cmd version {current} doesn't match blessed version {BLESSED_VERSION}, reinstalling"
+            );
         } else {
             cu::hint!("found existing cxxbridge-cmd installation, skipping");
             return Ok(());
@@ -68,6 +70,5 @@ pub fn remove(home: &HomeEnv) -> cu::Result<()> {
 
 pub fn invoke(home: &HomeEnv, args: Vec<String>) -> cu::Result<()> {
     let env = CxxBridgeEnv::resolve(home);
-    env.path.command().args(args)
-    .all_inherit().wait_nz()
+    env.path.command().args(args).all_inherit().wait_nz()
 }

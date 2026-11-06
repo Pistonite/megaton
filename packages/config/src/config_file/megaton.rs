@@ -1,7 +1,7 @@
 use cu::pre::*;
 use semver::{Version, VersionReq};
 
-use crate::config_file::{Validate, ValidateCtx, CaptureUnused};
+use crate::config_file::{CaptureUnused, Validate, ValidateCtx};
 
 /// The `[megaton]` section
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
@@ -38,7 +38,7 @@ pub fn check_megaton_version_requirement(version_req: &VersionReq) -> cu::Result
 #[cfg(test)]
 mod tests {
 
-use super::*;
+    use super::*;
 
     #[test]
     fn cargo_pkg_version_is_valid_semver() -> cu::Result<()> {
@@ -63,7 +63,7 @@ use super::*;
         let error_message = format!("{:?}", result.unwrap_err());
         assert_eq!(
             error_message,
-            format!("the project requires megaton version >=99999.0.0, current version is {curr}")
+            format!("the project requires megaton >=99999.0.0, but current version is {curr}")
         );
         Ok(())
     }

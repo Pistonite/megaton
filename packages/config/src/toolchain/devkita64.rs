@@ -56,7 +56,6 @@ pub struct DevKitA64PicLibs {
     pub m: String,
 
     // -Wl,--start-group
-
     pub sysbase: String,
     /// C lib
     pub c: String,
@@ -84,7 +83,9 @@ impl DevKitA64Env {
             match path {
                 Ok(p) => {
                     if !p.is_dir() {
-                        cu::hint!("DEVKITPRO environment variable is not set to a valid directory.");
+                        cu::hint!(
+                            "DEVKITPRO environment variable is not set to a valid directory."
+                        );
                         (p, false)
                     } else {
                         (p, true)
@@ -92,12 +93,14 @@ impl DevKitA64Env {
                 }
                 Err(_) => {
                     cu::hint!("DEVKITPRO environment variable is not set to a valid path.");
-                    (Default::default(),false)
+                    (Default::default(), false)
                 }
             }
         };
         if !ok {
-            cu::hint!("please ensure DevKitA64 is installed and set the DEVKITPRO environment variable");
+            cu::hint!(
+                "please ensure DevKitA64 is installed and set the DEVKITPRO environment variable"
+            );
             cu::bail!("failed to resolve DEVKITPRO");
         }
         cu::check!(dkp.as_utf8(), "DEVKITPRO path must be utf-8")?;
@@ -131,15 +134,16 @@ impl DevKitA64Env {
         let (c_includes, cpp_includes) = get_includes(&dka64, &version)?;
 
         // libraries
-        let gcc_lib= cu::path!(&dka64 / "lib" / "gcc" / "aarch64-none-elf" / version / "pic" / "libgcc.a");
+        let gcc_lib =
+            cu::path!(&dka64 / "lib" / "gcc" / "aarch64-none-elf" / version / "pic" / "libgcc.a");
         let other_lib_dir = cu::path!(&dka64 / "aarch64-none-elf" / "lib" / "pic");
-        let libs = DevKitA64PicLibs { 
+        let libs = DevKitA64PicLibs {
             stdcppexp: other_lib_dir.join("libstdc++exp.a").into_utf8()?,
             stdcpp: other_lib_dir.join("libstdc++.a").into_utf8()?,
             m: other_lib_dir.join("libm.a").into_utf8()?,
             sysbase: other_lib_dir.join("libsysbase.a").into_utf8()?,
             c: other_lib_dir.join("libc.a").into_utf8()?,
-            gcc: gcc_lib.into_utf8()?
+            gcc: gcc_lib.into_utf8()?,
         };
 
         Ok(Self {
@@ -155,9 +159,8 @@ impl DevKitA64Env {
             elf2nso: elf2nso.into_utf8()?,
             c_includes,
             cpp_includes,
-            libs
+            libs,
         })
-
     }
 }
 
@@ -178,21 +181,23 @@ fn get_gcc_version_from_installation(dka64: &Path) -> Option<String> {
                 cu::debug!("error reading some entry from devkitpro c++ include path: {e:?}");
                 continue;
             }
-            Ok(x) => x
+            Ok(x) => x,
         };
         let version = match entry.file_name().into_utf8() {
             Err(e) => {
                 cu::debug!("ignoring non-utf8 while reading devkitpro c++ version: {e:?}");
                 continue;
             }
-            Ok(x) => x
+            Ok(x) => x,
         };
         match candidate {
             None => {
                 candidate = Some(version);
             }
             Some(old_version) => {
-                cu::debug!("more than one version is found ({version} and {old_version}), requires calling gcc to resolve");
+                cu::debug!(
+                    "more than one version is found ({version} and {old_version}), requires calling gcc to resolve"
+                );
                 return None;
             }
         }
@@ -229,13 +234,18 @@ fn get_includes(dka64: &Path, version: &str) -> cu::Result<(Vec<String>, Vec<Str
     let dka64_triple_include_cpp = cu::path!(&dka64_triple_include / "c++" / version);
     let dka64_lib_gcc_include = cu::path!(&dka64 / "lib" / "gcc" / DEVKITA64_TRIPLE / version);
 
-    Ok((vec![
-        dka64_triple_include.into_utf8()?,
-        dka64_lib_gcc_include.join("include").into_utf8()?,
-        cu::path!(dka64_lib_gcc_include / "include-fixed").into_utf8()?
-    ], vec![
-        dka64_triple_include_cpp.join(DEVKITA64_TRIPLE).into_utf8()?,
-        dka64_triple_include_cpp.join("backward").into_utf8()?,
-        dka64_triple_include_cpp.into_utf8()?,
-    ]))
+    Ok((
+        vec![
+            dka64_triple_include.into_utf8()?,
+            dka64_lib_gcc_include.join("include").into_utf8()?,
+            cu::path!(dka64_lib_gcc_include / "include-fixed").into_utf8()?,
+        ],
+        vec![
+            dka64_triple_include_cpp
+                .join(DEVKITA64_TRIPLE)
+                .into_utf8()?,
+            dka64_triple_include_cpp.join("backward").into_utf8()?,
+            dka64_triple_include_cpp.into_utf8()?,
+        ],
+    ))
 }

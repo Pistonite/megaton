@@ -8,7 +8,9 @@ pub struct HomeEnv {
 }
 impl HomeEnv {
     pub fn resolve() -> cu::Result<Self> {
-        Ok(Self { path: get_megaton_home()? })
+        Ok(Self {
+            path: get_megaton_home()?,
+        })
     }
     pub fn bin_path(&self, bin_name: &str) -> PathBuf {
         let mut p = self.path.join("bin");

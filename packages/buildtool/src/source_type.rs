@@ -48,7 +48,7 @@ impl SourceType {
             SourceType::C => &config.flags.resolved.c,
             SourceType::Cpp => &config.flags.resolved.cxx,
             SourceType::Asm => &config.flags.resolved.cc_asm,
-            SourceType::AsmPre => &config.flags.resolved.cc_asm
+            SourceType::AsmPre => &config.flags.resolved.cc_asm,
         }
     }
     #[inline]
@@ -57,7 +57,7 @@ impl SourceType {
             SourceType::C => &config.flags.resolved.compdb.c,
             SourceType::Cpp => &config.flags.resolved.compdb.cxx,
             SourceType::Asm => &config.flags.resolved.compdb.cc_asm,
-            SourceType::AsmPre => &config.flags.resolved.compdb.cc_asm
+            SourceType::AsmPre => &config.flags.resolved.compdb.cc_asm,
         }
     }
 

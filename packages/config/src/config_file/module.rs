@@ -37,7 +37,7 @@ pub struct ModuleConfig {
     #[serde(default = "ModuleConfig::default_compile_commands")]
     pub compile_commands: PathBuf,
 
-    /// Arbitrary metadata that other tools can use 
+    /// Arbitrary metadata that other tools can use
     pub metadata: Option<json::Value>,
 
     #[serde(flatten, default, skip_serializing)]
@@ -94,4 +94,3 @@ impl Validate for ModuleConfig {
         self.unused.validate(ctx)
     }
 }
-

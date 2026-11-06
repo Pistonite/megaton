@@ -50,7 +50,7 @@ impl<T: ExtendProfile> Profile<T> {
                 }
                 cu::bail!("{desc} profile '{name}' does not exist");
             }
-            Some(config) => Ok(&config)
+            Some(config) => Ok(config),
         }
     }
 }
@@ -69,11 +69,18 @@ impl<T: ExtendProfile> Validate for Profile<T> {
 }
 
 impl<T: Resolve + ExtendProfile> Resolve for Profile<T> {
-    fn resolve(&mut self, project: &ProjectTargetEnv, toolchain: Option<&ToolchainEnv>) -> cu::Result<()> {
+    fn resolve(
+        &mut self,
+        project: &ProjectTargetEnv,
+        toolchain: Option<&ToolchainEnv>,
+    ) -> cu::Result<()> {
         // only need to resolve the selected profile
         let profile = &project.profile;
         if profile == BASE_PROFILE {
-            cu::check!(self.base.resolve(project, toolchain), "failed to resolve config for base profile")?;
+            cu::check!(
+                self.base.resolve(project, toolchain),
+                "failed to resolve config for base profile"
+            )?;
             return Ok(());
         }
         let Some(config) = self.profiles.0.get_mut(profile) else {
@@ -83,7 +90,10 @@ impl<T: Resolve + ExtendProfile> Resolve for Profile<T> {
         let mut extended = self.base.clone();
         // resolve must happen after extension
         extended.extend_profile(config);
-        cu::check!(extended.resolve(project, toolchain), "failed to resolve config for profile \"{profile}\"")?;
+        cu::check!(
+            extended.resolve(project, toolchain),
+            "failed to resolve config for profile \"{profile}\""
+        )?;
         *config = extended;
         Ok(())
     }
@@ -113,7 +123,10 @@ pub trait ExtendProfile: Validate + Clone + std::fmt::Debug {
 }
 
 /// Extend by overiding if the extension value is some
-pub fn extend_by_overriding_if_some<T: Clone>(current: &mut Option<T>, incoming_extend: Option<&T>) {
+pub fn extend_by_overriding_if_some<T: Clone>(
+    current: &mut Option<T>,
+    incoming_extend: Option<&T>,
+) {
     if let Some(x) = incoming_extend {
         *current = Some(x.clone());
     }

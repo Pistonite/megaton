@@ -2,7 +2,9 @@ use std::path::PathBuf;
 
 use cu::pre::*;
 
-use crate::config_file::{CaptureUnused, ExtendProfile, ProjectTargetEnv, Resolve, Validate, ValidateCtx};
+use crate::config_file::{
+    CaptureUnused, ExtendProfile, ProjectTargetEnv, Resolve, Validate, ValidateCtx,
+};
 use crate::toolchain::ToolchainEnv;
 
 /// The `check` section

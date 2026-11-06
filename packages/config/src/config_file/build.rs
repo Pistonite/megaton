@@ -2,7 +2,9 @@ use std::path::{Path, PathBuf};
 
 use cu::pre::*;
 
-use crate::config_file::{self, CaptureUnused, ExtendProfile, ProjectTargetEnv, Resolve, Validate, ValidateCtx};
+use crate::config_file::{
+    self, CaptureUnused, ExtendProfile, ProjectTargetEnv, Resolve, Validate, ValidateCtx,
+};
 use crate::toolchain::{DEVKITA64_TRIPLE, ToolchainEnv};
 
 /// Config in the `[build]` section
@@ -71,27 +73,37 @@ impl BuildConfig {
     pub fn std_enabled(&self) -> bool {
         self.std.unwrap_or(Self::DEFAULT_STD)
     }
-    fn serialize_std<S: serde::Serializer>(v: &Option<bool>, ser: S) -> Result<S::Ok, S::Error>{
+    fn serialize_std<S: serde::Serializer>(v: &Option<bool>, ser: S) -> Result<S::Ok, S::Error> {
         ser.serialize_bool(v.unwrap_or(Self::DEFAULT_STD))
     }
     /// Get the cpp std version
     pub fn std_cpp(&self) -> &str {
         self.std_cpp.as_deref().unwrap_or(Self::DEFAULT_STD_CPP)
     }
-    fn serialize_std_cpp<S: serde::Serializer>(v: &Option<String>, ser: S) -> Result<S::Ok, S::Error>{
+    fn serialize_std_cpp<S: serde::Serializer>(
+        v: &Option<String>,
+        ser: S,
+    ) -> Result<S::Ok, S::Error> {
         ser.serialize_str(v.as_deref().unwrap_or(Self::DEFAULT_STD_CPP))
     }
     /// Get the c std version
     pub fn std_c(&self) -> &str {
         self.std_c.as_deref().unwrap_or(Self::DEFAULT_STD_C)
     }
-    fn serialize_std_c<S: serde::Serializer>(v: &Option<String>, ser: S) -> Result<S::Ok, S::Error>{
+    fn serialize_std_c<S: serde::Serializer>(
+        v: &Option<String>,
+        ser: S,
+    ) -> Result<S::Ok, S::Error> {
         ser.serialize_str(v.as_deref().unwrap_or(Self::DEFAULT_STD_C))
     }
 }
 
 impl Resolve for BuildConfig {
-    fn resolve(&mut self, project: &ProjectTargetEnv, toolchain: Option<&ToolchainEnv>) -> cu::Result<()> {
+    fn resolve(
+        &mut self,
+        project: &ProjectTargetEnv,
+        toolchain: Option<&ToolchainEnv>,
+    ) -> cu::Result<()> {
         for p in &mut self.sources {
             *p = project.root.join(&*p);
         }
@@ -112,7 +124,7 @@ impl Resolve for BuildConfig {
         }
         self.compiler.resolve(project, toolchain)?;
         let mut flags = std::mem::take(&mut self.flags);
-        flags.resolve(project, &self, toolchain)?;
+        flags.resolve(project, self, toolchain)?;
         self.flags = flags;
         Ok(())
     }
@@ -126,7 +138,9 @@ impl Validate for BuildConfig {
 
         if self.std_enabled() {
             if !self.compiler.cc_flavor.is_dkp() || !self.compiler.cxx_flavor.is_dkp() {
-                cu::bail!("DevKitA64 toolchain must be used when std is enabled; either remove build.compiler.C and build.compiler.CXX to use DevKitA64, or set build.std = false to disable standard library support.");
+                cu::bail!(
+                    "DevKitA64 toolchain must be used when std is enabled; either remove build.compiler.C and build.compiler.CXX to use DevKitA64, or set build.std = false to disable standard library support."
+                );
             }
         }
         Ok(())
@@ -188,19 +202,25 @@ pub struct BuildCompilerConfig {
 }
 impl BuildCompilerConfig {
     #[cu::context("failed to resolve build.compiler")]
-    pub fn resolve(&mut self, project: &ProjectTargetEnv, toolchain: Option<&ToolchainEnv>) -> cu::Result<()> {
+    pub fn resolve(
+        &mut self,
+        project: &ProjectTargetEnv,
+        toolchain: Option<&ToolchainEnv>,
+    ) -> cu::Result<()> {
         match &self.cc {
             None => {
                 self.cc = match toolchain {
                     None => Some(format!("{DEVKITA64_TRIPLE}-gcc")),
-                    Some(tc) => Some(tc.devkita64.cc.clone())
+                    Some(tc) => Some(tc.devkita64.cc.clone()),
                 };
                 self.cc_flavor = CompilerFlavor::Dkp;
             }
             Some(x) => {
                 self.cc = Some(Self::resolve_program(&project.root, x, "C compiler")?);
                 let cc_is_clang = self.cc.as_deref().unwrap_or_default().contains("clang");
-                self.cc_flavor = if cc_is_clang { CompilerFlavor::Clang } else {
+                self.cc_flavor = if cc_is_clang {
+                    CompilerFlavor::Clang
+                } else {
                     CompilerFlavor::Gcc
                 };
             }
@@ -209,14 +229,16 @@ impl BuildCompilerConfig {
             None => {
                 self.cxx = match toolchain {
                     None => Some(format!("{DEVKITA64_TRIPLE}-g++")),
-                    Some(tc) => Some(tc.devkita64.cxx.clone())
+                    Some(tc) => Some(tc.devkita64.cxx.clone()),
                 };
                 self.cxx_flavor = CompilerFlavor::Dkp;
             }
             Some(x) => {
                 self.cxx = Some(Self::resolve_program(&project.root, x, "CXX compiler")?);
                 let cxx_is_clang = self.cxx.as_deref().unwrap_or_default().contains("clang");
-                self.cxx_flavor = if cxx_is_clang { CompilerFlavor::Clang } else {
+                self.cxx_flavor = if cxx_is_clang {
+                    CompilerFlavor::Clang
+                } else {
                     CompilerFlavor::Gcc
                 };
             }
@@ -225,7 +247,7 @@ impl BuildCompilerConfig {
             None => {
                 self.asm = match toolchain {
                     None => Some(format!("{DEVKITA64_TRIPLE}-as")),
-                    Some(tc) => Some(tc.devkita64.asm.clone())
+                    Some(tc) => Some(tc.devkita64.asm.clone()),
                 };
             }
             Some(x) => {
@@ -236,11 +258,15 @@ impl BuildCompilerConfig {
             None => {
                 self.cxx_ld = match toolchain {
                     None => Some(format!("{DEVKITA64_TRIPLE}-g++")),
-                    Some(tc) => Some(tc.devkita64.cxx.clone())
+                    Some(tc) => Some(tc.devkita64.cxx.clone()),
                 };
             }
             Some(x) => {
-                self.cxx_ld = Some(Self::resolve_program(&project.root, x, "CXX compiler for linking")?);
+                self.cxx_ld = Some(Self::resolve_program(
+                    &project.root,
+                    x,
+                    "CXX compiler for linking",
+                )?);
             }
         }
 
@@ -251,7 +277,7 @@ impl BuildCompilerConfig {
             // this should be utf-8 since root should be, and program is str
             cu::which(root.join(program).as_utf8()?)
         } else {
-            cu::which(&program)
+            cu::which(program)
         };
         let x = cu::check!(p, "failed to find {desc}")?;
         let x = cu::check!(x.into_utf8(), "path to {desc} is not utf-8")?;
@@ -334,82 +360,67 @@ pub struct BuildFlagConfig {
 
 impl BuildFlagConfig {
     #[cu::context("failed to resolve build.flags")]
-    pub fn resolve(&mut self, project: &ProjectTargetEnv, build: &BuildConfig, toolchain: Option<&ToolchainEnv>) -> cu::Result<()> {
-        let common = config_file::resolve_default_token(
-            vec![],
-            self.common.as_ref().map(|x| x.as_slice()),
-            || {
-                DEFAULT_COMMON
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<_>>()
-            },
-        );
-        let mut c = config_file::resolve_default_token(
-            vec![],
-            self.c.as_ref().map(|x| x.as_slice()),
-            || {
-                let mut out = common.clone();
-                out.extend(DEFAULT_C_COMMON.iter().map(|x| x.to_string()));
-                if build.compiler.cc_flavor.is_clang() {
-                    out.extend(DEFAULT_C_CLANG.iter().map(|x| x.to_string()));
-                }
-                out
+    pub fn resolve(
+        &mut self,
+        project: &ProjectTargetEnv,
+        build: &BuildConfig,
+        toolchain: Option<&ToolchainEnv>,
+    ) -> cu::Result<()> {
+        let common = config_file::resolve_default_token(vec![], self.common.as_deref(), || {
+            DEFAULT_COMMON
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+        });
+        let mut c = config_file::resolve_default_token(vec![], self.c.as_deref(), || {
+            let mut out = common.clone();
+            out.extend(DEFAULT_C_COMMON.iter().map(|x| x.to_string()));
+            if build.compiler.cc_flavor.is_clang() {
+                out.extend(DEFAULT_C_CLANG.iter().map(|x| x.to_string()));
             }
-        );
-        let mut cxx = config_file::resolve_default_token(
-            vec![],
-            self.cxx.as_ref().map(|x| x.as_slice()),
-            || {
-                let mut out = c.clone();
-                out.extend(DEFAULT_CPP_COMMON.iter().map(|x| x.to_string()));
-                if build.compiler.cxx_flavor.is_clang() {
-                    out.extend(DEFAULT_CPP_CLANG.iter().map(|x| x.to_string()));
-                }
-                out
+            out
+        });
+        let mut cxx = config_file::resolve_default_token(vec![], self.cxx.as_deref(), || {
+            let mut out = c.clone();
+            out.extend(DEFAULT_CPP_COMMON.iter().map(|x| x.to_string()));
+            if build.compiler.cxx_flavor.is_clang() {
+                out.extend(DEFAULT_CPP_CLANG.iter().map(|x| x.to_string()));
             }
-        );
+            out
+        });
         c.push(format!("-std={}", build.std_c()));
         cxx.push(format!("-std={}", build.std_cpp()));
-        let mut cc_asm = config_file::resolve_default_token(
-            vec![],
-            self.cc_asm.as_ref().map(|x| x.as_slice()),
-            || {
-                let mut out = common.clone();
-                out.extend(DEFAULT_ASM_GCC.iter().map(|x| x.to_string()));
-                if build.compiler.cc_flavor.is_clang() {
-                    out.extend(DEFAULT_C_CLANG.iter().map(|x| x.to_string()));
-                }
-                out
+        let mut cc_asm = config_file::resolve_default_token(vec![], self.cc_asm.as_deref(), || {
+            let mut out = common.clone();
+            out.extend(DEFAULT_ASM_GCC.iter().map(|x| x.to_string()));
+            if build.compiler.cc_flavor.is_clang() {
+                out.extend(DEFAULT_C_CLANG.iter().map(|x| x.to_string()));
             }
-        );
-        let mut cxx_ld = config_file::resolve_default_token(
-            vec![],
-            self.cxx_ld.as_ref().map(|x| x.as_slice()),
-            || {
-                let mut out = common.clone();
-                out.extend(DEFAULT_LINKER.iter().map(|x| x.to_string()));
-                out
-            }
-        );
-        let rustflags = config_file::resolve_default_token(
-            vec![],
-            self.rust.as_ref().map(|x| x.as_slice()),
-            || {
-                DEFAULT_RUST.iter().map(|x| x.to_string()).collect()
-            }
-        );
+            out
+        });
+        let mut cxx_ld = config_file::resolve_default_token(vec![], self.cxx_ld.as_deref(), || {
+            let mut out = common.clone();
+            out.extend(DEFAULT_LINKER.iter().map(|x| x.to_string()));
+            out
+        });
+        let rustflags = config_file::resolve_default_token(vec![], self.rust.as_deref(), || {
+            DEFAULT_RUST.iter().map(|x| x.to_string()).collect()
+        });
         let cargo = config_file::resolve_default_token(
-            vec!["--target-dir".to_string(), project.target_root.as_utf8()?.to_string()],
-            self.cargo.as_ref().map(|x| x.as_slice()),
-            || {
-                DEFAULT_CARGO.iter().map(|x| x.to_string()).collect()
-            }
+            vec![
+                "--target-dir".to_string(),
+                project.target_root.as_utf8()?.to_string(),
+            ],
+            self.cargo.as_deref(),
+            || DEFAULT_CARGO.iter().map(|x| x.to_string()).collect(),
         );
 
         // sysroot
         if let Some(sysroot) = &build.sysroot {
-            let sysroot_str = cu::check!(sysroot.as_utf8(), "(in build.sysroot) sysroot path must be UTF-8")?;
+            let sysroot_str = cu::check!(
+                sysroot.as_utf8(),
+                "(in build.sysroot) sysroot path must be UTF-8"
+            )?;
             let flag = make_build_flag("--sysroot=", sysroot_str)?;
             for flagset in [&mut c, &mut cxx, &mut cc_asm, &mut cxx_ld] {
                 flagset.push(flag.clone());
@@ -434,7 +445,10 @@ impl BuildFlagConfig {
         // - then user system-includes
         // - dkp ones are only added to compdb if compiler is dkp
         for include in &build.includes {
-            let include_str = cu::check!(include.as_utf8(), "(in build.includes) include path must be UTF-8")?;
+            let include_str = cu::check!(
+                include.as_utf8(),
+                "(in build.includes) include path must be UTF-8"
+            )?;
             let flag = make_build_flag("-I", include_str)?;
             for flagset in [&mut c, &mut cxx, &mut cc_asm] {
                 flagset.push(flag.clone());
@@ -442,21 +456,30 @@ impl BuildFlagConfig {
         }
         if build.std_enabled() {
             let include_path = cu::path!(&(&project.lib_root) / "mega-cpp" / "include");
-            let include_str = cu::check!(include_path.as_utf8(), "megaton include path must be UTF-8; please put the project in another location")?;
+            let include_str = cu::check!(
+                include_path.as_utf8(),
+                "megaton include path must be UTF-8; please put the project in another location"
+            )?;
             let flag = make_build_flag("-I", include_str)?;
             for flagset in [&mut c, &mut cxx, &mut cc_asm] {
                 flagset.push(flag.clone());
             }
 
             // generated headers
-            let include_str = cu::check!(project.out_inc.as_utf8(), "megaton generated include path must be UTF-8; please put the project in another location")?;
+            let include_str = cu::check!(
+                project.out_inc.as_utf8(),
+                "megaton generated include path must be UTF-8; please put the project in another location"
+            )?;
             let flag = make_build_flag("-I", include_str)?;
             for flagset in [&mut c, &mut cxx, &mut cc_asm] {
                 flagset.push(flag.clone());
             }
         }
         for include in &build.system_includes {
-            let include_str = cu::check!(include.as_utf8(), "(in build.system-includes) system include path must be UTF-8")?;
+            let include_str = cu::check!(
+                include.as_utf8(),
+                "(in build.system-includes) system include path must be UTF-8"
+            )?;
             let flag = make_build_flag("", include_str)?;
             for flagset in [&mut c, &mut cxx, &mut cc_asm] {
                 flagset.push("-isystem".to_string());
@@ -502,14 +525,21 @@ impl BuildFlagConfig {
         // - linker scripts
         // - library order
         let verfile = cu::path!(&(&project.lib_root) / "mega-cpp" / "etc" / "verfile");
-        cxx_ld.push(make_build_flag("-Wl,--version-script=", verfile.as_utf8()?)?);
-        let megaton_linker_script = cu::path!(&(&project.lib_root) / "mega-cpp" / "etc" / "megaton.ld");
-        cxx_ld.push(make_build_flag("-Wl,-T,", megaton_linker_script.as_utf8()?)?);
+        cxx_ld.push(make_build_flag(
+            "-Wl,--version-script=",
+            verfile.as_utf8()?,
+        )?);
+        let megaton_linker_script =
+            cu::path!(&(&project.lib_root) / "mega-cpp" / "etc" / "megaton.ld");
+        cxx_ld.push(make_build_flag(
+            "-Wl,-T,",
+            megaton_linker_script.as_utf8()?,
+        )?);
         for linker_script in &build.ldscripts {
             let path_str = cu::check!(linker_script.as_utf8(), "linker script path must be UTF-8")?;
             cxx_ld.push(make_build_flag("-Wl,-T,", path_str)?);
         }
-        
+
         self.resolved.c = c;
         self.resolved.cxx = cxx;
         self.resolved.cc_asm = cc_asm;
@@ -581,7 +611,9 @@ pub struct CompdbFlags {
 /// Make a build flag by quoting the path `p` if needed, then prepend `prefix`
 pub fn make_build_flag(prefix: &str, p: &str) -> cu::Result<String> {
     if p.contains('"') {
-        cu::bail!("path cannot contain quotes; paths are quoted automatically if needed when converted to flags: '{p}'");
+        cu::bail!(
+            "path cannot contain quotes; paths are quoted automatically if needed when converted to flags: '{p}'"
+        );
     }
     let flag = if p.contains(' ') {
         format!("{prefix}\"{p}\"")
@@ -590,7 +622,6 @@ pub fn make_build_flag(prefix: &str, p: &str) -> cu::Result<String> {
     };
     Ok(flag)
 }
-
 
 /// Default common flags, works for both GCC/Clang
 static DEFAULT_COMMON: &[&str] = &[
@@ -658,7 +689,6 @@ static DEFAULT_LINKER: &[&str] = &[
     // include anyway so it's not black magic
     "-Wl,-init=_init",
     "-Wl,-fini=_fini",
-
     // force symbols to be undefined to pull them in from the correct
     // library (libsysbase instead of libc)
     "-Wl,-u,abort",

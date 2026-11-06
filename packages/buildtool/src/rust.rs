@@ -35,30 +35,47 @@ pub fn resolve_project(config: &Config) -> cu::Result<RustProject> {
     let manifest_path = &config.rust.cargo_manifest;
     let manifest_dir = manifest_path.parent_abs()?;
 
-    let manifest = cu::check!(cu::fs::read_string(manifest_path), "failed to read project's Cargo.toml")?;
-    let manifest = cu::check!(toml::parse::<toml::Table>(&manifest), "failed to parse project's Cargo.toml")?;
+    let manifest = cu::check!(
+        cu::fs::read_string(manifest_path),
+        "failed to read project's Cargo.toml"
+    )?;
+    let manifest = cu::check!(
+        toml::parse::<toml::Table>(&manifest),
+        "failed to parse project's Cargo.toml"
+    )?;
 
-    let crate_name = manifest.get("package").and_then(|x| x.as_table()).and_then(|x| x.get("name"))
+    let crate_name = manifest
+        .get("package")
+        .and_then(|x| x.as_table())
+        .and_then(|x| x.get("name"))
         .and_then(|x| x.as_str());
-    let crate_name = cu::check!(crate_name, "failed to resolve crate name; ensure package.name exists in Cargo.toml")?;
+    let crate_name = cu::check!(
+        crate_name,
+        "failed to resolve crate name; ensure package.name exists in Cargo.toml"
+    )?;
 
     // resolve output .a file path from cargo
-        let lib_name = manifest.get("lib").and_then(|x| x.as_table())
-        .and_then(|x| x.get("name")).and_then(|x| x.as_str());
-        let archive_base = match lib_name {
-            None => {
-                crate_name.replace("-", "_")
-            }
-            Some(name) => {
-                name.to_string()
-            }
+    let lib_name = manifest
+        .get("lib")
+        .and_then(|x| x.as_table())
+        .and_then(|x| x.get("name"))
+        .and_then(|x| x.as_str());
+    let archive_base = match lib_name {
+        None => crate_name.replace("-", "_"),
+        Some(name) => name.to_string(),
     };
-        let archive_name = format!("lib{archive_base}.a");
-        // cargo flag would include --target-dir to direct to the same target directory
-        let output_path = cu::path!(&(&config.project.target_root) / "aarch64-unknown-hermit" / "release" / archive_name);
-        let linked_path = cu::path!(&(&config.project.output_root) / format!("lib{archive_base}_hermit.o"));
+    let archive_name = format!("lib{archive_base}.a");
+    // cargo flag would include --target-dir to direct to the same target directory
+    let output_path = cu::path!(
+        &(&config.project.target_root) / "aarch64-unknown-hermit" / "release" / archive_name
+    );
+    let linked_path =
+        cu::path!(&(&config.project.output_root) / format!("lib{archive_base}_hermit.o"));
 
-    let dependencies = cu::check!(manifest.get("dependencies").and_then(|x| x.as_table()), "cannot find [dependencies] in Cargo.toml")?;
+    let dependencies = cu::check!(
+        manifest.get("dependencies").and_then(|x| x.as_table()),
+        "cannot find [dependencies] in Cargo.toml"
+    )?;
 
     let has_cxx = dependencies.get("cxx").is_some();
     let has_build_script = cu::path!(&manifest_dir / "build.rs").is_file();
@@ -70,32 +87,26 @@ pub fn resolve_project(config: &Config) -> cu::Result<RustProject> {
         NotFound,
         NotSetPath,
         NotRightPath,
-        Ok
+        Ok,
     }
     let megaton_state = match dependencies.get("megaton") {
         None => MegatonDepState::NotFound,
-        Some(megaton) => {
-            match megaton.as_table() {
+        Some(megaton) => match megaton.as_table() {
+            None => MegatonDepState::NotSetPath,
+            Some(megaton) => match megaton.get("path") {
                 None => MegatonDepState::NotSetPath,
-                Some(megaton) => {
-                    match megaton.get("path") {
-                        None => MegatonDepState::NotSetPath,
-                        Some(p) => {
-                            match p.as_str() {
-                                None => MegatonDepState::NotRightPath,
-                                Some(p) => {
-                                    if p == expected_megaton_path {
-                                        MegatonDepState::NotRightPath
-                                    } else {
-                                        MegatonDepState::Ok
-                                    }
-                                }
-                            }
+                Some(p) => match p.as_str() {
+                    None => MegatonDepState::NotRightPath,
+                    Some(p) => {
+                        if p == expected_megaton_path {
+                            MegatonDepState::NotRightPath
+                        } else {
+                            MegatonDepState::Ok
                         }
                     }
-                }
-            }
-        }
+                },
+            },
+        },
     };
     let megaton_not_ok = match megaton_state {
         MegatonDepState::NotFound => {
@@ -110,23 +121,29 @@ pub fn resolve_project(config: &Config) -> cu::Result<RustProject> {
             cu::warn!("'megaton' dependency is not set to the expected local path");
             true
         }
-        MegatonDepState::Ok => false
+        MegatonDepState::Ok => false,
     };
     if megaton_not_ok {
-        cu::hint!("please add or update the dependency to `megaton.path = \"{expected_megaton_path}\"`");
+        cu::hint!(
+            "please add or update the dependency to `megaton.path = \"{expected_megaton_path}\"`"
+        );
     }
 
-    Ok(RustProject { 
-        has_cxx, has_build_script, output_path, 
+    Ok(RustProject {
+        has_cxx,
+        has_build_script,
+        output_path,
         linked_path,
-        include_namespace: crate_name.to_string() })
+        include_namespace: crate_name.to_string(),
+    })
 }
 
 /// Run `cargo metadata` to check cxx version
 pub fn check_cxx_version_with_cargo_metadata(manifest_path: &Path) -> cu::Result<()> {
-    let metadata = cu::check!(MetadataCommand::new()
-        .manifest_path(manifest_path)
-        .exec(), "failed to execute cargo-metadata")?;
+    let metadata = cu::check!(
+        MetadataCommand::new().manifest_path(manifest_path).exec(),
+        "failed to execute cargo-metadata"
+    )?;
     let cxx = match metadata.packages.iter().find(|pack| pack.name == "cxx") {
         Some(package) => package,
         None => {
@@ -162,39 +179,56 @@ fn check_cxx_version(current_version: &Version) -> cu::Result<()> {
 /// additional files needed for later steps
 #[cu::context("failed to run cargo build script")]
 pub async fn run_build_script(
-    config: &Config, 
+    config: &Config,
     toolchain: &ToolchainEnv,
     rust_env: &RustEnv,
 ) -> cu::Result<()> {
     // cargo doesn't have a way to just run the build script, the best option is to run check
-    run_cargo("running cargo build script", config, toolchain, rust_env, ["check"]).await
+    run_cargo(
+        "running cargo build script",
+        config,
+        toolchain,
+        rust_env,
+        ["check"],
+    )
+    .await
 }
 
 /// Build the full crate
 #[cu::context("failed to build rust crate")]
 pub async fn run_build_full(
-    config: &Config, 
+    config: &Config,
     toolchain: &ToolchainEnv,
     rust_env: &RustEnv,
 ) -> cu::Result<()> {
-    run_cargo("running cargo build", config, toolchain, rust_env, ["build"]).await
+    run_cargo(
+        "running cargo build",
+        config,
+        toolchain,
+        rust_env,
+        ["build"],
+    )
+    .await
 }
 
 /// Run cargo command in the current project
-async fn run_cargo<C: IntoIterator<Item=impl AsRef<OsStr>>>(
+async fn run_cargo<C: IntoIterator<Item = impl AsRef<OsStr>>>(
     desc: &str,
-    config: &Config, 
+    config: &Config,
     toolchain: &ToolchainEnv,
     rust_env: &RustEnv,
-    command: C
+    command: C,
 ) -> cu::Result<()> {
     let build_config = config.build_config()?;
     let rustflags = &build_config.flags.resolved.rustflags;
     let cargo_flags = &build_config.flags.resolved.cargo;
     let c_flags = build_config.flags.resolved.c.join(" ");
-    let cxx_flags = &build_config.flags.resolved.cxx.join(" ");
+    let cxx_flags = build_config.flags.resolved.cxx.join(" ");
     // cargo doesn't have a way to just run the build script, the best option is to run check
-    let (child, bar) = rust_env.host.cargo.command()
+    let (child, bar) = rust_env
+        .host
+        .cargo
+        .command()
         .env("RUSTFLAGS", rustflags)
         .env("CRATE_CC_NO_DEFAULTS", "1") // stop cc crate from adding default flags
         .env("CC_aarch64-unknown-hermit", &toolchain.devkita64.cc)
@@ -202,11 +236,16 @@ async fn run_cargo<C: IntoIterator<Item=impl AsRef<OsStr>>>(
         .env("AR_aarch64-unknown-hermit", &toolchain.devkita64.ar)
         .env("CFLAGS_aarch64-unknown-hermit", &c_flags)
         .env("CXXFLAGS_aarch64-unknown-hermit", &cxx_flags)
-        .add(cu::args![MEGATON_TOOLCHAIN_SELECTOR, "--manifest-path", &config.rust.cargo_manifest])
+        .add(cu::args![
+            MEGATON_TOOLCHAIN_SELECTOR,
+            "--manifest-path",
+            &config.rust.cargo_manifest
+        ])
         .args(cargo_flags)
         .args(command)
         .preset(cu::pio::cargo(desc))
-        .co_spawn().await?;
+        .co_spawn()
+        .await?;
     child.co_wait_nz().await?;
     bar.done();
     Ok(())
@@ -215,21 +254,33 @@ async fn run_cargo<C: IntoIterator<Item=impl AsRef<OsStr>>>(
 /// Run cxxbridge over rust files that need to generate .cc and header files. Return a list
 /// of source files that need to be compiled
 #[cu::context("failed to generate cxxbridge files")]
-pub async fn run_cxxbridge(config: &Config, toolchain: &ToolchainEnv, project: &RustProject) -> cu::Result<Vec<PathBuf>> {
+pub async fn run_cxxbridge(
+    config: &Config,
+    toolchain: &ToolchainEnv,
+    project: &RustProject,
+) -> cu::Result<Vec<PathBuf>> {
     let pool = cu::co::pool(-1);
     let header_suffix = &config.rust.header_suffix;
-    let header_extension = if header_suffix .is_empty() {
+    let header_extension = if header_suffix.is_empty() {
         None
-    } else {Some(format!(".rs{header_suffix}"))};
+    } else {
+        Some(format!(".rs{header_suffix}"))
+    };
     let inc_root = config.project.out_inc.join(&project.include_namespace);
     let mut handles = vec![];
     let source_root = &config.rust.source;
     let mut walker = cu::fs::walker(source_root);
     walker.follow_links(true);
-    let walk = 
-    cu::check!(walker.walk(), "failed to process rust source directory with cxxbridge: {}", source_root.display())?;
+    let walk = cu::check!(
+        walker.walk(),
+        "failed to process rust source directory with cxxbridge: {}",
+        source_root.display()
+    )?;
 
-    let bar = cu::progress("running cxxbridge").total(0).percentage(false).eta(false)
+    let bar = cu::progress("running cxxbridge")
+        .total(0)
+        .percentage(false)
+        .eta(false)
         .spawn();
 
     for entry in walk {
@@ -237,7 +288,10 @@ pub async fn run_cxxbridge(config: &Config, toolchain: &ToolchainEnv, project: &
             cu::debug!("ignoring entry with error");
             continue;
         };
-        if !entry.file_name().is_some_and(|x| x.as_encoded_bytes().ends_with(b".rs")) {
+        if !entry
+            .file_name()
+            .is_some_and(|x| x.as_encoded_bytes().ends_with(b".rs"))
+        {
             continue;
         }
         let out_inc_path = {
@@ -253,16 +307,17 @@ pub async fn run_cxxbridge(config: &Config, toolchain: &ToolchainEnv, project: &
         let cxxbridge = toolchain.cxxbridge.path.clone();
         let bar = bar.clone();
 
-
         let handle = pool.spawn(async move {
-            let (child, stdout, stderr) = cxxbridge.command()
-            .add(cu::args![&input_path])
+            let (child, stdout, stderr) = cxxbridge
+                .command()
+                .add(cu::args![&input_path])
                 .stdout(cu::pio::string())
                 .stderr(cu::pio::string())
                 .stdin_null()
-                .co_spawn().await?;
+                .co_spawn()
+                .await?;
             let result = child.co_wait_nz().await;
-            if let Err(e) = result{
+            if let Err(e) = result {
                 let stderr = stderr.co_join().await??;
                 if stderr.starts_with("cxxbridge: no #[cxx::bridge] module found") {
                     cu::progress!(bar += 1);
@@ -273,14 +328,16 @@ pub async fn run_cxxbridge(config: &Config, toolchain: &ToolchainEnv, project: &
             let stdout = stdout.co_join().await??;
             cu::fs::write(&src_cc_path, stdout)?;
 
-            let (child, stdout, stderr) = cxxbridge.command()
-            .add(cu::args![&input_path, "--header"])
+            let (child, stdout, stderr) = cxxbridge
+                .command()
+                .add(cu::args![&input_path, "--header"])
                 .stdout(cu::pio::string())
                 .stderr(cu::pio::string())
                 .stdin_null()
-                .co_spawn().await?;
+                .co_spawn()
+                .await?;
             let result = child.co_wait_nz().await;
-            if let Err(e) = result{
+            if let Err(e) = result {
                 let stderr = stderr.co_join().await??;
                 cu::rethrow!(e, "cxxbridge failed to generate header: {stderr}");
             }
@@ -288,7 +345,6 @@ pub async fn run_cxxbridge(config: &Config, toolchain: &ToolchainEnv, project: &
             cu::fs::write(&out_inc_path, stdout)?;
 
             cu::progress!(bar += 1, "processed {}", src_cc_path.try_to_rel().display());
-
 
             Ok(Some(src_cc_path))
         });
@@ -313,16 +369,17 @@ pub async fn run_cxxbridge(config: &Config, toolchain: &ToolchainEnv, project: &
                 cu::error!("{e:?}");
                 error_count += 1;
             }
-            Ok(None) => { }
-            Ok(Some(x)) => {
-                src_cc_paths.push(x)
-            }
+            Ok(None) => {}
+            Ok(Some(x)) => src_cc_paths.push(x),
         }
     }
     if error_count > 0 {
         cu::bail!("{error_count} errors while running cxxbridge");
     }
-    bar.done_with_message(&format!("processed {} files with cxxbridge attributes", src_cc_paths.len()));
+    bar.done_with_message(&format!(
+        "processed {} files with cxxbridge attributes",
+        src_cc_paths.len()
+    ));
 
     Ok(src_cc_paths)
 }
@@ -338,7 +395,7 @@ pub async fn link_hermit_kernel(
     rust_project: &RustProject,
 ) -> cu::Result<bool> {
     // find hermit objects
-    let hermit_object_dir = cu::path!(&(&config.project.lib_root) / "mega-cpp"/"lib" / "hermit");
+    let hermit_object_dir = cu::path!(&(&config.project.lib_root) / "mega-cpp" / "lib" / "hermit");
     let mut objects = vec![];
     for entry in cu::fs::read_dir(&hermit_object_dir)? {
         let entry = entry?;
@@ -346,7 +403,10 @@ pub async fn link_hermit_kernel(
         if !path.is_file() {
             continue;
         }
-        if path.extension().is_some_and(|x| x.as_encoded_bytes() == b".o") {
+        if path
+            .extension()
+            .is_some_and(|x| x.as_encoded_bytes() == b".o")
+        {
             objects.push(path);
         }
     }
@@ -355,11 +415,7 @@ pub async fn link_hermit_kernel(
     let archive_path = &rust_project.output_path;
     let linked_path = &rust_project.linked_path;
 
-    let is_up_to_date = is_linked_up_to_date(
-        linked_path,
-        archive_path,
-        &objects
-    );
+    let is_up_to_date = is_linked_up_to_date(linked_path, archive_path, &objects);
 
     if is_up_to_date {
         return Ok(false);
@@ -374,14 +430,20 @@ pub async fn link_hermit_kernel(
 
     // ld -r -o output.o hermit.o ... --whole-archive librust.a --no-whole-archive
     let ld = Path::new(&toolchain.devkita64.ld);
-    let (child, stdout, stderr) = ld.command()
-    .add(cu::args!["-r", "-o", &temp_linked_path])
-    .args(&objects)
-        .add(cu::args!["--whole-archive", archive_path, "--no-whole-archive"])
+    let (child, stdout, stderr) = ld
+        .command()
+        .add(cu::args!["-r", "-o", &temp_linked_path])
+        .args(&objects)
+        .add(cu::args![
+            "--whole-archive",
+            archive_path,
+            "--no-whole-archive"
+        ])
         .stdout(cu::pio::buffer())
         .stderr(cu::pio::buffer())
         .stdin_null()
-        .co_spawn().await?;
+        .co_spawn()
+        .await?;
     let result = child.co_wait_nz().await;
     if let Ok(stderr) = stderr.co_join().await.flatten() {
         cu::print!("{}", String::from_utf8_lossy(&stderr));
@@ -394,9 +456,13 @@ pub async fn link_hermit_kernel(
     }
 
     // objcopy --localize-symbols=hermit.txt object.o
-    let hermit_syscall_file = cu::path!(&(&config.project.lib_root) / "mega-cpp"/"etc" / "hermit_syscalls.txt").into_utf8()?;
+    let hermit_syscall_file =
+        cu::path!(&(&config.project.lib_root) / "mega-cpp" / "etc" / "hermit_syscalls.txt")
+            .into_utf8()?;
     if hermit_syscall_file.contains('"') {
-        cu::bail!("library file cannot contain quotes - please move the project to another location");
+        cu::bail!(
+            "library file cannot contain quotes - please move the project to another location"
+        );
     }
     let localize_symbol_flag = if hermit_syscall_file.contains(' ') {
         format!("--localize-symbols=\"{hermit_syscall_file}\"")
@@ -405,12 +471,15 @@ pub async fn link_hermit_kernel(
     };
 
     let objcopy = Path::new(&toolchain.devkita64.objcopy);
-    let (child, stdout, stderr) = objcopy.command().arg(localize_symbol_flag)
+    let (child, stdout, stderr) = objcopy
+        .command()
+        .arg(localize_symbol_flag)
         .arg(&temp_linked_path)
         .stdout(cu::pio::buffer())
         .stderr(cu::pio::buffer())
         .stdin_null()
-        .co_spawn().await?;
+        .co_spawn()
+        .await?;
     let result = child.co_wait_nz().await;
     if let Err(e) = result {
         if let Ok(stderr) = stderr.co_join().await.flatten() {
@@ -424,7 +493,10 @@ pub async fn link_hermit_kernel(
 
     cu::fs::copy(&temp_linked_path, linked_path)?;
     if let Err(e) = cu::fs::remove(&temp_linked_path) {
-        cu::debug!("failed to remove temp file: {}: {e:?}", temp_linked_path.display());
+        cu::debug!(
+            "failed to remove temp file: {}: {e:?}",
+            temp_linked_path.display()
+        );
     }
 
     Ok(true)
@@ -434,7 +506,7 @@ pub async fn link_hermit_kernel(
 fn is_linked_up_to_date(
     linked_path: &Path,
     archive_path: &Path,
-    hermit_objects: &[PathBuf]
+    hermit_objects: &[PathBuf],
 ) -> bool {
     if !linked_path.exists() {
         cu::debug!("need to relink rust with hermit kernel: output does not exist");
@@ -449,7 +521,7 @@ fn is_linked_up_to_date(
             cu::debug!("need to relink rust with hermit kernel: output does not exist");
             return false;
         }
-        Ok(Some(t)) => t
+        Ok(Some(t)) => t,
     };
     let archive_mtime = match cu::fs::get_mtime(archive_path) {
         Err(e) => {
@@ -457,10 +529,13 @@ fn is_linked_up_to_date(
             return false;
         }
         Ok(None) => {
-            cu::warn!("failed to get mtime of rust static archive: archive does not exist: {}", archive_path.display());
+            cu::warn!(
+                "failed to get mtime of rust static archive: archive does not exist: {}",
+                archive_path.display()
+            );
             return false;
         }
-        Ok(Some(t)) => t
+        Ok(Some(t)) => t,
     };
 
     if archive_mtime > linked_mtime {
@@ -475,12 +550,18 @@ fn is_linked_up_to_date(
                 return false;
             }
             Ok(None) => {
-                cu::warn!("failed to get mtime of hermit object: file does not exist: {}", obj.display());
+                cu::warn!(
+                    "failed to get mtime of hermit object: file does not exist: {}",
+                    obj.display()
+                );
                 return false;
             }
             Ok(Some(t)) => {
                 if t > linked_mtime {
-                    cu::debug!("need to relink rust with hermit kernel: hermit object {} changed", obj.display());
+                    cu::debug!(
+                        "need to relink rust with hermit kernel: hermit object {} changed",
+                        obj.display()
+                    );
                     return false;
                 }
             }

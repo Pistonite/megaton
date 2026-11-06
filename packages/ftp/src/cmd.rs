@@ -23,13 +23,19 @@ impl Cmd {
                 let ftp_config = config.ftp_config()?;
                 let profile = &config.project.profile;
                 let server = get_server(common.server)?;
-                cu::check!(run_upload(&server, profile, &ftp_config).await, "upload failed")?;
+                cu::check!(
+                    run_upload(&server, profile, ftp_config).await,
+                    "upload failed"
+                )?;
             }
             SubCmd::Download { delete, common } => {
                 let config = common.load_config(dir)?;
                 let ftp_config = config.ftp_config()?;
                 let server = get_server(common.server)?;
-                cu::check!(run_download(&server, &ftp_config, !delete).await, "download failed")?;
+                cu::check!(
+                    run_download(&server, ftp_config, !delete).await,
+                    "download failed"
+                )?;
             }
         }
         Ok(())
@@ -68,7 +74,7 @@ impl AsProfileFlag for SubCmd {
     fn as_profile_mut(&mut self) -> Option<&mut Option<String>> {
         match self {
             SubCmd::Upload { common } => common.as_profile_mut(),
-            SubCmd::Download { common, .. } => common.as_profile_mut()
+            SubCmd::Download { common, .. } => common.as_profile_mut(),
         }
     }
 }
@@ -91,7 +97,6 @@ pub struct CommonOpts {
     common: cu::cli::Flags,
 }
 impl CommonOpts {
-    
     fn load_config(&self, dir: Option<&str>) -> cu::Result<Config> {
         let opts = ConfigLoadOpts {
             resolve: true,
@@ -109,9 +114,7 @@ impl AsProfileFlag for CommonOpts {
     }
 }
 
-async fn run_upload(
-    server: &str, profile: &str, config: &FtpConfig
-) -> cu::Result<()> {
+async fn run_upload(server: &str, profile: &str, config: &FtpConfig) -> cu::Result<()> {
     const BIG_FILE: usize = 0x4000000; // 64MB
     let mut upload_path_maps = BTreeMap::<String, BTreeMap<String, Vec<u8>>>::new();
     let mut count = 0;
@@ -125,13 +128,22 @@ async fn run_upload(
         }
         let content = cu::fs::read(local_path)?;
         let server_path = Path::new(&task.server_path);
-        let name = cu::check!(server_path.file_name_str(), "invalid server file path; must be the target file and not directory: '{}'", server_path.display())?;
-        let directory = cu::check!(server_path.parent(), "invalid server file path; must be the target file and not directory: '{}'", server_path.display())?;
+        let name = cu::check!(
+            server_path.file_name_str(),
+            "invalid server file path; must be the target file and not directory: '{}'",
+            server_path.display()
+        )?;
+        let directory = cu::check!(
+            server_path.parent(),
+            "invalid server file path; must be the target file and not directory: '{}'",
+            server_path.display()
+        )?;
         let directory = directory.as_utf8()?;
 
         if content.len() >= BIG_FILE {
-            let mut ftp = FtpClient::connect(&server).await?;
-            ftp.upload(directory, vec![(name.to_string(), content)]).await?;
+            let mut ftp = FtpClient::connect(server).await?;
+            ftp.upload(directory, vec![(name.to_string(), content)])
+                .await?;
             ftp.quit().await;
             count += 1;
             continue;
@@ -150,7 +162,7 @@ async fn run_upload(
         }
     }
 
-    let mut ftp = FtpClient::connect(&server).await?;
+    let mut ftp = FtpClient::connect(server).await?;
     for (dir, files) in upload_path_maps {
         let files = files.into_iter().collect::<Vec<_>>();
         count += files.len();
@@ -161,15 +173,13 @@ async fn run_upload(
     Ok(())
 }
 
-async fn run_download(
-    server: &str, config: &FtpConfig, keep: bool
-) -> cu::Result<()> {
-    let mut ftp = FtpClient::connect(&server).await?;
+async fn run_download(server: &str, config: &FtpConfig, keep: bool) -> cu::Result<()> {
+    let mut ftp = FtpClient::connect(server).await?;
     for task in config.resolved_download_tasks() {
         let local_path = &task.local_path;
         let server_path = &task.server_path;
         ftp.download(server_path, local_path.as_utf8()?, keep)
-        .await?;
+            .await?;
     }
     ftp.quit().await;
     Ok(())

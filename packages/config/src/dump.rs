@@ -1,60 +1,54 @@
-
 use cu::pre::*;
 
 /// Dump a value given the key
 pub fn dump(key: &str, mut value: json::Value) -> cu::Result<json::Value> {
-        let mut rest = key;
-        let mut current_path = String::new();
-        loop {
-            let next = cu::check!(
-                parse_next_key(rest),
-                "error parsing config key"
-            )?;
-            let key = match next {
-                Some((key, next_rest)) => {
-                    rest = next_rest;
-                    key
-                }
-                None => return Ok(value),
-            };
-            match value {
-                json::Value::Object(mut map) => match map.remove(key) {
-                    None => {
-                        let keys = format!("{:?}", map.keys().collect::<Vec<_>>());
-                        cu::bail!(
-                            "invalid key '{key}' at '{current_path}', valid keys are: {keys}"
-                        );
-                    }
-                    Some(v) => value = v,
-                },
-                json::Value::Array(mut values) => {
-                    let len = values.len();
-                    let num = cu::parse::<usize>(key.trim());
-                    let num = cu::check!(
-                        num,
-                        "invalid key '{key}' at '{current_path}', valid keys are: [0 - {}] for array of length {len}",
-                        len - 1
-                    )?;
-                    if num >= len {
-                        cu::bail!("index {num} out of bound: length at '{current_path}' is {len}");
-                    }
-                    value = values.swap_remove(num);
-                }
-                x => {
-                    let stringified = match json::stringify(&x) {
-                        Ok(x) => x,
-                        Err(_) => format!("{x:?}"),
-                    };
-                    cu::bail!(
-                        "invalid key '{key}' at '{current_path}', is a scalar value: {stringified}"
-                    );
-                }
+    let mut rest = key;
+    let mut current_path = String::new();
+    loop {
+        let next = cu::check!(parse_next_key(rest), "error parsing config key")?;
+        let key = match next {
+            Some((key, next_rest)) => {
+                rest = next_rest;
+                key
             }
-            if !current_path.is_empty() {
-                current_path.push('.');
+            None => return Ok(value),
+        };
+        match value {
+            json::Value::Object(mut map) => match map.remove(key) {
+                None => {
+                    let keys = format!("{:?}", map.keys().collect::<Vec<_>>());
+                    cu::bail!("invalid key '{key}' at '{current_path}', valid keys are: {keys}");
+                }
+                Some(v) => value = v,
+            },
+            json::Value::Array(mut values) => {
+                let len = values.len();
+                let num = cu::parse::<usize>(key.trim());
+                let num = cu::check!(
+                    num,
+                    "invalid key '{key}' at '{current_path}', valid keys are: [0 - {}] for array of length {len}",
+                    len - 1
+                )?;
+                if num >= len {
+                    cu::bail!("index {num} out of bound: length at '{current_path}' is {len}");
+                }
+                value = values.swap_remove(num);
             }
-            current_path.push_str(key);
+            x => {
+                let stringified = match json::stringify(&x) {
+                    Ok(x) => x,
+                    Err(_) => format!("{x:?}"),
+                };
+                cu::bail!(
+                    "invalid key '{key}' at '{current_path}', is a scalar value: {stringified}"
+                );
+            }
         }
+        if !current_path.is_empty() {
+            current_path.push('.');
+        }
+        current_path.push_str(key);
+    }
 }
 
 /// Parse the next key segment
@@ -63,26 +57,22 @@ fn parse_next_key(key: &str) -> cu::Result<Option<(&str, &str)>> {
     if key.is_empty() {
         return Ok(None);
     }
-    let c1 = cu::some!(key.chars().next()) ;
+    let c1 = cu::some!(key.chars().next());
     match c1 {
         '"' => {
             let i = key[1..].find('"');
-            let i =cu::check!(i, "unclosed double-quote in key: {key}")?;
-            Ok(Some((&key[1..i+1], trim_rest(&key[i+2..]))))
+            let i = cu::check!(i, "unclosed double-quote in key: {key}")?;
+            Ok(Some((&key[1..i + 1], trim_rest(&key[i + 2..]))))
         }
         '\'' => {
             let i = key[1..].find('\'');
-            let i =cu::check!(i, "unclosed single-quote in key: {key}")?;
-            Ok(Some((&key[1..i+1], trim_rest(&key[i+2..]))))
+            let i = cu::check!(i, "unclosed single-quote in key: {key}")?;
+            Ok(Some((&key[1..i + 1], trim_rest(&key[i + 2..]))))
         }
-        _ => {
-            match key.find('.') {
-                None => Ok(Some((key.trim(), ""))),
-                Some(i) => {
-                    Ok(Some((key[..i].trim(),trim_rest(&key[i+1..]))))
-                }
-            }
-        }
+        _ => match key.find('.') {
+            None => Ok(Some((key.trim(), ""))),
+            Some(i) => Ok(Some((key[..i].trim(), trim_rest(&key[i + 1..])))),
+        },
     }
 }
 
@@ -105,23 +95,15 @@ pub enum DumpFormat {
     #[default]
     Raw,
     /// Like Raw, but array and objects are space-separated instead of one per line.
-    OneLine
+    OneLine,
 }
 impl DumpFormat {
     pub fn stringify(self, value: &json::Value, hex: bool) -> cu::Result<String> {
         match self {
-            Self::Json => {
-                json::stringify(&value)
-            }
-            Self::JsonPretty => {
-                json::stringify_pretty(&value)
-            }
-            Self::Raw => {
-                json_obj_to_raw(&value, '\n', hex)
-            }
-            Self::OneLine => {
-                json_obj_to_raw(&value, ' ', hex)
-            }
+            Self::Json => json::stringify(&value),
+            Self::JsonPretty => json::stringify_pretty(&value),
+            Self::Raw => json_obj_to_raw(value, '\n', hex),
+            Self::OneLine => json_obj_to_raw(value, ' ', hex),
         }
     }
 }
@@ -138,7 +120,7 @@ fn json_obj_to_raw(value: &json::Value, join: char, hex: bool) -> cu::Result<Str
             }
         }
         json::Value::Object(map) => {
-            for (k,v) in map {
+            for (k, v) in map {
                 if !buf.is_empty() {
                     buf.push(join);
                 }
@@ -162,9 +144,9 @@ fn json_to_raw(out: &mut String, value: &json::Value, hex: bool) -> cu::Result<(
         json::Value::Null => out.push_str("null"),
         json::Value::Bool(x) => {
             if *x {
-                out .push_str( "true");
+                out.push_str("true");
             } else {
-                out .push_str( "false");
+                out.push_str("false");
             }
         }
         json::Value::Number(n) => {
@@ -175,13 +157,10 @@ fn json_to_raw(out: &mut String, value: &json::Value, hex: bool) -> cu::Result<(
                 let _ = write!(out, "{n}");
             }
         }
-        json::Value::String(x) => {
-            out.push_str(x)
-        }
+        json::Value::String(x) => out.push_str(x),
     }
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -237,7 +216,10 @@ mod tests {
     #[test]
     fn double_quoted_segment() -> cu::Result<()> {
         // a quoted segment may contain separators and whitespace
-        assert_eq!(parse_next_key(r#""foo.bar".baz"#)?, Some(("foo.bar", "baz")));
+        assert_eq!(
+            parse_next_key(r#""foo.bar".baz"#)?,
+            Some(("foo.bar", "baz"))
+        );
         assert_eq!(parse_next_key(r#"" foo ".bar"#)?, Some((" foo ", "bar")));
         assert_eq!(parse_next_key(r#""foo""#)?, Some(("foo", "")));
         assert_eq!(parse_next_key(r#"  "foo" . bar"#)?, Some(("foo", "bar")));

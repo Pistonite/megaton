@@ -4,7 +4,9 @@
 use std::path::Path;
 
 use cu::pre::*;
-use megaton_config::toolchain::{HomeEnv, MEGATON_TOOLCHAIN_NAME, RustEnv, RustEnvPartial, RustHostEnv};
+use megaton_config::toolchain::{
+    HomeEnv, MEGATON_TOOLCHAIN_NAME, RustEnv, RustEnvPartial, RustHostEnv,
+};
 
 /// The Rust compiler repo
 static RUST_REPO: &str = "https://github.com/rust-lang/rust";
@@ -45,7 +47,10 @@ pub fn inspect() {
 #[cu::context("failed to install megaton rust toolchain")]
 pub fn install(home: &HomeEnv, keep: bool, mut clean: bool) -> cu::Result<()> {
     let rust_env = RustEnvPartial::resolve();
-    let host_env = cu::check!(rust_env.host, "cannot find rust toolchain, which is required to install megaton's custom rust toolchain; please install rustup")?;
+    let host_env = cu::check!(
+        rust_env.host,
+        "cannot find rust toolchain, which is required to install megaton's custom rust toolchain; please install rustup"
+    )?;
 
     match rust_env.megaton {
         None => {
@@ -53,16 +58,17 @@ pub fn install(home: &HomeEnv, keep: bool, mut clean: bool) -> cu::Result<()> {
         }
         Some(env) => {
             if env.commit_hash == BLESSED_COMMIT {
-                cu::warn!(
-                "found existing toolchain installation that matched blessed commit hash"
-            );
+                cu::warn!("found existing toolchain installation that matched blessed commit hash");
                 cu::hint!(
-                "if you want to reinstall it, remove it first with 'megaton toolchain remove'."
-            );
+                    "if you want to reinstall it, remove it first with 'megaton toolchain remove'."
+                );
                 return Ok(());
             }
             // older toolchain installed, proceed with reinstallment
-            cu::info!("found older toolchain installation with commit hash: {}", env.commit_hash);
+            cu::info!(
+                "found older toolchain installation with commit hash: {}",
+                env.commit_hash
+            );
             remove(home)?;
         }
     }
@@ -92,7 +98,7 @@ pub fn install(home: &HomeEnv, keep: bool, mut clean: bool) -> cu::Result<()> {
     }
     if clean {
         cu::warn!("performing full re-checkout");
-        clone_rust_source( &build_dep.git, &rust_path)?;
+        clone_rust_source(&build_dep.git, &rust_path)?;
     }
     checkout_blessed_commit(&rust_path)?;
 
@@ -144,7 +150,7 @@ pub fn install(home: &HomeEnv, keep: bool, mut clean: bool) -> cu::Result<()> {
                     bootstrap_toml.push_str(llvm_targets);
                 }
                 "{{MEGATON_HOST_TRIPLE}}" => {
-                    bootstrap_toml.push_str(&host_triple);
+                    bootstrap_toml.push_str(host_triple);
                 }
                 "{{MEGATON_INSTALL_PREFIX}}" => {
                     bootstrap_toml.push_str(install_prefix);
@@ -199,7 +205,8 @@ pub fn install(home: &HomeEnv, keep: bool, mut clean: bool) -> cu::Result<()> {
     }
 
     let install_location = home.rust_install_path();
-    let toolchain_link_result = host_env.rustup
+    let toolchain_link_result = host_env
+        .rustup
         .command()
         .add(cu::args![
             "toolchain",
@@ -246,12 +253,16 @@ pub fn remove(home: &HomeEnv) -> cu::Result<()> {
     if rust_env.megaton.is_none() {
         cu::info!("megaton rust toolchain is not installed");
     }
-    let host_env = cu::check!(rust_env.host, "cannot find rust toolchain, which is required to install megaton's custom rust toolchain; please install rustup")?;
+    let host_env = cu::check!(
+        rust_env.host,
+        "cannot find rust toolchain, which is required to install megaton's custom rust toolchain; please install rustup"
+    )?;
     remove_internal(home, &host_env)
 }
 
 fn remove_internal(home: &HomeEnv, host_env: &RustHostEnv) -> cu::Result<()> {
-    host_env.rustup
+    host_env
+        .rustup
         .command()
         .args(["toolchain", "uninstall", MEGATON_TOOLCHAIN_NAME])
         .name("rustup")
@@ -262,8 +273,8 @@ fn remove_internal(home: &HomeEnv, host_env: &RustHostEnv) -> cu::Result<()> {
     let rust_env = RustEnvPartial::resolve();
     if rust_env.megaton.is_some() {
         cu::bail!(
-        "failed to uninstall toolchain. Please run 'rustup toolchain uninstall {MEGATON_TOOLCHAIN_NAME}' to uninstall it manually, then try again."
-    );
+            "failed to uninstall toolchain. Please run 'rustup toolchain uninstall {MEGATON_TOOLCHAIN_NAME}' to uninstall it manually, then try again."
+        );
     }
 
     let install_path = home.rust_install_path();

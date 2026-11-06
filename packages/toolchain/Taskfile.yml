@@ -31,3 +31,6 @@ tasks:
     - task: cargo:fmt-check
   fix:
     - task: cargo:fmt-fix
+
+  clean:
+    - rm -rf rust

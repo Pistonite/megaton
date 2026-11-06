@@ -1,3 +1,2 @@
-
-pub mod cmd;
 mod client;
+pub mod cmd;

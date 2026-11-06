@@ -23,7 +23,11 @@ pub trait Resolve {
     ///
     /// Toolchain maybe optional if the caller decides to not resolve the toolchain
     /// environment. The implementation can either pick default values or bail
-    fn resolve(&mut self, project: &ProjectTargetEnv, toolchain: Option<&ToolchainEnv>) -> cu::Result<()>;
+    fn resolve(
+        &mut self,
+        project: &ProjectTargetEnv,
+        toolchain: Option<&ToolchainEnv>,
+    ) -> cu::Result<()>;
 }
 
 /// Trait for validating the config

@@ -2,5 +2,5 @@
 
 pub mod cmd;
 pub mod config_file;
-pub mod toolchain;
 pub mod dump;
+pub mod toolchain;

@@ -16,8 +16,8 @@ includes:
 
   # libraries
   mega-cpp:      { taskfile: packages/mega-cpp,      dir: packages/mega-cpp,      internal: true }
-  mega-rs:       { taskfile: packages/mega-rs,       dir: packages/mega-rs,       internal: true }
-  mega-rspmacro: { taskfile: packages/mega-rspmacro, dir: packages/mega-rspmacro, internal: true }
+  # mega-rs:       { taskfile: packages/mega-rs,       dir: packages/mega-rs,       internal: true }
+  # mega-rspmacro: { taskfile: packages/mega-rspmacro, dir: packages/mega-rspmacro, internal: true }
 
   # other
   docs:          { taskfile: packages/docs,             dir: packages/docs,            internal: true }
@@ -40,25 +40,41 @@ tasks:
     cmds:
       - task: cargo-binstall
         vars:
-          PACKAGES: lisensor mdbook shwoop layered-crate
-  #
-  # test:
-  #   - task: cli:test
-  #
-  # check:
-  #   - task: check-non-dkp
-  #   - task: check-dkp
-  # check-non-dkp:
+          PACKAGES: lisensor shwoop bindgen-cli
+  check:
+    desc: Check the code for issues
+    cmds:
+      - task: check-non-dkp
+      - task: check-dkp
+  check-non-dkp:
   #   - lisensor
-  #   - task: toolchain-build:check
-  #   - task: cli-build:check
-  #   - task: docker-build:check
-  #   - task: cli:check
+    - task: config:check
+    - task: packaging:check
+    - task: toolchain:check
+    - task: ftp:check
+    - task: buildtool:check
+    # - task: cli:check
+    # - task: docker-build:check
   #   - task: lib:check-rs
-  # check-dkp:
-  #   - task: lib:configure
+  check-dkp:
+    - task: mega-cpp:configure
+    - task: mega-cpp:check
   #   - task: lib:check-c
-  #
+  
+  fix:
+    desc: Fix formatting issues
+    cmds:
+      - cargo fmt --all
+      - task: mega-cpp:fix
+
+  test:
+    - task: config:test
+
+  package:
+    desc: Package megaton library. Required for building/running megaton-buildtool
+    cmds:
+      - task: packaging:make
+
   # build:
   #   - task: build-non-dkp
   #   - task: build-dkp
@@ -69,6 +85,14 @@ tasks:
   # build-dkp:
   #   - task: lib:configure
   #   - task: lib:build-c
+  #
+
+  clean:
+    - cargo clean
+    - task: mega-cpp:clean
+    - task: packaging:clean
+    - task: toolchain:clean
+
   #
   # upgrade:
   #   - cargo upgrade

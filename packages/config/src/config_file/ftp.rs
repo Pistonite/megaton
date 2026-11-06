@@ -46,11 +46,7 @@ impl ExtendProfile for FtpConfig {
     }
 }
 impl Resolve for FtpConfig {
-    fn resolve(
-        &mut self,
-        project: &ProjectTargetEnv,
-        _: Option<&ToolchainEnv>,
-    ) -> cu::Result<()> {
+    fn resolve(&mut self, project: &ProjectTargetEnv, _: Option<&ToolchainEnv>) -> cu::Result<()> {
         let resolved = config_file::resolve_default_token(vec![], self.uploads.as_deref(), || {
             vec![FtpUploadTask::Npdm, FtpUploadTask::Nso]
         });
@@ -58,9 +54,10 @@ impl Resolve for FtpConfig {
             .into_iter()
             .filter_map(|x| x.into_task(project))
             .collect();
-        let resolved = config_file::resolve_default_token(vec![], self.downloads.as_deref(), || {
-            vec![FtpDownloadTask::CrashReports, FtpDownloadTask::Logs]
-        });
+        let resolved =
+            config_file::resolve_default_token(vec![], self.downloads.as_deref(), || {
+                vec![FtpDownloadTask::CrashReports, FtpDownloadTask::Logs]
+            });
         self.resolved.downloads = resolved
             .into_iter()
             .filter_map(|x| x.into_task(project))
@@ -95,14 +92,20 @@ impl FtpUploadTask {
                 let title_id = project.title_id;
                 let server = format!("/atmosphere/contents/{title_id:016X}/exefs/main.npdm");
                 let local = project.out_npdm.clone();
-                Some(FtpTask { local_path: local, server_path: server })
+                Some(FtpTask {
+                    local_path: local,
+                    server_path: server,
+                })
             }
             Self::Nso => {
                 let title_id = project.title_id;
                 let nso_name = project.nso_name.as_ref()?;
                 let server = format!("/atmosphere/contents/{title_id:016X}/exefs/{nso_name}");
                 let local = project.out_nso.clone();
-                Some(FtpTask { local_path: local, server_path: server })
+                Some(FtpTask {
+                    local_path: local,
+                    server_path: server,
+                })
             }
             Self::Custom(t) => Some(t),
         }
@@ -133,12 +136,18 @@ impl FtpDownloadTask {
             Self::CrashReports => {
                 let local = project.output_root.join("crash_reports");
                 let server = "/atmosphere/crash_reports".to_string();
-                Some(FtpTask { local_path: local, server_path: server })
+                Some(FtpTask {
+                    local_path: local,
+                    server_path: server,
+                })
             }
             Self::Logs => {
                 let local = project.output_root.join("logs");
                 let server = format!("/megaton/{}/logs", project.module_name);
-                Some(FtpTask { local_path: local, server_path: server })
+                Some(FtpTask {
+                    local_path: local,
+                    server_path: server,
+                })
             }
             Self::Custom(t) => Some(t),
         }
@@ -264,7 +273,7 @@ mod tests {
     fn config_with_both_task_lists() -> cu::Result<()> {
         let config = json::parse::<FtpConfig>(
             r#"{
-                "uploads": ["<default>", "npdm", "subsdk", { "local": "a", "server": "b" }],
+                "uploads": ["<default>", "npdm", "nso", { "local": "a", "server": "b" }],
                 "downloads": ["<default>", "crash-reports"]
             }"#,
         )?;

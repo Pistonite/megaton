@@ -36,27 +36,27 @@ enum SubCmd {
     Check(cu::cli::Flags),
 
     /// Invoke cxxbridge, installs if needed
-    Cxxbridge(CmdCxxBridge)
+    Cxxbridge(CmdCxxBridge),
 }
 
-    /// Invoke cxxbridge, installs if needed
+/// Invoke cxxbridge, installs if needed
 #[derive(Debug, clap::Parser, AsRef)]
 #[clap(bin_name = "megaton-toolchain cxxbridge")]
 struct CmdCxxBridge {
-        /// Generate binding for this RS file
-        rs_file: Option<String>,
-        /// Generate header instead of CPP
-        #[clap(long)]
-        header: bool,
-        #[clap(flatten)]
+    /// Generate binding for this RS file
+    rs_file: Option<String>,
+    /// Generate header instead of CPP
+    #[clap(long)]
+    header: bool,
+    #[clap(flatten)]
     #[as_ref]
-        common: cu::cli::Flags,
+    common: cu::cli::Flags,
 }
 
 impl Cmd {
     pub fn run(self) -> cu::Result<()> {
-                cu::cli::print_to(cu::cli::Target::Stderr);
-                cu::cli::animate_to(Some(cu::cli::Target::Stderr));
+        cu::cli::print_to(cu::cli::Target::Stderr);
+        cu::cli::animate_to(Some(cu::cli::Target::Stderr));
         let home = HomeEnv::resolve()?;
         match self.command {
             SubCmd::Install { keep, clean, .. } => {
@@ -65,21 +65,21 @@ impl Cmd {
                 Ok(())
             }
             SubCmd::Remove(_) => {
-    crate::cxxbridge::remove(&home)?;
-    cu::info!("uninstalled cxxbridge");
-    crate::rust::remove(&home)?;
-    cu::info!("uninstalled megaton rust toolchain");
-    Ok(())
-            }
-            SubCmd::Clean(_) => {
-                crate::rust::clean(&home)
-            }
-            SubCmd::Check(_) => {
-    crate::cxxbridge::inspect(&home);
-    crate::rust::inspect();
+                crate::cxxbridge::remove(&home)?;
+                cu::info!("uninstalled cxxbridge");
+                crate::rust::remove(&home)?;
+                cu::info!("uninstalled megaton rust toolchain");
                 Ok(())
             }
-            SubCmd::Cxxbridge (CmdCxxBridge{rs_file, header, ..}  ) => {
+            SubCmd::Clean(_) => crate::rust::clean(&home),
+            SubCmd::Check(_) => {
+                crate::cxxbridge::inspect(&home);
+                crate::rust::inspect();
+                Ok(())
+            }
+            SubCmd::Cxxbridge(CmdCxxBridge {
+                rs_file, header, ..
+            }) => {
                 if rs_file.is_none() && !header {
                     cu::lv::disable_print_time();
                     cu::cli::print_help::<CmdCxxBridge>(false);
@@ -94,6 +94,9 @@ impl Cmd {
                     args.push("--header".to_string())
                 }
                 if args.is_empty() {
+                    cu::lv::disable_print_time();
+                    cu::cli::print_help::<CmdCxxBridge>(false);
+                    return Ok(());
                 }
                 crate::cxxbridge::invoke(&home, args)?;
                 Ok(())
@@ -108,7 +111,7 @@ impl AsRef<cu::cli::Flags> for Cmd {
             SubCmd::Remove(args) => args,
             SubCmd::Clean(args) => args,
             SubCmd::Check(args) => args,
-            SubCmd::Cxxbridge( command) => command.as_ref(),
+            SubCmd::Cxxbridge(command) => command.as_ref(),
         }
     }
 }

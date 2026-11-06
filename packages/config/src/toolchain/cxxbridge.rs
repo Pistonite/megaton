@@ -16,24 +16,23 @@ impl CxxBridgeEnv {
         let version = get_cxxbridge_version(&binary).unwrap_or_default();
         Self {
             path: binary,
-            version
+            version,
         }
     }
 
-    pub fn is_installed(&self) ->
-     bool {
+    pub fn is_installed(&self) -> bool {
         !self.version.is_empty() && self.path.is_file()
     }
 }
 
 #[cu::context("failed to resolve cxxbridge version")]
 fn get_cxxbridge_version(binary: &Path) -> cu::Result<String> {
-        let (child, stdout) = binary
-            .command()
-            .arg("--version")
-            .stdout(cu::pio::string())
-            .stdie_null()
-            .spawn()?;
+    let (child, stdout) = binary
+        .command()
+        .arg("--version")
+        .stdout(cu::pio::string())
+        .stdie_null()
+        .spawn()?;
     child.wait_nz()?;
     let version_string = stdout.join()??;
     let version = match version_string.strip_prefix("cxxbridge ") {

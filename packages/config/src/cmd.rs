@@ -54,12 +54,10 @@ impl Cmd {
         let key = self.key.as_deref().unwrap_or_default();
         let value = if self.env {
             match ToolchainEnv::resolve() {
-                Ok(tc) => {
-                    cu::check!(
-                        tc.to_json(),
-                        "failed to convert toolchain environment to JSON"
-                    )?
-                }
+                Ok(tc) => cu::check!(
+                    tc.to_json(),
+                    "failed to convert toolchain environment to JSON"
+                )?,
                 Err(_) => {
                     // attempt to resolve partial
                     let tc = ToolchainEnv::resolve_partial()?;
@@ -88,8 +86,7 @@ impl Cmd {
                 Config::new_from_project_dir(dir, opts)?
             };
 
-            let value = cu::check!(config.to_json(), "failed to convert config value to JSON")?;
-            value
+            cu::check!(config.to_json(), "failed to convert config value to JSON")?
         };
         let value = cu::check!(
             dump::dump(key, value),

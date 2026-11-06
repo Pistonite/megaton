@@ -15,9 +15,12 @@ impl RustEnv {
     pub fn resolve() -> cu::Result<Self> {
         let host = RustHostEnv::resolve()?;
         let build_dep = RustBuildDepEnv::resolve()?;
-        let megaton = RustToolchainEnv::resolve(Some(MEGATON_TOOLCHAIN_NAME))
-            .ok();
-        Ok(Self { host, build_dep, megaton })
+        let megaton = RustToolchainEnv::resolve(Some(MEGATON_TOOLCHAIN_NAME)).ok();
+        Ok(Self {
+            host,
+            build_dep,
+            megaton,
+        })
     }
 }
 
@@ -32,9 +35,12 @@ impl RustEnvPartial {
     pub fn resolve() -> Self {
         let host = RustHostEnv::resolve().ok();
         let build_dep = RustBuildDepEnvPartial::resolve();
-        let megaton = RustToolchainEnv::resolve(Some(MEGATON_TOOLCHAIN_NAME))
-            .ok();
-        Self { host, build_dep, megaton }
+        let megaton = RustToolchainEnv::resolve(Some(MEGATON_TOOLCHAIN_NAME)).ok();
+        Self {
+            host,
+            build_dep,
+            megaton,
+        }
     }
 }
 
@@ -58,7 +64,12 @@ impl RustHostEnv {
         let rustup = cu::which("rustup")?;
         let cargo = cu::which("cargo")?;
         let env = RustToolchainEnv::resolve(None)?;
-        Ok(Self { rustc, rustup, cargo, env })
+        Ok(Self {
+            rustc,
+            rustup,
+            cargo,
+            env,
+        })
     }
 }
 
@@ -94,9 +105,18 @@ impl RustBuildDepEnvPartial {
     }
     pub fn resolve_full(self) -> cu::Result<RustBuildDepEnv> {
         Ok(RustBuildDepEnv {
-            git: cu::check!(self.git, "cannot find git, which is required to build the rust toolchain")?,
-            ninja: cu::check!(self.ninja, "cannot find ninja, which is required to build llvm for the rust toolchain")?,
-            cmake: cu::check!(self.cmake, "cannot find cmake, which is required to build llvm for the rust toolchain")?,
+            git: cu::check!(
+                self.git,
+                "cannot find git, which is required to build the rust toolchain"
+            )?,
+            ninja: cu::check!(
+                self.ninja,
+                "cannot find ninja, which is required to build llvm for the rust toolchain"
+            )?,
+            cmake: cu::check!(
+                self.cmake,
+                "cannot find cmake, which is required to build llvm for the rust toolchain"
+            )?,
         })
     }
 }
@@ -172,10 +192,11 @@ fn get_rustc_info(toolchain: Option<&str>) -> cu::Result<RustToolchainEnv> {
     // rustup +toolchain target list --installed
     let command = cu::which("rustup")?.command();
     let command = match toolchain {
-        Some(toolchain) => command.arg(&format!("+{toolchain}")),
+        Some(toolchain) => command.arg(format!("+{toolchain}")),
         None => command,
     };
-    let (child, stdout, stderr) = command.args(["target", "list", "--installed"])
+    let (child, stdout, stderr) = command
+        .args(["target", "list", "--installed"])
         .stdout(cu::pio::string())
         .stderr(cu::pio::string())
         .stdin_null()
