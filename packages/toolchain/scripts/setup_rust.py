@@ -41,7 +41,7 @@ from typing import NamedTuple
 ROOT = Path(__file__).parent.parent
 SCRIPTS_DIR = ROOT / "scripts"
 RUST_DIR = ROOT / "rust"
-TOOLCHAIN_RS = ROOT / "src" / "rust_toolchain.rs"
+TOOLCHAIN_RS = ROOT / "src" / "rust.rs"
 
 RUST_REPO = "https://github.com/rust-lang/rust"
 PATCH_BRANCH = "patch"
