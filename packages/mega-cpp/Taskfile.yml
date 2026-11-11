@@ -85,7 +85,7 @@ tasks:
         echo 'libraries/libvapours/include/vapours/ams_version.h' >> .git/info/sparse-checkout
         git pull origin master
       silent: true
-    - cp -RL .cache/atmosphere/libraries/libvapours/include/vapours include
+    - cp -RL .cache/atmosphere/libraries/libvapours/include/vapours src/megacpp/include
 
   configure:
     desc: Configure CMake
