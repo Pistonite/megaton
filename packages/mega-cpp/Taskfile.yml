@@ -59,6 +59,34 @@ tasks:
             echo 'etc/flags.cmake is up-to-date'
           fi
 
+  update-lib-vapours:
+    - rm -rf .cache/atmosphere include-lib/vapours
+    - mkdir -p .cache
+    - cmd: |
+        echo '==> updating lib: libvapours (Atmosphere-NX/Atmosphere)'
+        mkdir -p .cache/atmosphere/.git/info
+        cd .cache/atmosphere 
+        git init
+        git config core.sparseCheckout true
+        git remote add origin https://github.com/Atmosphere-NX/Atmosphere
+        echo 'libraries/libvapours/include/vapours/results' > .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/util' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/impl' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/ams' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/freebsd' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/results.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/util.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/assert.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/common.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/includes.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/defines.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/compiler.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/types.hpp' >> .git/info/sparse-checkout
+        echo 'libraries/libvapours/include/vapours/ams_version.h' >> .git/info/sparse-checkout
+        git pull origin master
+      silent: true
+    - cp -RL .cache/atmosphere/libraries/libvapours/include/vapours include
+
   configure:
     desc: Configure CMake
     cmds:

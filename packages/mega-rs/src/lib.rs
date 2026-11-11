@@ -6,3 +6,4 @@ mod hermit;
 mod megacpp_sys;
 
 pub use mega_rspmacro::main;
+mod nn;
