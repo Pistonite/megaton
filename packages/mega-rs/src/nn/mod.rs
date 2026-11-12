@@ -11,5 +11,3 @@ pub use binding::{
     nn_fs_DirectoryEntry,
     _megakernel_close_directory
 };
-
-
