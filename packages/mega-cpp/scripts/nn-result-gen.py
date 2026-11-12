@@ -20,7 +20,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent.parent # mega-cpp crate root
 RESULTS_DIR = ROOT / "src" / "megacpp" / "include" / "vapours" / "results"
-OUT_FILE = ROOT / ".." / "mega-rs" / "src" / "nn" / "nn_result_gen.rs"
+OUT_FILE = ROOT.parent / "mega-rs" / "src" / "nn" / "nn_result_gen.rs"
 
 # see ams::result::impl::ResultTraits in results_common.hpp
 MODULE_BITS = 9
