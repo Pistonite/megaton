@@ -18,6 +18,6 @@ path = "setup_common.rs"
 name = "megaton-docker-setup-toolchain"
 path = "toolchain-image/setup.rs"
 
-# [[bin]]
-# name = "megaton-docker-setup-cmd"
-# path = "setup_cmd.rs"
+[[bin]]
+name = "megaton-docker-setup-dist"
+path = "dist-image/setup.rs"

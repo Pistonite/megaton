@@ -9,9 +9,12 @@ ARG RUST_VERSION
 # not the main build tool package or the library
 COPY ./crates /opt/megaton/toolchain-build
 ENV MEGATON_HOME=/opt/megaton
+# Cache dirs are only mounted during the build so we don't need to worry about --keep
+# making the image bigger
 RUN \
+--mount=type=cache,target=/opt/megaton/toolchain-build/target,id=megaton-docker-toolchain-build-${RUST_VERSION} \
 --mount=type=cache,target=/opt/megaton/rust,id=megaton-docker-build-llvm-${GCC_VERSION} \
 --mount=type=cache,target=/root/.cargo/registry,id=megaton-docker-build-cargo-${RUST_VERSION} \
 cd /opt/megaton/toolchain-build && cargo run \
 --bin megaton-toolchain \
--- install -v && cargo clean
+-- install -k -v

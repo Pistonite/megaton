@@ -1,4 +1,4 @@
 /rust
-/scripts
+/scripts/*.py
 /.gitignore
 /Taskfile.yml

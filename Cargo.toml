@@ -14,7 +14,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.3.0"
 edition = "2024"
 
 
@@ -29,6 +29,8 @@ version = "0.3.0"
 
 [workspace.dependencies]
 mega-rspmacro.path = "packages/mega-rspmacro"
+megaton-buildtool.path = "packages/buildtool"
+megaton-ftp.path = "packages/ftp"
 megaton-packaging.path = "packages/packaging"
 megaton-toolchain.path = "packages/toolchain"
 megaton-config.path = "packages/config"

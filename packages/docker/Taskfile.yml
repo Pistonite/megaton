@@ -22,6 +22,7 @@ tasks:
       - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > base-image/rustup-init.sh
       - task: packaging:make
       - cargo run --bin megaton-docker-setup-toolchain
+      - cargo run --bin megaton-docker-setup-dist
       - task: build-base-image
       - task: dump-base-image-info
       - task: build-toolchain-image
