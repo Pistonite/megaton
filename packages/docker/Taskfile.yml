@@ -1,0 +1,57 @@
+version: '3'
+
+includes:
+  docker:
+    taskfile: ../../mono-dev/task/docker.yaml
+    internal: true
+    optional: true
+  packaging:
+    taskfile: ../packaging
+    dir: ../packaging
+    internal: true
+
+vars:
+  RUST_VERSION: 1.99.1 # host toolchain version
+  BASE_IMAGE: megaton/builder-base
+  TOOLCHAIN_IMAGE: megaton/builder-toolchain
+
+tasks:
+
+  build:
+    cmds:
+      - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > base-image/rustup-init.sh
+      - task: packaging:make
+      - cargo run --bin megaton-docker-setup-toolchain
+      - cargo run --bin megaton-docker-setup-dist
+      - task: build-base-image
+      - task: dump-base-image-info
+      - task: build-toolchain-image
+
+  build-base-image:
+    internal: true
+    cmds:
+      - task: docker:build
+        vars:
+          DOCKER_IMAGE: '{{.BASE_IMAGE}}'
+          ARGS: --build-arg RUST_VERSION={{.RUST_VERSION}}
+          DIR: base-image
+
+  dump-base-image-info:
+    internal: true
+    cmds:
+      - docker run --rm --entrypoint python3 '{{.BASE_IMAGE}}' /root/dump-info.py > base-image/info.json
+
+  build-toolchain-image:
+    internal: true
+    vars:
+      BASE_RUST_VERSION:
+        sh: python3 base-image/read-info.py rustc_version
+      BASE_GCC_VERSION:
+        sh: python3 base-image/read-info.py gcc_version
+    cmds:
+      - task: docker:build
+        vars:
+          DOCKER_IMAGE: '{{.TOOLCHAIN_IMAGE}}'
+          ARGS: --build-arg RUST_VERSION={{.BASE_RUST_VERSION}} --build-arg GCC_VERSION={{.BASE_GCC_VERSION}}
+          DIR: toolchain-image
+    

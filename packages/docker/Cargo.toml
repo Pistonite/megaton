@@ -1,0 +1,23 @@
+[package]
+name = "megaton-docker-setup"
+version = "0.0.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+cu = { workspace = true, features = ["fs", "cli"] }
+
+megaton-packaging.workspace = true
+# megaton-cli-build.path = "../cli-build"
+
+[lib]
+name = "megaton_docker_setup"
+path = "setup_common.rs"
+
+[[bin]]
+name = "megaton-docker-setup-toolchain"
+path = "toolchain-image/setup.rs"
+
+[[bin]]
+name = "megaton-docker-setup-dist"
+path = "dist-image/setup.rs"

@@ -1,7 +1,7 @@
 [package]
 name = "megaton-cmd"
-version = "0.1.2"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 license = "MIT"
 description = "The `megaton` CLI command"
 repository = "https://github.com/Pistonite/megaton"
@@ -9,23 +9,17 @@ publish = false
 
 [dependencies.cu]
 workspace = true
-features = ["cli", "process", "prompt", "toml", "json", "fs", "coroutine-heavy", "derive"]
+features = ["cli", "derive"]
 
 [dependencies]
-serde.workspace = true
-tokio.workspace = true
-flate2.workspace = true
-tar.workspace = true
-walkdir.workspace = true
-fxhash.workspace = true
-depfile.workspace = true
-regex.workspace = true
-cargo_metadata.workspace = true
-semver.workspace = true
-semver.features = ["serde"]
-
+megaton-buildtool.workspace = true
+megaton-ftp.workspace = true
 megaton-toolchain.workspace = true
+megaton-config.workspace = true
+
+[build-dependencies]
 megaton-packaging.workspace = true
+cu.workspace = true
 
 
 [[bin]]

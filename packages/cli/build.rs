@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2025-2026 Megaton contributors
-use std::path::PathBuf;
 use std::process::ExitCode;
 
-use cu::pre::*;
-
-fn main() {
+fn main() -> ExitCode {
     match main_internal() {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {

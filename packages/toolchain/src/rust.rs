@@ -236,8 +236,12 @@ pub fn install(home: &HomeEnv, keep: bool, mut clean: bool) -> cu::Result<()> {
     if !keep {
         cu::info!("removing build artifacts to free disk space");
         cu::hint!("- use --keep if you want to keep them");
-        let _bar = cu::progress("removing build artifacts");
-        cu::fs::rec_remove(rust_path)?;
+        let bar = cu::progress("removing build artifacts").spawn();
+        if let Err(e) = cu::fs::rec_remove(rust_path) {
+            cu::warn!("failed to remove rust repo: {e:?}");
+        } else {
+            bar.done();
+        }
     } else {
         cu::hint!("keeping build artifacts since --keep is specified");
     }
@@ -296,10 +300,11 @@ pub fn clean(home: &HomeEnv) -> cu::Result<()> {
         cu::info!("rust repo is already removed");
         return Ok(());
     }
-    let _bar = cu::progress("removing rust repo");
+    let bar = cu::progress("removing rust repo").spawn();
     if let Err(e) = cu::fs::rec_remove(rust_path) {
         cu::warn!("failed to remove rust repo: {e}");
     }
+    bar.done();
     Ok(())
 }
 

@@ -20,10 +20,8 @@ includes:
   # mega-rspmacro: { taskfile: packages/mega-rspmacro, dir: packages/mega-rspmacro, internal: true }
 
   # other
-  docs:          { taskfile: packages/docs,             dir: packages/docs,            internal: true }
-
-  # todo:
-  # docker-build:    { taskfile: packages/docker-build,     dir: packages/docker-build,    internal: true }
+  docs:      { taskfile: packages/docs,      dir: packages/docs,      internal: true }
+  docker:    { taskfile: packages/docker,    dir: packages/docker,    internal: true }
 
 tasks:
   install:

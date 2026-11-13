@@ -7,7 +7,4 @@
 mod binding;
 mod result;
 
-pub use binding::{
-    nn_fs_DirectoryEntry,
-    _megakernel_close_directory
-};
+pub use binding::{_megakernel_close_directory, nn_fs_DirectoryEntry};

@@ -104,9 +104,15 @@ mod tests {
     fn test_conversion() {
         let result = nn_Result::from_parts(
             nn_ResultModule::Fs.to_raw(),
-            nn_ResultDescription_fs::PathNotFound.to_raw()
+            nn_ResultDescription_fs::PathNotFound.to_raw(),
         );
-        assert_eq!(result.description(), Some(nn_ResultDescription_fs::PathNotFound));
-        assert_ne!(result.description(), Some(nn_ResultDescription_ncm::InvalidContentStorageBase))
+        assert_eq!(
+            result.description(),
+            Some(nn_ResultDescription_fs::PathNotFound)
+        );
+        assert_ne!(
+            result.description(),
+            Some(nn_ResultDescription_ncm::InvalidContentStorageBase)
+        )
     }
 }

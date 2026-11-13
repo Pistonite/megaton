@@ -3,7 +3,9 @@
 
 use cu::pre::*;
 
-use crate::env;
+use megaton_config::toolchain::HomeEnv;
+
+static COMMIT: &str = env!("MEGATON_COMMIT");
 
 /// The version subcommand
 #[derive(clap::Parser, AsRef)]
@@ -24,15 +26,20 @@ impl CmdVersion {
             println!(
                 "megaton v{} ({})",
                 env!("CARGO_PKG_VERSION"),
-                &env::commit()[0..8]
+                &COMMIT[0..8]
             );
             return Ok(());
         }
         // verbose mode, run env init which prints debugging info
         // for the environment
-        cu::hint!("--- environment ---");
+        match HomeEnv::resolve() {
+            Err(e) => {
+                cu::warn!("error resolving home: {e:?}");
+            }
+        };
+        ToolchainEnvPartial::re
+        cu::hint!("MEGATON_HOME={}", home_env.path.display());
         if let Err(e) = env::init() {
-            cu::warn!("error while initializing environment: {e:?}");
         };
         cu::hint!("--- toolchain ---");
         if let Err(e) = megaton_toolchain_build::cmd::check() {
@@ -40,7 +47,7 @@ impl CmdVersion {
         }
         // then print the (long) version info
         cu::hint!("--- build tool ---");
-        cu::print!("commit {}", env::commit());
+        cu::print!("commit {COMMIT}");
         cu::print!("version {}", env!("CARGO_PKG_VERSION"));
         Ok(())
     }

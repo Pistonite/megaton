@@ -6,6 +6,15 @@ includes:
     internal: true
     optional: true
 
+vars:
+  SOURCES: >
+    src/hermit
+    src/rocrt
+    src/megacpp/megaton
+    src/megacpp/sysbase
+    src-user
+    include
+
 tasks:
   rs-bindgen:
     desc: Generate binding for megaton rust library
@@ -101,21 +110,24 @@ tasks:
       - bash build.sh
 
   check:
-    - task: ccpp:clang-tidy
-      vars:
-        BUILD: build
-        HEADER: ^include/
-        ADD_CHECKS: >
-          -bugprone-reserved-identifier,
+    # FIXME: some issue with detecting header language when clang-tidy
+    # checks header; might be able to fix if cmake generates compile instructions
+    # for headers
+    # - task: ccpp:clang-tidy
+    #   vars:
+    #     BUILD: build
+    #     HEADER: ^(include|src/megacpp/include/megaton-priv)/
+    #     ADD_CHECKS: >
+    #       -bugprone-reserved-identifier,
 
     - task: ccpp:fmt-check
       vars:
-        SOURCE: src src-user include
+        SOURCE: '{{.SOURCES}}'
 
   fix:
     - task: ccpp:fmt-fix
       vars:
-        SOURCE: src src-user include
+        SOURCE: '{{.SOURCES}}'
 
   clean:
     desc: Clean output
