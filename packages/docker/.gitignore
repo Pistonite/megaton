@@ -1,0 +1,3 @@
+/base-image/info.json
+/base-image/rustup-init.sh
+/toolchain-image/crates

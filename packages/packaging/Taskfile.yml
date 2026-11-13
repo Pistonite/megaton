@@ -14,9 +14,10 @@ includes:
 
 tasks:
   make:
-    desc: Create the megatonlib package and build the CLI
+    desc: Create the megatonlib package
     cmds:
       - task: mega-cpp:make
+      - task: refresh-lock
       - cargo run -p megaton-packaging --features packaging-script
 
   check:
@@ -30,6 +31,16 @@ tasks:
     desc: Test unpacking the packed megatonlib
     cmds:
       - cargo run -p megaton-packaging --example megatonlib_unpack_test
+
+  refresh-lock:
+    internal: true
+    dir: ../..
+    vars:
+      IGNORE:
+        sh: cargo metadata --quiet
+    cmds:
+      - slient: true
+        cmd: echo 'Cargo.lock refreshed'
 
   clean:
     - rm -rf dist lib

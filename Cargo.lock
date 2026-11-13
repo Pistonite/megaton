@@ -811,6 +811,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "megaton-docker-setup"
+version = "0.0.0"
+dependencies = [
+ "megaton-packaging",
+ "pistonite-cu",
+]
+
+[[package]]
 name = "megaton-ftp"
 version = "0.0.0"
 dependencies = [
