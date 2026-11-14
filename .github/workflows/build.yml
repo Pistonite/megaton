@@ -46,6 +46,7 @@ jobs:
         with:
           # tool-mdbook: true
           ccpp-cmake: true
+      - run: echo '/root/.cargo/bin' >> "$GITHUB_PATH"
       - run: 'rustup target add ${{ matrix.rust-target }}'
       - run: task package
       - uses: Pistonight/mono-dev/actions/rust-xplat@main
