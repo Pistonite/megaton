@@ -124,7 +124,6 @@ tasks:
       vars:
         SOURCE: '{{.SOURCES}}'
         BUILD: build
-        # HEADER: ^(include/megaton|src/megacpp/include/megaton-priv)/
         ADD_CHECKS: >
           -bugprone-reserved-identifier,
 
