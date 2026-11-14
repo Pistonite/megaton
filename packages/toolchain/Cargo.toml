@@ -1,9 +1,9 @@
 [package]
 name = "megaton-toolchain"
-description = "The megaton toolchain command"
 version.workspace = true
 edition.workspace = true
 license = "MIT"
+description = "The megaton toolchain command"
 publish = false
 
 [dependencies]

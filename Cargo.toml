@@ -2,13 +2,13 @@
 resolver = "2"
 members = [
     "packages/buildtool",
-    # "packages/cli",
+    "packages/cli",
     "packages/config",
     "packages/docker",
     "packages/packaging",
+    "packages/synctool",
     "packages/toolchain",
     # "packages/test-mod",
-    "packages/ftp",
     "packages/mega-rs",
     "packages/mega-rspmacro",
 ]
@@ -30,7 +30,7 @@ version = "0.3.0"
 [workspace.dependencies]
 mega-rspmacro.path = "packages/mega-rspmacro"
 megaton-buildtool.path = "packages/buildtool"
-megaton-ftp.path = "packages/ftp"
+megaton-synctool.path = "packages/synctool"
 megaton-packaging.path = "packages/packaging"
 megaton-toolchain.path = "packages/toolchain"
 megaton-config.path = "packages/config"

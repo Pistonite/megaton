@@ -13,7 +13,7 @@ features = ["cli", "derive"]
 
 [dependencies]
 megaton-buildtool.workspace = true
-megaton-ftp.workspace = true
+megaton-synctool.workspace = true
 megaton-toolchain.workspace = true
 megaton-config.workspace = true
 

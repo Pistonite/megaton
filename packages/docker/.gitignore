@@ -1,3 +1,6 @@
 /base-image/info.json
 /base-image/rustup-init.sh
 /toolchain-image/crates
+/dist-image/crates
+/dist-image/info.txt
+/dist-image/print-info.sh

@@ -3,7 +3,7 @@
 
 use cu::pre::*;
 
-use megaton_config::toolchain::HomeEnv;
+use megaton_config::toolchain::ToolchainEnv;
 
 static COMMIT: &str = env!("MEGATON_COMMIT");
 
@@ -23,32 +23,69 @@ impl CmdVersion {
         }
         cu::lv::disable_print_time();
         if !cu::lv::D.enabled() {
-            println!(
-                "megaton v{} ({})",
-                env!("CARGO_PKG_VERSION"),
-                &COMMIT[0..8]
-            );
+            println!("megaton v{} ({})", env!("CARGO_PKG_VERSION"), &COMMIT[0..8]);
             return Ok(());
         }
+        cu::print!("megaton version {} ({COMMIT})", env!("CARGO_PKG_VERSION"));
         // verbose mode, run env init which prints debugging info
         // for the environment
-        match HomeEnv::resolve() {
+        match ToolchainEnv::resolve_partial() {
             Err(e) => {
-                cu::warn!("error resolving home: {e:?}");
+                cu::warn!("error resolving toolchain: {e:?}");
             }
-        };
-        ToolchainEnvPartial::re
-        cu::hint!("MEGATON_HOME={}", home_env.path.display());
-        if let Err(e) = env::init() {
-        };
-        cu::hint!("--- toolchain ---");
-        if let Err(e) = megaton_toolchain_build::cmd::check() {
-            cu::warn!("error while checking toolchain: {e:?}");
+            Ok(toolchain) => {
+                cu::debug!("MEGATON_HOME={}", toolchain.home.path.display());
+                match &toolchain.devkita64 {
+                    None => {
+                        cu::debug!("devkita64: <not resolved>");
+                    }
+                    Some(x) => {
+                        cu::debug!("devkita64: gcc {}", x.version);
+                    }
+                }
+                if toolchain.cxxbridge.is_installed() {
+                    cu::debug!("cxxbridge: {}", toolchain.cxxbridge.version);
+                } else {
+                    cu::debug!("cxxbridge: <not installed>");
+                }
+                let rust = toolchain.rust;
+                match &rust.host {
+                    None => {
+                        cu::debug!("rust (host): <not resolved>");
+                    }
+                    Some(x) => {
+                        cu::debug!("rust (host): {} ({})", x.env.release, x.env.commit_hash);
+                    }
+                }
+                match &rust.megaton {
+                    None => {
+                        cu::debug!("rust (megaton): <not installed>");
+                    }
+                    Some(x) => {
+                        cu::debug!("rust (megaton): {} ({})", x.release, x.commit_hash);
+                    }
+                }
+                fn get_installed_str(installed: bool) -> &'static str {
+                    if installed {
+                        "<installed>"
+                    } else {
+                        "<not installed>"
+                    }
+                }
+                cu::debug!(
+                    "build_dep/git: {}",
+                    get_installed_str(rust.build_dep.git.is_some())
+                );
+                cu::debug!(
+                    "build_dep/ninja: {}",
+                    get_installed_str(rust.build_dep.ninja.is_some())
+                );
+                cu::debug!(
+                    "build_dep/cmake: {}",
+                    get_installed_str(rust.build_dep.cmake.is_some())
+                );
+            }
         }
-        // then print the (long) version info
-        cu::hint!("--- build tool ---");
-        cu::print!("commit {COMMIT}");
-        cu::print!("version {}", env!("CARGO_PKG_VERSION"));
         Ok(())
     }
 }

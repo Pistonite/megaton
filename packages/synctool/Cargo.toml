@@ -1,8 +1,9 @@
 [package]
-name = "megaton-ftp"
-version = "0.0.0"
-description = "ftp utility for uploading/downloading files"
-edition = "2024"
+name = "megaton-synctool"
+version.workspace = true
+edition.workspace = true
+license = "MIT"
+description = "Utility for uploading/downloading files"
 publish = false
 
 [dependencies]

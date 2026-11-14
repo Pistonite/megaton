@@ -48,7 +48,7 @@ pub struct Cmd {
     common: cu::cli::Flags,
 }
 impl Cmd {
-    pub fn run(self, dir: Option<&str>) -> cu::Result<()> {
+    pub fn run(self, config_path: Option<&str>) -> cu::Result<()> {
         cu::lv::disable_print_time();
         cu::cli::print_to(cu::cli::Target::Stderr);
         let key = self.key.as_deref().unwrap_or_default();
@@ -83,7 +83,7 @@ impl Cmd {
             let config = if self.no_config {
                 Config::new_no_megaton_toml(opts)?
             } else {
-                Config::new_from_project_dir(dir, opts)?
+                Config::new_from_project(config_path, opts)?
             };
 
             cu::check!(config.to_json(), "failed to convert config value to JSON")?

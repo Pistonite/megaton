@@ -7,9 +7,9 @@ includes:
     flatten: true
 
   # cli (megaton-cmd)
-  # cli:             { taskfile: packages/cli,              dir: packages/cli,             internal: true }
+  cli:       { taskfile: packages/cli,       dir: packages/cli,       internal: true }
   buildtool: { taskfile: packages/buildtool, dir: packages/buildtool, internal: true }
-  ftp:       { taskfile: packages/ftp,       dir: packages/ftp,       internal: true }
+  synctool:  { taskfile: packages/synctool,  dir: packages/synctool,  internal: true }
   toolchain: { taskfile: packages/toolchain, dir: packages/toolchain, internal: true }
   packaging: { taskfile: packages/packaging, dir: packages/packaging, internal: true }
   config:    { taskfile: packages/config,    dir: packages/config,    internal: true }
@@ -49,9 +49,9 @@ tasks:
     - task: config:check
     - task: packaging:check
     - task: toolchain:check
-    - task: ftp:check
+    - task: synctool:check
     - task: buildtool:check
-    # - task: cli:check
+    - task: cli:check
     # - task: docker-build:check
   #   - task: lib:check-rs
   check-dkp:

@@ -8,7 +8,7 @@ use megaton_config::config_file::{Config, ConfigLoadOpts, FtpConfig};
 
 use crate::client::FtpClient;
 
-/// The `ftp` command
+/// The `sync` command
 #[derive(clap::Parser)]
 pub struct Cmd {
     #[clap(subcommand)]
@@ -16,7 +16,11 @@ pub struct Cmd {
 }
 
 impl Cmd {
-    pub async fn run(self, dir: Option<&str>) -> cu::Result<()> {
+    pub fn run(self, dir: Option<String>) -> cu::Result<()> {
+        cu::co::spawn(async move { self.run_async(dir.as_deref()).await }).join()??;
+        Ok(())
+    }
+    pub async fn run_async(self, dir: Option<&str>) -> cu::Result<()> {
         match self.command {
             SubCmd::Upload { common } => {
                 let config = common.load_config(dir)?;
@@ -97,14 +101,14 @@ pub struct CommonOpts {
     common: cu::cli::Flags,
 }
 impl CommonOpts {
-    fn load_config(&self, dir: Option<&str>) -> cu::Result<Config> {
+    fn load_config(&self, config_path: Option<&str>) -> cu::Result<Config> {
         let opts = ConfigLoadOpts {
             resolve: true,
             validate: true,
             cli_profile: self.profile.as_deref(),
             toolchain: None, // ftp tool does not need the toolchain to be resolved
         };
-        Config::new_from_project_dir(dir, opts)
+        Config::new_from_project(config_path, opts)
     }
 }
 

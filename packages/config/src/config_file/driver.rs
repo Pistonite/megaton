@@ -43,11 +43,11 @@ pub struct Config {
     unused: CaptureUnused,
 }
 impl Config {
-    pub fn new_from_project_dir(
-        root_dir: Option<&str>,
+    pub fn new_from_project(
+        root_dir_or_config: Option<&str>,
         opts: ConfigLoadOpts<'_, '_>,
     ) -> cu::Result<Self> {
-        let paths = ProjectPaths::resolve(root_dir)?;
+        let paths = ProjectPaths::resolve(root_dir_or_config)?;
         let content = cu::fs::read_string(&paths.config_path)?;
         let mut config = cu::check!(
             toml::parse::<Config>(&content),
@@ -249,9 +249,15 @@ struct ProjectPaths {
 }
 impl ProjectPaths {
     /// Resolve the project from --dir/-C flag
-    pub fn resolve(root_dir: Option<&str>) -> cu::Result<Self> {
-        if let Some(root_dir) = root_dir {
+    pub fn resolve(root_dir_or_config: Option<&str>) -> cu::Result<Self> {
+        if let Some(root_dir) = root_dir_or_config {
             let mut p = PathBuf::from(root_dir);
+            if p.is_file() {
+                return Ok(Self {
+                    root: p.parent_abs()?,
+                    config_path: p.normalize()?,
+                });
+            }
             for config_file in MEGATON_TOML_FILENAMES {
                 p.push(config_file);
                 if p.exists() {

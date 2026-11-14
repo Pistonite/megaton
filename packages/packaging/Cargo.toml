@@ -2,9 +2,9 @@
 name = "megaton-packaging"
 version.workspace = true
 edition.workspace = true
-publish = false
-description = "Steps to package the megaton tool"
 license = "MIT"
+description = "Steps to package the megaton tool"
+publish = false
 
 [dependencies]
 cu = { workspace = true, features = ["cli", "process", "toml"] }

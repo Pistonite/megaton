@@ -14,6 +14,7 @@ vars:
   RUST_VERSION: 1.99.1 # host toolchain version
   BASE_IMAGE: megaton/builder-base
   TOOLCHAIN_IMAGE: megaton/builder-toolchain
+  DIST_IMAGE: ghcr.io/pistonite/megaton
 
 tasks:
 
@@ -23,9 +24,12 @@ tasks:
       - task: packaging:make
       - cargo run --bin megaton-docker-setup-toolchain
       - cargo run --bin megaton-docker-setup-dist
+      - git rev-parse HEAD > dist-image/crates/packages/cli/COMMIT
       - task: build-base-image
       - task: dump-base-image-info
       - task: build-toolchain-image
+      - task: build-dist-image
+      - task: dump-dist-image-info
 
   build-base-image:
     internal: true
@@ -55,3 +59,36 @@ tasks:
           ARGS: --build-arg RUST_VERSION={{.BASE_RUST_VERSION}} --build-arg GCC_VERSION={{.BASE_GCC_VERSION}}
           DIR: toolchain-image
     
+  build-dist-image:
+    internal: true
+    cmds:
+      - task: docker:build
+        vars:
+          DOCKER_IMAGE: '{{.DIST_IMAGE}}'
+          DIR: dist-image
+
+  dump-dist-image-info:
+    internal: true
+    cmds:
+      - docker run --rm --entrypoint sh '{{.DIST_IMAGE}}' /root/print-info.sh > dist-image/info.txt
+
+  publish:
+    vars:
+      TAG_VERSION:
+        sh: grep -E ^version ../../Cargo.toml | head -n1 | sed -E 's/^version\s*=\s"([^"]+)"$/v\1/'
+      TAG_COMMIT:
+        sh: echo "sha-$(git rev-parse --short=7 HEAD)"
+      DOCKER_IMAGE: '{{.DIST_IMAGE}}'
+    cmds:
+      - docker tag {{.DOCKER_IMAGE}}:latest {{.DOCKER_IMAGE}}:{{.TAG_VERSION}}
+      - docker tag {{.DOCKER_IMAGE}}:latest {{.DOCKER_IMAGE}}:{{.TAG_COMMIT}}
+      - docker push {{.DOCKER_IMAGE}}:latest
+      - docker push {{.DOCKER_IMAGE}}:{{.TAG_VERSION}}
+      - docker push {{.DOCKER_IMAGE}}:{{.TAG_COMMIT}}
+      - cmd: echo 'https://github.com/orgs/Pistonite/packages/container/package/megaton'
+        silent: true
+
+  clean:
+    - rm -rf dist-image/crates toolchain-image/crates
+    - docker system prune
+
