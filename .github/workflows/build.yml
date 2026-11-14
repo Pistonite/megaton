@@ -13,12 +13,11 @@ jobs:
     container:
       image: ghcr.io/pistonite/megaton
     steps:
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 26
       - uses: Pistonight/mono-dev/actions/setup@main
         with:
+          ecma-node: true
           ccpp-cmake: true
+      - uses: Swatinem/rust-cache@v2
       - run: task package
       - uses: actions/upload-artifact@v7
         with:
@@ -58,7 +57,7 @@ jobs:
         if: github.event_name == 'pull_request'
         with:
           name: megatonlib
-          commit: ${{ github.sha }}
+          ref: ${{ github.ref }}
           path: packages/packaging/dist
           workflow_conclusion: "" # uploaded in a previous job
       - name: list downloaded artifacts
