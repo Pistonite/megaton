@@ -1,0 +1,19 @@
+name: setup clang
+description: setup clang for our workflows
+
+runs:
+  using: composite
+  steps:
+    - name: setup clang
+      shell: bash
+      # setup clang path and libclang for bindgen
+      run: |
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 23
+        rm llvm.sh
+        echo "/usr/lib/llvm-23/bin" >> "$GITHUB_PATH"
+        echo "LIBCLANG_PATH=/usr/lib/llvm-23/lib" >> "$GITHUB_ENV"
+    - run: clang --version
+      shell: bash
+
