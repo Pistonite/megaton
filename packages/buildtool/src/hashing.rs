@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Contributors of https://github.com/Pistonite/megaton
+
 use std::fmt::Write as _;
 use std::hash::Hasher;
 use std::path::{Path, PathBuf};

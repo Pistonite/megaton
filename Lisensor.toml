@@ -1,26 +1,23 @@
-["Megaton contributors"]
+["Contributors of https://github.com/Pistonite/megaton"]
 
-"packages/cli/src/*.rs" = "MIT"
+# cli (megaton-cmd)
+"packages/buildtool/src/**/*.rs" = "MIT"
+"packages/cli/src/**/*.rs" = "MIT"
 "packages/cli/build.rs" = "MIT"
-"packages/cli-build/**/*.rs" = "MIT"
-"packages/docker-build/*.rs" = "MIT"
+"packages/config/src/**/*.rs" = "MIT"
+"packages/docker/**/*.rs" = "MIT"
+"packages/packaging/src/**/*.rs" = "MIT"
+"packages/packaging/examples/*.rs" = "MIT"
+"packages/synctool/src/**/*.rs" = "MIT"
+"packages/toolchain/src/**/*.rs" = "MIT"
 
-"packages/lib/src/megaton/*.{s,c,cpp}" = "GPL-3.0-or-later"
-"packages/lib/src/nximpl/*.{s,c,cpp}" = "GPL-3.0-or-later"
-"packages/lib/include/exl/**/*.{h,hpp}" = "GPL-3.0-or-later"
-"packages/lib/include/exl_armv8/**/*.{h,hpp}" = "GPL-3.0-or-later"
-"packages/lib/include/megaton/*.{h,hpp}" = "GPL-3.0-or-later"
-"packages/lib/include/megaton/{__internal,__priv}/*.{h,hpp}" = "GPL-3.0-or-later"
-"packages/lib/**/*.rs" = "GPL-3.0-or-later"
-
-"packages/test-mod/src/*.{c,cpp}" = "GPL-3.0-or-later"
-"packages/test-mod/include/*.{h,hpp}" = "GPL-3.0-or-later"
-"packages/test-mod/**/*.rs" = "GPL-3.0-or-later"
-
-"packages/toolchain-build/**/*.rs" = "MIT"
-
-# Unmodified files
-# ["libnx Authors"]
-# "packages/lib/src/external/libnx/*.s" = "ISC"
-# ["Matthew Conte"]
-# "packages/lib/include/megaton/__external/tlsf.h" = "BSD-3-Clause"
+# library
+"packages/mega-rs/src/**/*.rs" = "GPL-3.0-or-later"
+"packages/mega-rspmacro/src/**/*.rs" = "MIT"
+"packages/mega-cpp/include/megaton/**/*.h" = "GPL-3.0-or-later"
+"packages/mega-cpp/src-user/*.{c,cpp}" = "GPL-3.0-or-later"
+"packages/mega-cpp/src/rocrt/*.{s,cpp}" = "GPL-3.0-or-later"
+"packages/mega-cpp/src/hermit/*.{h,cpp}" = "GPL-3.0-or-later"
+"packages/mega-cpp/src/megacpp/include/megaton-priv/**/*.h" = "GPL-3.0-or-later"
+"packages/mega-cpp/src/megacpp/sysbase/**/*.{c,cpp}" = "GPL-3.0-or-later"
+"packages/mega-cpp/src/megacpp/megaton/**/*.{c,cpp}" = "GPL-3.0-or-later"

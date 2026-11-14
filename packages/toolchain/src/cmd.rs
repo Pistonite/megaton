@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2026 Megaton contributors
+// Copyright (c) 2026 Contributors of https://github.com/Pistonite/megaton
 
 use cu::pre::*;
 use megaton_config::toolchain::HomeEnv;
@@ -80,8 +80,8 @@ impl Cmd {
             SubCmd::Cxxbridge(CmdCxxBridge {
                 rs_file, header, ..
             }) => {
+                cu::lv::disable_print_time();
                 if rs_file.is_none() && !header {
-                    cu::lv::disable_print_time();
                     cu::cli::print_help::<CmdCxxBridge>(false);
                     return Ok(());
                 }

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2025-2026 Megaton contributors
+// Copyright (c) 2025-2026 Contributors of https://github.com/Pistonite/megaton
+
 use std::process::ExitCode;
 
 fn main() -> ExitCode {

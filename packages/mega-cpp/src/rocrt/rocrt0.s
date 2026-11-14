@@ -1,6 +1,5 @@
-
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (c) 2025-2026 Megaton contributors
+// Copyright (c) 2025-2026 Contributors of https://github.com/Pistonite/megaton
 // * * * * *
 // 
 // crt0.s

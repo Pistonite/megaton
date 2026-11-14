@@ -40,4 +40,7 @@ done
 # copy libmegacpp
 cp build/src/megacpp/libmegacpp.a lib/libmegacpp.a
 
+# set timestamps on everything in lib to 2026-11-01 for reproducible build
+find lib -exec touch -h -d '2026-11-01T00:00:00Z' {} +
+
 echo '==> all done'

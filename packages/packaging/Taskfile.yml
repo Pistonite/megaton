@@ -5,6 +5,10 @@ includes:
     taskfile: ../mega-cpp
     dir: ../mega-cpp
     internal: true
+  mega-rs:
+    taskfile: ../mega-rs
+    dir: ../mega-rs
+    internal: true
 
   cargo:
     taskfile: ../../mono-dev/task/cargo.yaml
@@ -16,7 +20,11 @@ tasks:
   make:
     desc: Create the megatonlib package
     cmds:
+      - task: mega-cpp:install
       - task: mega-cpp:make
+      # building the Rust side just to make sure it can build,
+      # we ship the source for everything on the Rust side.
+      - task: mega-rs:build
       - task: refresh-lock
       - cargo run -p megaton-packaging --features packaging-script
 
@@ -39,7 +47,7 @@ tasks:
       IGNORE:
         sh: cargo metadata --quiet
     cmds:
-      - slient: true
+      - silent: true
         cmd: echo 'Cargo.lock refreshed'
 
   clean:

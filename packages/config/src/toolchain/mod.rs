@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Contributors of https://github.com/Pistonite/megaton
+
 mod devkita64;
 pub use devkita64::*;
 mod driver;
