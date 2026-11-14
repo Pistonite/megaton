@@ -25,7 +25,7 @@ pub fn inspect(home: &HomeEnv) {
 
 /// Install cxxbridge tool
 #[cu::context("failed to install cxxbridge-cmd")]
-pub fn install(home: &HomeEnv) -> cu::Result<()> {
+pub fn install(home: &HomeEnv, print_if_already_installed: bool) -> cu::Result<()> {
     let env = CxxBridgeEnv::resolve(home);
     if env.is_installed() {
         if env.version != BLESSED_VERSION {
@@ -34,7 +34,9 @@ pub fn install(home: &HomeEnv) -> cu::Result<()> {
                 "cxxbridge-cmd version {current} doesn't match blessed version {BLESSED_VERSION}, reinstalling"
             );
         } else {
-            cu::hint!("found existing cxxbridge-cmd installation, skipping");
+            if print_if_already_installed {
+                cu::hint!("cxxbridge-cmd {BLESSED_VERSION} is already installed");
+            }
             return Ok(());
         }
     } else {

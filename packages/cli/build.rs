@@ -25,9 +25,7 @@ fn main_internal() -> cu::Result<()> {
         let commit = cu::fs::read_string(commit_file_path)?;
         let commit = commit.trim().to_lowercase();
         // todo: when it becomes sha256 by default this might need to change
-        if commit.len() != 40 || commit.chars().any(|c| 
-            !c.is_ascii_hexdigit()
-        ) {
+        if commit.len() != 40 || commit.chars().any(|c| !c.is_ascii_hexdigit()) {
             cu::bail!("{commit} is not a valid git commit hash");
         }
         println!("cargo::rustc-env=MEGATON_COMMIT={commit}");

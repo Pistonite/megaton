@@ -15,8 +15,12 @@ if [ ! -f build/CMakeCache.txt ]; then
     cmake -G Ninja -B build
 fi
 
+echo '==> running build'
 cmake --build build
+echo '==> running header verification'
+cmake --build build --target all_verify_header_sets
 
+echo '==> copying output files'
 rm -rf lib
 mkdir -p lib/hermit
 
@@ -36,4 +40,4 @@ done
 # copy libmegacpp
 cp build/src/megacpp/libmegacpp.a lib/libmegacpp.a
 
-echo 'copied output files'
+echo '==> all done'

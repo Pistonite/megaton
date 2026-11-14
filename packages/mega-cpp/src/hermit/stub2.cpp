@@ -2,4 +2,6 @@
 
 void _megahermit_abort() {}
 
-void _megahermit_stub1() {}
+uint32_t _megahermit_stub1() {
+    return 0;
+}

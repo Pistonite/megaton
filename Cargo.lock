@@ -768,21 +768,21 @@ dependencies = [
 
 [[package]]
 name = "mega-rspmacro"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "pistonite-pm",
 ]
 
 [[package]]
 name = "megaton"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "mega-rspmacro",
 ]
 
 [[package]]
 name = "megaton-buildtool"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "cargo_metadata",
  "depfile",
@@ -803,7 +803,7 @@ dependencies = [
 
 [[package]]
 name = "megaton-cmd"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "megaton-buildtool",
  "megaton-config",
@@ -815,7 +815,7 @@ dependencies = [
 
 [[package]]
 name = "megaton-config"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "pistonite-cu",
  "semver",
@@ -832,7 +832,7 @@ dependencies = [
 
 [[package]]
 name = "megaton-packaging"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "flate2",
  "pistonite-cu",
@@ -842,7 +842,7 @@ dependencies = [
 
 [[package]]
 name = "megaton-synctool"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "megaton-config",
  "pistonite-cu",
@@ -853,7 +853,7 @@ dependencies = [
 
 [[package]]
 name = "megaton-toolchain"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "megaton-config",
  "pistonite-cu",
