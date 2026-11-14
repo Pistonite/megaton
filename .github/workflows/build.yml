@@ -42,7 +42,6 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 26
-      - uses: ./.github/steps/setup-clang
       - uses: Pistonight/mono-dev/actions/setup@main
         with:
           rust: stable
@@ -50,6 +49,7 @@ jobs:
           # tool-mdbook: true
           tool-cargo-install: bindgen(bindgen-cli)
           ccpp-cmake: true
+      - uses: ./.github/steps/setup-clang
       - run: task package
       - uses: Pistonight/mono-dev/actions/rust-xplat@main
         with:
@@ -64,11 +64,11 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 26
-      - uses: ./.github/steps/setup-clang
       - uses: Pistonight/mono-dev/actions/setup@main
         with:
           rust: stable
           # tool-mdbook: true
           tool-cargo-install: bindgen(bindgen-cli)
           ccpp-cmake: true
+      - uses: ./.github/steps/setup-clang
       - run: task check-dkp
