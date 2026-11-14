@@ -22,8 +22,8 @@ tasks:
     cmds:
       - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > base-image/rustup-init.sh
       - task: packaging:make
-      - cargo run --bin megaton-docker-setup-toolchain
-      - cargo run --bin megaton-docker-setup-dist
+      - cargo run --bin megaton-docker-setup-toolchain --quiet
+      - cargo run --bin megaton-docker-setup-dist --quiet
       - git rev-parse HEAD > dist-image/crates/packages/cli/COMMIT
       - task: build-base-image
       - task: dump-base-image-info
@@ -65,6 +65,7 @@ tasks:
       - task: docker:build
         vars:
           DOCKER_IMAGE: '{{.DIST_IMAGE}}'
+          ARGS: --build-arg RUST_VERSION={{.RUST_VERSION}}
           DIR: dist-image
 
   dump-dist-image-info:

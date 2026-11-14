@@ -3,6 +3,7 @@
 
 #[cu::cli]
 fn main(_: cu::cli::Flags) -> cu::Result<()> {
+    cu::lv::disable_print_time();
     megaton_docker_setup::setup_isolated_crates(
         "dist-image",
         &[

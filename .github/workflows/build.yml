@@ -19,7 +19,6 @@ jobs:
       - uses: Pistonight/mono-dev/actions/setup@main
         with:
           ccpp-cmake: true
-      - run: echo '/root/.cargo/bin' >> "$GITHUB_PATH"
       - run: task package
       - uses: actions/upload-artifact@v7
         with:

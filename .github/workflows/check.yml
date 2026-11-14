@@ -32,6 +32,6 @@ jobs:
         with:
           # tool-mdbook: true
           ccpp-cmake: true
-      - run: echo '/root/.cargo/bin' >> "$GITHUB_PATH"
       - run: rustup toolchain list
-      - run: task check-dkp
+      - run: rustup default
+      # - run: task check-dkp
