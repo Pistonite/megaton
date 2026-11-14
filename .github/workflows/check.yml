@@ -32,6 +32,4 @@ jobs:
         with:
           # tool-mdbook: true
           ccpp-cmake: true
-      - run: rustup toolchain list
-      - run: rustup default
-      # - run: task check-dkp
+      - run: task check-dkp

@@ -1,7 +1,5 @@
 FROM devkitpro/devkita64
 
-ARG RUST_VERSION
-
 RUN apt update && apt upgrade -y && apt install -y lsb-release software-properties-common
 
 RUN wget -O /root/llvm.sh https://apt.llvm.org/llvm.sh && \
@@ -14,7 +12,7 @@ ENV \
 
 COPY ./rustup-init.sh /root/rustup-init.sh
 RUN chmod +x /root/rustup-init.sh && \
-  /root/rustup-init.sh -y --default-toolchain ${RUST_VERSION} --no-modify-path && \
+  /root/rustup-init.sh -y --no-modify-path && \
   chmod -R a+w $RUSTUP_HOME $CARGO_HOME
 
 RUN cargo install bindgen-cli
