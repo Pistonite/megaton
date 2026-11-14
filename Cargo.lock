@@ -802,6 +802,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "megaton-cmd"
+version = "0.3.0"
+dependencies = [
+ "megaton-buildtool",
+ "megaton-config",
+ "megaton-packaging",
+ "megaton-synctool",
+ "megaton-toolchain",
+ "pistonite-cu",
+]
+
+[[package]]
 name = "megaton-config"
 version = "0.3.0"
 dependencies = [
@@ -819,17 +831,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "megaton-ftp"
-version = "0.0.0"
-dependencies = [
- "megaton-config",
- "pistonite-cu",
- "serde",
- "suppaftp",
- "tokio",
-]
-
-[[package]]
 name = "megaton-packaging"
 version = "0.3.0"
 dependencies = [
@@ -837,6 +838,17 @@ dependencies = [
  "pistonite-cu",
  "sha2",
  "tar",
+]
+
+[[package]]
+name = "megaton-synctool"
+version = "0.3.0"
+dependencies = [
+ "megaton-config",
+ "pistonite-cu",
+ "serde",
+ "suppaftp",
+ "tokio",
 ]
 
 [[package]]

@@ -1,10 +1,9 @@
-
 use cu::pre::*;
 
 use megaton_buildtool::cmd::Cmd as CmdBuild;
-use megaton_ftp::cmd::Cmd as CmdFtp;
-use megaton_toolchain::cmd::Cmd as CmdToolchain;
 use megaton_config::cmd::Cmd as CmdConfigDump;
+use megaton_synctool::cmd::Cmd as CmdSync;
+use megaton_toolchain::cmd::Cmd as CmdToolchain;
 
 use crate::version::CmdVersion;
 
@@ -19,6 +18,10 @@ static LOGO: &str = r#"
 #[derive(clap::Parser, AsRef)]
 #[clap(before_help(LOGO))]
 pub struct Cmd {
+    /// Specify the config path or project directory
+    #[clap(short = 'C', long)]
+    config: Option<String>,
+
     #[clap(subcommand)]
     command: Option<CmdSubcommand>,
 
@@ -46,9 +49,13 @@ impl Cmd {
             cu::lv::disable_print_time();
             return Ok(());
         };
+
+        let config_path = self.config.as_deref();
         match command {
-            CmdSubcommand::Build(cmd) => cmd.run()?,
+            CmdSubcommand::Build(cmd) => cmd.run(config_path)?,
+            CmdSubcommand::Sync(cmd) => cmd.run(self.config)?,
             CmdSubcommand::Toolchain(cmd) => cmd.run()?,
+            CmdSubcommand::ConfigDump(cmd) => cmd.run(config_path)?,
             CmdSubcommand::Version(_) => {}
         }
 
@@ -61,10 +68,10 @@ pub enum CmdSubcommand {
     /// Build the modding project
     Build(CmdBuild),
     /// Sync files from/to the console file system
-    Ftp(CmdFtp),
+    Sync(CmdSync),
     /// Manage the custom Rust toolchain and other tools
     Toolchain(CmdToolchain),
-    /// Print the version. -v to show toolchain information. -q to only print the version number
+    /// Dump resolved config or toolchain information
     ConfigDump(CmdConfigDump),
     /// Print the version. -v to show toolchain information. -q to only print the version number
     Version(CmdVersion),
@@ -74,7 +81,9 @@ impl AsRef<cu::cli::Flags> for CmdSubcommand {
     fn as_ref(&self) -> &cu::cli::Flags {
         match self {
             CmdSubcommand::Build(cmd) => cmd.as_ref(),
+            CmdSubcommand::Sync(cmd) => cmd.as_ref(),
             CmdSubcommand::Toolchain(cmd) => cmd.as_ref(),
+            CmdSubcommand::ConfigDump(cmd) => cmd.as_ref(),
             CmdSubcommand::Version(cmd) => cmd.as_ref(),
         }
     }

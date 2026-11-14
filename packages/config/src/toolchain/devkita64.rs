@@ -111,13 +111,13 @@ impl DevKitA64Env {
 
         let version = match get_gcc_version_from_installation(&dka64) {
             Some(v) => {
-                cu::debug!("detected gcc version from installation: {v}");
+                cu::trace!("detected gcc version from installation: {v}");
                 v
             }
             None => {
-                cu::debug!("invoking gcc to check its version");
+                cu::trace!("invoking gcc to check its version");
                 let v = get_gcc_version_from_gcc(&cc)?;
-                cu::debug!("detected gcc version from gcc: {v}");
+                cu::trace!("detected gcc version from gcc: {v}");
                 v
             }
         };
@@ -170,7 +170,7 @@ fn get_gcc_version_from_installation(dka64: &Path) -> Option<String> {
     let readdir = match cu::fs::read_dir(&dka64_include_cpp) {
         Ok(readdir) => readdir,
         Err(e) => {
-            cu::debug!("failed to read c++ include path: {e:?}");
+            cu::trace!("failed to read c++ include path: {e:?}");
             return None;
         }
     };
@@ -178,14 +178,14 @@ fn get_gcc_version_from_installation(dka64: &Path) -> Option<String> {
     for entry in readdir {
         let entry = match entry {
             Err(e) => {
-                cu::debug!("error reading some entry from devkitpro c++ include path: {e:?}");
+                cu::trace!("error reading some entry from devkitpro c++ include path: {e:?}");
                 continue;
             }
             Ok(x) => x,
         };
         let version = match entry.file_name().into_utf8() {
             Err(e) => {
-                cu::debug!("ignoring non-utf8 while reading devkitpro c++ version: {e:?}");
+                cu::trace!("ignoring non-utf8 while reading devkitpro c++ version: {e:?}");
                 continue;
             }
             Ok(x) => x,
@@ -195,7 +195,7 @@ fn get_gcc_version_from_installation(dka64: &Path) -> Option<String> {
                 candidate = Some(version);
             }
             Some(old_version) => {
-                cu::debug!(
+                cu::trace!(
                     "more than one version is found ({version} and {old_version}), requires calling gcc to resolve"
                 );
                 return None;
@@ -204,7 +204,7 @@ fn get_gcc_version_from_installation(dka64: &Path) -> Option<String> {
     }
 
     if candidate.is_none() {
-        cu::debug!("no gcc versions found in c++ include path");
+        cu::trace!("no gcc versions found in c++ include path");
     }
 
     candidate

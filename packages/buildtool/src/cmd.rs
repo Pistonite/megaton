@@ -46,12 +46,12 @@ impl AsProfileFlag for Cmd {
 }
 
 impl Cmd {
-    pub fn run(self, dir: Option<&str>) -> cu::Result<()> {
+    pub fn run(self, config_path: Option<&str>) -> cu::Result<()> {
         // config/toolchain must be resolved outside of async runtime
         // because they are blocking
         let toolchain = Arc::new(ToolchainEnv::resolve()?);
-        let config = Arc::new(Config::new_from_project_dir(
-            dir,
+        let config = Arc::new(Config::new_from_project(
+            config_path,
             ConfigLoadOpts {
                 resolve: true,
                 validate: true,

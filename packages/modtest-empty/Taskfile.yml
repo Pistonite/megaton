@@ -11,9 +11,9 @@ tasks:
   upload:
     cmds:
       - task: download # to ensure our previous run outputs are downloaded and removed
-      - cargo run -p megaton-ftp upload
+      - cargo run -p megaton-synctool upload
 
   download:
     desc: Download logs and crash reports from console
     cmds:
-      - cargo run -p megaton-ftp download -d
+      - cargo run -p megaton-synctool download -d
