@@ -78,14 +78,14 @@ tasks:
         sh: grep -E ^version ../../Cargo.toml | head -n1 | sed -E 's/^version\s*=\s"([^"]+)"$/v\1/'
       TAG_COMMIT:
         sh: echo "sha-$(git rev-parse --short=7 HEAD)"
-      DOCKER_IMAGE: '{{.MAIN_DOCKER_IMAGE}}'
+      DOCKER_IMAGE: '{{.DIST_IMAGE}}'
     cmds:
       - docker tag {{.DOCKER_IMAGE}}:latest {{.DOCKER_IMAGE}}:{{.TAG_VERSION}}
       - docker tag {{.DOCKER_IMAGE}}:latest {{.DOCKER_IMAGE}}:{{.TAG_COMMIT}}
       - docker push {{.DOCKER_IMAGE}}:latest
       - docker push {{.DOCKER_IMAGE}}:{{.TAG_VERSION}}
       - docker push {{.DOCKER_IMAGE}}:{{.TAG_COMMIT}}
-      - cmd: echo 'https://github.com/orgs/Pistonite/packages/container/package/megaton-build'
+      - cmd: echo 'https://github.com/orgs/Pistonite/packages/container/package/megaton'
         silent: true
 
   clean:
