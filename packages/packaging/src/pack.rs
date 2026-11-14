@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Contributors of https://github.com/Pistonite/megaton
+
 use std::fs::File;
 use std::path::Path;
 
@@ -42,7 +45,7 @@ impl LibraryPackager {
             "failed to open '{}'",
             file_path.display()
         )?;
-        cu::print!("packing {}", rel_path.display());
+        cu::debug!("packing {}", rel_path.display());
         self.tar.append_file(rel_path, &mut file)?;
         Ok(())
     }
@@ -80,7 +83,7 @@ impl LibraryPackager {
                 "failed to open '{}'",
                 entry_path.display()
             )?;
-            cu::print!("packing {}", rel_path.display());
+            cu::debug!("packing {}", rel_path.display());
             self.tar.append_file(&rel_path, &mut file)?;
         }
         Ok(())
@@ -95,10 +98,22 @@ impl LibraryPackager {
         let gz = self.tar.into_inner()?;
         let buffer = gz.finish()?;
         let sha256 = hash_sha256(&buffer);
-        let info = LibraryPackageInfo {
+        let mut info = LibraryPackageInfo {
+            up_to_date: false,
             size: buffer.len() as u64,
             sha256,
         };
+
+        let out_path = out_path.as_ref();
+        let out_sha_path = out_sha_path.as_ref();
+        if let Ok(existing) = cu::fs::read(out_path) {
+            if let Ok(existing_sha) = cu::fs::read_string(out_sha_path) {
+                if existing == buffer && info.sha256 == existing_sha {
+                    info.up_to_date =true;
+                    return Ok(info);
+                }
+            }
+        }
 
         cu::fs::write(out_path, buffer)?;
         cu::fs::write(out_sha_path, &info.sha256)?;
@@ -107,6 +122,7 @@ impl LibraryPackager {
 }
 
 pub struct LibraryPackageInfo {
+    pub up_to_date: bool,
     pub size: u64,
     pub sha256: String,
 }

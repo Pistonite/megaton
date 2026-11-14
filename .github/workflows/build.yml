@@ -1,0 +1,72 @@
+name: build
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: Pistonight/mono-dev/actions/setup@main
+        with:
+          rust: stable
+          tool-cargo-binstall: lisensor
+          tool-cargo-install: bindgen(bindgen-cli)
+          ccpp-cmake: true
+      - name: placing stub megatonlib
+        run: |
+          mkdir -p packages/packaging/dist
+          echo '' > packages/packaging/dist/megatonlib.tar.gz
+          echo '01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b' > packages/packaging/dist/megatonlib.tar.gz.sha256
+      - run: task check-non-dkp
+      - run: task test
+
+  build-cli:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: blacksmith-4vcpu-ubuntu-2404
+            target: x64
+          # maybe support more targets in the future
+          # right now since we are in development, save some CI costs
+          # - image: blacksmith-4vcpu-ubuntu-2404-arm
+          #   target: arm64
+          # - image: blacksmith-6vcpu-macos-latest
+          #   target: arm64
+    runs-on: ${{ matrix.image }}
+    container:
+      image: ghcr.io/pistonite/megaton
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 26
+      - uses: Pistonight/mono-dev/actions/setup@main
+        with:
+          rust: stable
+          rust-native: ${{ matrix.target }}
+          # tool-mdbook: true
+          tool-cargo-install: bindgen(bindgen-cli)
+          ccpp-cmake: true
+      - run: task package
+      - uses: Pistonight/mono-dev/actions/rust-xplat@main
+        with:
+          arch: ${{ matrix.target }}
+          binary: megaton
+
+  check-dkp:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    container:
+      image: ghcr.io/pistonite/megaton
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 26
+      - uses: Pistonight/mono-dev/actions/setup@main
+        with:
+          rust: stable
+          # tool-mdbook: true
+          tool-cargo-install: bindgen(bindgen-cli)
+          ccpp-cmake: true
+      - run: task check-dkp

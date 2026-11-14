@@ -16,7 +16,7 @@ includes:
 
   # libraries
   mega-cpp:      { taskfile: packages/mega-cpp,      dir: packages/mega-cpp,      internal: true }
-  # mega-rs:       { taskfile: packages/mega-rs,       dir: packages/mega-rs,       internal: true }
+  mega-rs:       { taskfile: packages/mega-rs,       dir: packages/mega-rs,       internal: true }
   # mega-rspmacro: { taskfile: packages/mega-rspmacro, dir: packages/mega-rspmacro, internal: true }
 
   # other
@@ -28,10 +28,14 @@ tasks:
     - rm -rf packages/mono-dev
     - rm -rf mono-dev
     - git clone https://github.com/Pistonight/mono-dev --depth 1
-    # - '{{.TASK_EXE}} install-ci'
+    - '{{.TASK_EXE}} install-2' # reinvoke with shared tasks available
+  install-2:
+    interal: true
+    cmds:
+      - task: mega-cpp:install
 
-  install-ci:
-    - task: docs:install
+  # install-ci:
+  #   - task: docs:install
 
   install-cargo-extra-tools:
     aliases: [icets]
@@ -39,29 +43,36 @@ tasks:
       - task: cargo-binstall
         vars:
           PACKAGES: lisensor shwoop bindgen-cli
+
+  toolchain:
+    desc: Run megaton-toolchain
+    cmds:
+      - task: toolchain:run
+
+
   check:
     desc: Check the code for issues
     cmds:
       - task: check-non-dkp
       - task: check-dkp
   check-non-dkp:
-  #   - lisensor
+    - lisensor
     - task: config:check
     - task: packaging:check
     - task: toolchain:check
     - task: synctool:check
     - task: buildtool:check
     - task: cli:check
-    # - task: docker-build:check
-  #   - task: lib:check-rs
+
   check-dkp:
-    - task: mega-cpp:configure
+    - task: mega-cpp:install
     - task: mega-cpp:check
-  #   - task: lib:check-c
+      # TODO: check mega-rs and mega-rspmacro
   
   fix:
     desc: Fix formatting issues
     cmds:
+      - lisensor -f
       - cargo fmt --all
       - task: mega-cpp:fix
 
@@ -73,25 +84,15 @@ tasks:
     cmds:
       - task: packaging:make
 
-  # build:
-  #   - task: build-non-dkp
-  #   - task: build-dkp
-  # build-non-dkp:
-  #   - task: cli:build
-  #   - task: docs:build
-  #   - task: lib:build-rs
-  # build-dkp:
-  #   - task: lib:configure
-  #   - task: lib:build-c
-  #
+  build:
+    desc: Build everything
+    cmds:
+      - task: package
+      - cargo build -p megaton-cmd --release
 
   clean:
     - cargo clean
     - task: mega-cpp:clean
+    - task: docker:clean
     - task: packaging:clean
     - task: toolchain:clean
-
-  #
-  # upgrade:
-  #   - cargo upgrade
-  #

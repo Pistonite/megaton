@@ -220,7 +220,7 @@ def main():
     modules = parse_all()
     OUT_FILE.write_text(emit(modules))
     count = sum(len(m.descriptions) for m in modules)
-    print(f"{OUT_FILE.relative_to(ROOT)}: {len(modules)} modules, {count} descriptions")
+    print(f"{len(modules)} modules, {count} descriptions")
 
 if __name__ == "__main__":
     main();

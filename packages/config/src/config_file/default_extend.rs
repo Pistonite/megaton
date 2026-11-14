@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Contributors of https://github.com/Pistonite/megaton
+
 //! Default-extend behavior for arrays in configs
 //!
 //! The default token `<default>` means:
