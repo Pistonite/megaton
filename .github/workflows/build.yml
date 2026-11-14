@@ -48,17 +48,25 @@ jobs:
           rust: stable
           rust-native: ${{ matrix.target }}
       - uses: dawidd6/action-download-artifact@v28
+        if: github.event_name != 'pull_request'
         with:
           name: megatonlib
           pr: ${{ github.event.pull_request.number }}
           path: package/packaging/dist
           workflow_conclusion: "" # uploaded in a previous job
+      - uses: dawidd6/action-download-artifact@v28
+        if: github.event_name == 'pull_request'
+        with:
+          name: megatonlib
+          commit: ${{ github.sha }}
+          path: package/packaging/dist
+          workflow_conclusion: "" # uploaded in a previous job
       - name: debug downloaded artifacts
         run: ls package/packaging/dist
-      # - uses: Pistonight/mono-dev/actions/rust-xplat@main
-      #   with:
-      #     arch: ${{ matrix.target }}
-      #     binary: megaton
+      - uses: Pistonight/mono-dev/actions/rust-xplat@main
+        with:
+          arch: ${{ matrix.target }}
+          binary: megaton
 
 
 
