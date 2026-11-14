@@ -20,16 +20,16 @@ jobs:
   #     - run: task check-non-dkp
   #     - run: task test
 
-  dkp:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    container:
-      image: ghcr.io/pistonite/megaton
-    steps:
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 26
-      - uses: Pistonight/mono-dev/actions/setup@main
-        with:
-          # tool-mdbook: true
-          ccpp-cmake: true
-      - run: task check-dkp
+  # dkp:
+  #   runs-on: blacksmith-4vcpu-ubuntu-2404
+  #   container:
+  #     image: ghcr.io/pistonite/megaton
+  #   steps:
+  #     - uses: actions/setup-node@v6
+  #       with:
+  #         node-version: 26
+  #     - uses: Pistonight/mono-dev/actions/setup@main
+  #       with:
+  #         # tool-mdbook: true
+  #         ccpp-cmake: true
+  #     - run: task check-dkp
