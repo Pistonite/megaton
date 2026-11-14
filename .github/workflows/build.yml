@@ -45,10 +45,8 @@ jobs:
       - uses: Pistonight/mono-dev/actions/setup@main
         with:
           # tool-mdbook: true
-          tool-cargo-install: bindgen(bindgen-cli)
           ccpp-cmake: true
       - run: 'rustup target add ${{ matrix.rust-target }}'
-      - uses: ./.github/steps/setup-clang
       - run: task package
       - uses: Pistonight/mono-dev/actions/rust-xplat@main
         with:
@@ -66,7 +64,5 @@ jobs:
       - uses: Pistonight/mono-dev/actions/setup@main
         with:
           # tool-mdbook: true
-          tool-cargo-install: bindgen(bindgen-cli)
           ccpp-cmake: true
-      - uses: ./.github/steps/setup-clang
       - run: task check-dkp
