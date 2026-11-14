@@ -49,11 +49,8 @@ jobs:
       - run: echo '/root/.cargo/bin' >> "$GITHUB_PATH"
       - run: |
           which rustup
-          which cargo
-          which rustc
-          which bindgen
-          ls /root/.cargo/bin
-          ls $HOME/.cargo/bin
+          rustup default
+          rustup show active-toolchain
       - run: 'rustup target add ${{ matrix.rust-target }}'
       - run: task package
       - uses: Pistonight/mono-dev/actions/rust-xplat@main
