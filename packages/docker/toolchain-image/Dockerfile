@@ -14,7 +14,7 @@ ENV MEGATON_HOME=/opt/megaton
 RUN \
 --mount=type=cache,target=/opt/megaton/toolchain-build/target,id=megaton-docker-toolchain-build-${RUST_VERSION} \
 --mount=type=cache,target=/opt/megaton/rust,id=megaton-docker-build-llvm-${GCC_VERSION} \
---mount=type=cache,target=/root/.cargo/registry,id=megaton-docker-build-cargo-${RUST_VERSION} \
+--mount=type=cache,target=/usr/local/cargo/registry,id=megaton-docker-build-cargo-${RUST_VERSION} \
 cd /opt/megaton/toolchain-build && cargo run \
 --bin megaton-toolchain \
 -- install -k -v

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 Contributors of https://github.com/Pistonite/megaton
+
 mod hermit;
 
 #[path = "megacpp_sys_gen.rs"]

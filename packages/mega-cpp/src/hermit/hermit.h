@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 Contributors of https://github.com/Pistonite/megaton
 
 /** Binding for hermit kernel implementation in Rust to call into the C side */
 
@@ -8,10 +10,6 @@
 #else
 #include <stdint.h>
 #endif
-// FIXME: clang-tidy is confused about the language of this file,
-// add cmake rules for headers
-// NOLINTBEGIN(modernize-deprecated-headers)
-// NOLINTEND(modernize-deprecated-headers)
 
 #ifdef __cplusplus
 extern "C" {

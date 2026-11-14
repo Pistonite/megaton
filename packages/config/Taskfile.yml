@@ -12,3 +12,5 @@ tasks:
     - task: cargo:fmt-check
   fix:
     - task: cargo:fmt-fix
+  test:
+    - cargo test

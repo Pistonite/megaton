@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Contributors of https://github.com/Pistonite/megaton
+
 use std::path::Path;
 
 use cu::pre::*;
@@ -12,7 +15,7 @@ fn main(_: cu::cli::Flags) -> cu::Result<()> {
         cu::bail!("failed to get CARGO_MANIFEST_DIR, please run the packaging script with cargo");
     }
     let dist_dir = Path::new(&md).join("dist");
-    cu::fs::make_dir_empty(&dist_dir)?;
+    cu::fs::make_dir(&dist_dir)?;
 
     let packages_dir = Path::new(&md).parent_abs()?;
 
@@ -22,7 +25,7 @@ fn main(_: cu::cli::Flags) -> cu::Result<()> {
         );
     }
 
-    cu::info!("located packages directory: {}", packages_dir.display());
+    cu::debug!("located packages directory: {}", packages_dir.display());
 
     let repo_dir = packages_dir.parent_abs()?;
     let workspace_manifest_path = repo_dir.join("Cargo.toml");
@@ -34,7 +37,7 @@ fn main(_: cu::cli::Flags) -> cu::Result<()> {
     let subset_workspace_manifest_path = dist_dir.join("Cargo.toml");
 
     cu::fs::write(&subset_workspace_manifest_path, &subset_workspace_manifest)?;
-    cu::info!("created manifest for workspace subset packages");
+    cu::debug!("created manifest for workspace subset packages");
 
     let mut packer = LibraryPackager::new();
     packer.add_file(repo_dir.join("Cargo.lock"), "Cargo.lock")?;
@@ -53,7 +56,12 @@ fn main(_: cu::cli::Flags) -> cu::Result<()> {
         dist_dir.join("megatonlib.tar.gz.sha256"),
     )?;
 
-    cu::info!("successfully packed megatonlib.tar.gz");
+    if info.up_to_date {
+        cu::hint!("megatonlib.tar.gz is up-to-date")
+    } else {
+        cu::info!("successfully packed megatonlib.tar.gz");
+    }
+
     cu::info!("size: {} bytes, sha256: {}", info.size, info.sha256);
 
     Ok(())

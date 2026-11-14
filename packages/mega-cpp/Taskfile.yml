@@ -16,6 +16,10 @@ vars:
     include
 
 tasks:
+  install:
+    - task: rs-bindgen
+    - task: configure
+
   rs-bindgen:
     desc: Generate binding for megaton rust library
     vars:
@@ -32,6 +36,7 @@ tasks:
             echo '#include "'"$(realpath $header)"'"' >> build/rust_bindgen.h
           done
       - bindgen build/rust_bindgen.h -o ../mega-rs/src/megacpp_sys_gen.rs -- {{.C_FLAGS}}
+      - python3 scripts/nn-result-gen.py
 
   cmake-gen:
     desc: Generate CMake flags

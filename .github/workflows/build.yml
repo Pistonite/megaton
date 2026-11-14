@@ -1,0 +1,63 @@
+name: build
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  lib:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    container:
+      image: ghcr.io/pistonite/megaton
+    steps:
+      - uses: Pistonight/mono-dev/actions/setup@main
+        with:
+          ecma-node: true
+          ccpp-cmake: true
+      - uses: Swatinem/rust-cache@v2
+      - run: task package
+      - uses: actions/upload-artifact@v7
+        with:
+          path: packages/packaging/dist
+          name: megatonlib
+          retention-days: 3
+
+  cli:
+    needs:
+      - lib
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: blacksmith-4vcpu-ubuntu-2404
+            target: x64
+          # maybe support more targets in the future
+          # right now since we are in development, save some CI costs
+          - image: blacksmith-4vcpu-ubuntu-2404-arm
+            target: arm64
+          - image: blacksmith-6vcpu-macos-latest
+            target: arm64
+    runs-on: ${{ matrix.image }}
+    steps:
+      - uses: Pistonight/mono-dev/actions/setup@main
+        with:
+          rust: stable
+          rust-native: ${{ matrix.target }}
+      - uses: dawidd6/action-download-artifact@v28
+        with:
+          name: megatonlib
+          ref: ${{ github.ref }}
+          path: packages/packaging/dist
+          workflow_conclusion: "" # uploaded in a previous job
+      - name: list downloaded artifacts
+        run: ls packages/packaging/dist
+      - uses: Pistonight/mono-dev/actions/rust-xplat@main
+        with:
+          arch: ${{ matrix.target }}
+          binary: megaton
+
+
+

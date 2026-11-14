@@ -1,0 +1,11 @@
+version: '3'
+
+
+tasks:
+  
+  build:
+    # requires toolchain to be installed
+    # run cargo run -p megaton-toolchain -- install [-k]
+    # -k to keep the rust source to save build times in the future,
+    # but keeps ~20GB of llvm source/outputs
+    - cargo +megaton build --release --target aarch64-unknown-hermit

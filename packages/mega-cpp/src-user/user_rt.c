@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (c) 2026 Contributors of https://github.com/Pistonite/megaton
+
 #include <megaton/user_rt.h>
 
 // This file is compiled from values given in user's Megaton.toml.
