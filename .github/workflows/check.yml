@@ -29,9 +29,6 @@ jobs:
         with:
           ecma-node: true
           # tool-mdbook: true
-          ccpp-lint: true
-      - uses: Pistonight/actions-setup-cmake@test-perf-improvements
-        with:
-          cmake-version: '4.x'
+          ccpp-cmake: true
       - uses: Swatinem/rust-cache@v2
       - run: task check-dkp

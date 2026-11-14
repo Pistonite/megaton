@@ -16,10 +16,7 @@ jobs:
       - uses: Pistonight/mono-dev/actions/setup@main
         with:
           ecma-node: true
-          ccpp-lint: true
-      - uses: Pistonight/actions-setup-cmake@test-perf-improvements
-        with:
-          cmake-version: '4.x'
+          ccpp-cmake: true
       - uses: Swatinem/rust-cache@v2
       - run: task package
       - uses: actions/upload-artifact@v7
