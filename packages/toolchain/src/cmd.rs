@@ -60,7 +60,7 @@ impl Cmd {
         let home = HomeEnv::resolve()?;
         match self.command {
             SubCmd::Install { keep, clean, .. } => {
-                crate::cxxbridge::install(&home)?;
+                crate::cxxbridge::install(&home, true)?;
                 crate::rust::install(&home, keep, clean)?;
                 Ok(())
             }
@@ -85,7 +85,7 @@ impl Cmd {
                     cu::cli::print_help::<CmdCxxBridge>(false);
                     return Ok(());
                 }
-                crate::cxxbridge::install(&home)?;
+                crate::cxxbridge::install(&home, false)?;
                 let mut args = Vec::with_capacity(2);
                 if let Some(file) = rs_file {
                     args.push(file);

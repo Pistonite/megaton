@@ -1,4 +1,16 @@
+use cu::pre::*;
+
+#[derive(clap::Parser, AsRef)]
+struct CmdWrapper {
+    /// Specify the config path or project directory
+    #[clap(short = 'C', long)]
+    config: Option<String>,
+
+    #[clap(flatten)]
+    #[as_ref(cu::cli::Flags)]
+    cmd: megaton_config::cmd::Cmd,
+}
 #[cu::cli]
-fn main(cmd: megaton_config::cmd::Cmd) -> cu::Result<()> {
-    cmd.run(None)
+fn main(args: CmdWrapper) -> cu::Result<()> {
+    args.cmd.run(args.config.as_deref())
 }

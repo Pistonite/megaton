@@ -10,9 +10,9 @@ vars:
   SOURCES: >
     src/hermit
     src/rocrt
+    src/megacpp/include/megaton-priv
     src/megacpp/megaton
     src/megacpp/sysbase
-    src-user
     include
 
 tasks:
@@ -39,9 +39,12 @@ tasks:
       - silent: true
         cmd: |
           mkdir -p build etc
+          cargo build -p megaton-config
           echo 'dumping flags from megaton config-dump'
-          c_flags="$(cargo run -p megaton-config -- -p megaton_cmake build.flags.resolved.c --format=one-line)"
-          cxx_flags="$(cargo run --quiet -p megaton-config -- -p megaton_cmake build.flags.resolved.cxx --format=one-line)"
+          c_standard="$(cargo run --quiet -p megaton-config -- -p megaton_cmake build.std-c | tr -d 'c')"
+          cxx_standard="$(cargo run --quiet -p megaton-config -- -p megaton_cmake build.std-c++ | tr -d 'c++')"
+          c_flags="$(cargo run --quiet -p megaton-config -- -p megaton_cmake build.flags.resolved.c --format=one-line | sed -E 's/(^| )-std=[^ ]+//g')"
+          cxx_flags="$(cargo run --quiet -p megaton-config -- -p megaton_cmake build.flags.resolved.cxx --format=one-line | sed -E 's/(^| )-std=[^ ]+//g')"
           as_flags="$(cargo run --quiet -p megaton-config -- -p megaton_cmake build.flags.resolved.cc-asm --format=one-line)"
           output='build/flags.cmake'
           echo '# Generated flags from megaton config-dump' > $output
@@ -60,6 +63,13 @@ tasks:
             echo "  $flag" >> $output
           done
           echo ')' >> $output
+          echo "set(CMAKE_C_STANDARD ${c_standard})" >> $output
+          echo "set(CMAKE_C_STANDARD_REQUIRED ON)" >> $output
+          echo "set(CMAKE_C_EXTENSIONS OFF)" >> $output
+          echo "set(CMAKE_CXX_STANDARD ${cxx_standard})" >> $output
+          echo "set(CMAKE_CXX_STANDARD_REQUIRED ON)" >> $output
+          echo "set(CMAKE_CXX_EXTENSIONS OFF)" >> $output
+
           output2=etc/flags.cmake
           if ! cmp -s <(tr -d '\r' < "$output") <(tr -d '\r' < "$output2"); then
             cp "$output" "$output2"
@@ -110,24 +120,21 @@ tasks:
       - bash build.sh
 
   check:
-    # FIXME: some issue with detecting header language when clang-tidy
-    # checks header; might be able to fix if cmake generates compile instructions
-    # for headers
-    # - task: ccpp:clang-tidy
-    #   vars:
-    #     BUILD: build
-    #     HEADER: ^(include|src/megacpp/include/megaton-priv)/
-    #     ADD_CHECKS: >
-    #       -bugprone-reserved-identifier,
+    - task: ccpp:clang-tidy
+      vars:
+        SOURCE: '{{.SOURCES}}'
+        BUILD: build
+        ADD_CHECKS: >
+          -bugprone-reserved-identifier,
 
     - task: ccpp:fmt-check
       vars:
-        SOURCE: '{{.SOURCES}}'
+        SOURCE: '{{.SOURCES | trim}} src-user'
 
   fix:
     - task: ccpp:fmt-fix
       vars:
-        SOURCE: '{{.SOURCES}}'
+        SOURCE: '{{.SOURCES | trim}} src-user'
 
   clean:
     desc: Clean output

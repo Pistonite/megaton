@@ -13,8 +13,9 @@ sources = [
 # defines = [
 #     "NNSDK"
 # ]
+[build.profiles.rust_bindgen]
 includes = [
-    "src/include-priv", 
+    "src/megacpp/include", 
     "include",
 ]
 

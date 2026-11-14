@@ -3,10 +3,14 @@
 
 #pragma once
 
+#ifdef __cplusplus
+#include <cstdint>
+#else
+#include <stdint.h>
+#endif
 // FIXME: clang-tidy is confused about the language of this file,
 // add cmake rules for headers
 // NOLINTBEGIN(modernize-deprecated-headers)
-#include <stdint.h>
 // NOLINTEND(modernize-deprecated-headers)
 
 #ifdef __cplusplus
@@ -14,7 +18,7 @@ extern "C" {
 #endif // __cplusplus
 
 void _megahermit_abort();
-void _megahermit_stub1();
+uint32_t _megahermit_stub1();
 void _megahermit_stub2();
 
 #ifdef __cplusplus

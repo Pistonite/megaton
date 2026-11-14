@@ -27,18 +27,18 @@ set(CMAKE_RANLIB "${DKP_BIN}/${DKP_TRIPLE}-ranlib")
 
 # Disable C++20 module scanning so CMake doesn't inject -fmodules-ts / -fdeps-format / -fmodule-mapper
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
-# Clears paths CMake considers implicit for each language so they aren't
-# silently filtered from compile_commands.json (needed for clangd/clang-tidy).
-set(CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES "")
-set(CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES "")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(DEVKITA64_C_SYSTEM_INCLUDES
+    "${DKP_A64}/lib/gcc/${DKP_TRIPLE}/${DKP_VERSION}/include"
+    "${DKP_A64}/lib/gcc/${DKP_TRIPLE}/${DKP_VERSION}/include-fixed"
+    "${DKP_A64}/${DKP_TRIPLE}/include"
+)
 set(DEVKITA64_SYSTEM_INCLUDES
     "${DKP_A64}/${DKP_TRIPLE}/include/c++/${DKP_VERSION}"
     "${DKP_A64}/${DKP_TRIPLE}/include/c++/${DKP_VERSION}/${DKP_TRIPLE}"
     "${DKP_A64}/${DKP_TRIPLE}/include/c++/${DKP_VERSION}/backward"
-    "${DKP_A64}/lib/gcc/${DKP_TRIPLE}/${DKP_VERSION}/include"
-    "${DKP_A64}/lib/gcc/${DKP_TRIPLE}/${DKP_VERSION}/include-fixed"
-    "${DKP_A64}/${DKP_TRIPLE}/include"
-    "${DEVKITPRO}/libnx/include"
+    ${DEVKITA64_C_SYSTEM_INCLUDES}
 )
+set(CMAKE_C_STANDARD_INCLUDE_DIRECTORIES ${DEVKITA64_C_SYSTEM_INCLUDES})
+set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES ${DEVKITA64_SYSTEM_INCLUDES})
