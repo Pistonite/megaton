@@ -16,6 +16,9 @@ runs:
         rm llvm.sh
         echo "/usr/lib/llvm-23/bin" >> "$GITHUB_PATH"
         echo "LIBCLANG_PATH=/usr/lib/llvm-23/lib" >> "$GITHUB_ENV"
+        echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
     - run: clang --version
+      shell: bash
+    - run: bindgen --version
       shell: bash
 
