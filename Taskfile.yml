@@ -96,3 +96,13 @@ tasks:
     - task: docker:clean
     - task: packaging:clean
     - task: toolchain:clean
+
+  publish:
+    desc: Publish a new release
+    vars:
+      VERSION:
+        sh: grep -E ^version Cargo.toml | head -n1 | sed -E 's/^version\s*=\s"([^"]+)"$/v\1/'
+    cmds:
+      - git tag {{.VERSION}}
+      - git push origin {{.VERSION}}
+
