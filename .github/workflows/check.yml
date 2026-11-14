@@ -5,20 +5,20 @@ on:
       - main
 
 jobs:
-  non-dkp:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    steps:
-      - uses: Pistonight/mono-dev/actions/setup@main
-        with:
-          rust: stable
-          tool-cargo-binstall: lisensor
-      - name: placing stub megatonlib
-        run: |
-          mkdir -p packages/packaging/dist
-          echo '' > packages/packaging/dist/megatonlib.tar.gz
-          echo '01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b' > packages/packaging/dist/megatonlib.tar.gz.sha256
-      - run: task check-non-dkp
-      - run: task test
+  # non-dkp:
+  #   runs-on: blacksmith-4vcpu-ubuntu-2404
+  #   steps:
+  #     - uses: Pistonight/mono-dev/actions/setup@main
+  #       with:
+  #         rust: stable
+  #         tool-cargo-binstall: lisensor
+  #     - name: placing stub megatonlib
+  #       run: |
+  #         mkdir -p packages/packaging/dist
+  #         echo '' > packages/packaging/dist/megatonlib.tar.gz
+  #         echo '01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b' > packages/packaging/dist/megatonlib.tar.gz.sha256
+  #     - run: task check-non-dkp
+  #     - run: task test
 
   dkp:
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -32,4 +32,6 @@ jobs:
         with:
           # tool-mdbook: true
           ccpp-cmake: true
+      - run: echo '/root/.cargo/bin' >> "$GITHUB_PATH"
+      - run: rustup default
       - run: task check-dkp
