@@ -8,6 +8,8 @@ runs:
       shell: bash
       # setup clang path and libclang for bindgen
       run: |
+        sudo apt-get update
+        sudo apt-get install -y lsb-release software-properties-common
         wget https://apt.llvm.org/llvm.sh
         chmod +x llvm.sh
         sudo ./llvm.sh 23
