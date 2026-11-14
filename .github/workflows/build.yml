@@ -47,6 +47,13 @@ jobs:
           # tool-mdbook: true
           ccpp-cmake: true
       - run: echo '/root/.cargo/bin' >> "$GITHUB_PATH"
+      - run: |
+          which rustup
+          which cargo
+          which rustc
+          which bindgen
+          ls /root/.cargo/bin
+          ls $HOME/.cargo/bin
       - run: 'rustup target add ${{ matrix.rust-target }}'
       - run: task package
       - uses: Pistonight/mono-dev/actions/rust-xplat@main
