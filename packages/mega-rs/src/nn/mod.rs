@@ -7,4 +7,3 @@
 #![allow(dead_code)]
 
 mod result;
-

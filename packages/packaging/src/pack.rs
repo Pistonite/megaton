@@ -109,7 +109,7 @@ impl LibraryPackager {
         if let Ok(existing) = cu::fs::read(out_path) {
             if let Ok(existing_sha) = cu::fs::read_string(out_sha_path) {
                 if existing == buffer && info.sha256 == existing_sha {
-                    info.up_to_date =true;
+                    info.up_to_date = true;
                     return Ok(info);
                 }
             }
