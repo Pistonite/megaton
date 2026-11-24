@@ -2,5 +2,5 @@
     "compilerOptions": {
         "lib": ["esnext"]
     },
-    "include": ["*.ts"]
+    "include": ["icon"]
 }

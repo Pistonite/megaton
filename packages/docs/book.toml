@@ -2,13 +2,33 @@
 authors = ["Megaton Contributors"]
 language = "en"
 title = "Megaton"
+src = "src"
 
+#@mono-dev:preprocessor {
+#@mono-dev:    nvim-treesitter {
+[preprocessor.nvim-treesitter]
+command = "./.cache/mono-dev-mdbook/mdbook-nvim-treesitter"
+#@mono-dev:    }
+#@mono-dev:}
+
+#@mono-dev:html {
 [output.html]
+
+# add extra props here
+git-repository-url = "https://github.com/Pistonite/megaton"
+
+#@mono-dev:    props {
 default-theme = "frappe"
 preferred-dark-theme = "frappe"
 smart-punctuation = true
-git-repository-url = "https://github.com/Pistonite/megaton"
+#@mono-dev:    }
+
 additional-css = [
-    "./theme/extra-css/catppuccin.css", 
-    "./theme/extra-css/patch.css", 
+#@mono-dev:    css {
+    "./theme/extra-css/catppuccin.css",
+    "./theme/extra-css/patch.css",
+    "./theme/extra-css/tree-sitter.css",
+#@mono-dev:    }
 ]
+
+#@mono-dev:}

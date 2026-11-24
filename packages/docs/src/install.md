@@ -5,16 +5,24 @@
   (Select the `switch-dev` group)
 
   > [!NOTE]
-  > TODO Add info about how megaton searches for DKP installation
-- For Rust support (building mods written in Rust), a Rust toolchain for the host system
-  (i.e. the system used to build the mod) and `git` are required to clone and build
-  the Rust compiler for the `aarch64-unknown-hermit` target.
+  > Please set the `DEVKITPRO` environment variable for Megaton to be able to
+  > find the DKP installation:
+  >
+  > For example:
+  > ```bash
+  > DEVKITPRO=/opt/devkitpro
+  > ```
+
+- For building mods written in Rust, build tools are required to build the Rust
+  toolchain:
+    - Git
+    - CMake
+    - Ninja
+    - A C/CXX Toolchain
+    - A Rust Toolchain on the host system (for running `cargo`).
 
 ## Install Megaton
 The `megaton` CLI is a single binary, which can be installed in 3 ways:
-
-> [!NOTE]
-> TODO These don't work yet
 
 1. (Recommended) Install from prebuilt binary with `cargo-binstall`
     ```bash
@@ -29,10 +37,10 @@ The `megaton` CLI is a single binary, which can be installed in 3 ways:
 ## Install Megaton Rust Toolchain
 Megaton implements the [Hermit ABI](https://github.com/hermit-os/hermit-rs) to bind Rust
 Standard Library to NNSDK. This requires a custom Rust toolchain. Megaton will install
-this toolchain at `~/.cache/megaton/rust-toolchain`.
+this toolchain at ```bash`$MEGATON_HOME/rust-toolchain```. ```bash`$MEGATON_HOME```
+defaults to `~/.cache/megaton`.
 
-This toolchain is locked at a commit for every Megaton version. This will be bumped approximately
-in line with Rust's stable release. If you need Rust feature in a higher version of Rust than
+This toolchain is locked at a commit for every Megaton version. If you need Rust feature in a higher version of Rust than
 what is included with Megaton, please open an issue on GitHub.
 
 Run the following command to install the toolchain, or upgrade the toolchain in the future
@@ -42,7 +50,7 @@ megaton toolchain install
 
 > [!NOTE]
 > This compiles LLVM and bootstraps the Rust compiler, which will take a while.
-> To keep the build artifact, use the `-k`/`--keep` flag: `megaton toolchain install -k`.
+> To keep the build artifact, use the `-k`/`--keep` flag: ```bash`megaton toolchain install -k```.
 > This will make it faster to rebuild the toolchain in the future when upgrading. However,
 > this will consume 10-20GB of disk spaces.
 

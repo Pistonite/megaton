@@ -8,20 +8,28 @@ includes:
 
 tasks:
   install:
-    - task: mdbook:install-theme
-      vars:
-        MONO_DEV: ../../mono-dev
+    - task: mdbook:config
     - cp src/icon.svg theme/favicon.svg
     - cp src/icon.png theme/favicon.png
+
+  icon:
+    desc: Rebuild icons (requires `prism`)
+    dir: icon
+    cmds:
+      - prism > prism.d.ts
+      - prism icon.ts > ../src/icon.svg
+      - prism icon.ts --png ../src/icon.png
+      - task: install
 
   dev:
     desc: Start mdbook in watch mode
     cmds:
       - rm -rf book
-      - shwoop book -w src --host -- mdbook build
+      - shwoop book -w src --host -- {{.TASK_EXE}} build
 
   build:
-    desc: (Re-)build the book
+    desc: Build the book
     cmds:
-      - rm -rf book
-      - mdbook build
+      - task: mdbook:call-mdbook
+        vars:
+          COMMAND: build

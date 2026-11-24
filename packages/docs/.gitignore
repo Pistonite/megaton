@@ -1,2 +1,6 @@
+/.cache
 /theme
 /book
+/icon/*.d.ts
+/icon/*.svg
+/icon/*.png
