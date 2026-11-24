@@ -4,6 +4,8 @@
 > At the moment, there is no `megaton init` command, so the initial files
 > will need to be created manually. When this command is added in the future,
 > this step will be much faster and easier.
+>
+> <https://github.com/Pistonite/megaton/issues/136>
 
 ## Create Megaton Config
 To initialize a Megaton project, you will need a `Megaton.toml` config file.
@@ -13,99 +15,77 @@ Megaton project.
 ```toml
 # Megaton.toml
 
+# The version of Megaton to use.
+# If the version of Megaton operating on this config file does not
+# satisfy the version, it will error.
+megaton.version = "^0.3.0"
+
 [module]
 # The name of the compiled module. This will be the name of the output NSO
 name = "my-mod"
-# REQUIRED: Add the title id for your target game here
-# title-id = 0x0
+# If you want to have versioning for your mod, you can use this field.
+# Megaton ignores this completely
+version = "0.1.0"
 
-[megaton]
-# Uncomment to enable version check
-# version = "0.1.0"
+# Change it to your game's title id
+title-id = 0x0
+# Megaton has a sync tool that will upload the mod via filesystem (USB)
+# or FTP. This is the target file name for the NSO.
+nso-name = "subsdk9"
 
-# Set a custom mod entry point. This will disable the megaton runtime library,
-# including rust support. Only use this if you know what you are doing.
-# custom-entry = ""
-
-[profile]
-default = "none"
-
-[build] # Options for building C/C++ sources
+# Options for building C/C++ sources
+[build]
+# Source directories. C/C++/assembly files inside are recursively scanned
 sources = ["src"]
+# Include directories.
 includes = ["include"]
-
-[build.flags]
-
-[cargo]
-manifest = "Cargo.toml"
-
-[check]
-# Add the symbols from your target game's SDK
-symbols = []
 ```
 See the pages under [Configuration](../reference/configuration/index.html)
 for a full specification of all the config options.
 
 ## Create Cargo Project
-If you are using rust, initialize a cargo project. The default location is the
-same as the Megaton root. If you want your rust code to live elsewhere, set the
-path of the cargo manifest in the config field `cargo.manifest`.
-```
-$ cargo init --lib .
-```
+
+If you are using rust, initialize a cargo project. Megaton will automatically
+enable Rust support if it finds a `Cargo.toml` in the same directory.
+You can also configure it to look in another place.
+
 ```toml
 # Cargo.toml
 
 [package]
+# Currently the crate name is used as the import namespace for CXX-generated
+# headers. In your C++ code, you will include Rust files like `#include <my-mod-rs/lib.rs.h>`
 name = "my-mod-rs"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-# Needed for standard library support
-megaton = {version = "0.1.0", path = "target/megaton/none/lib"}
+# The megaton Rust library needs to be added for utilities that allow
+# the Rust side to talk to the C++ side
+megaton.path = "target/megaton/lib"
 
-# Useful for C++/Rust FFI
-# Megaton distributes a "blessed" version of the cxx-bridge cli tool
-# with the rust toolchain. The build tool will warn if the version
-# chosen here doesn't match the blessed cxx version
-cxx = "1.0.194"
+# Megaton has built-in support for the `cxx` crate for Rust-CXX interop.
+# The upstream crate ships breaking changes pretty often, so Megaton
+# typically has a "blessed" version that is locked with each release.
+# You can run `megaton -vV` to check the "blessed" version.
+#
+# If you are using a higher version, it will print a warning. If you are using
+# a lower version, it will return an error prompting you to upgrade.
+cxx = "1.0.197"
 
 [lib]
-# Crate must be a static library in order to link into the NSO
+# Crate must be a static library in order for Megaton to process the output
 crate-type = ["staticlib"]
 ```
+
 ```rust
 // src/lib.rs
 
-// For straightforward FFI, define a cxx::bridge module
-// The Megaton build tool will generate the required interop
-// sources and headers and automattically build/include them.
+// Put a `megaton::main` attribute on the initialization function of the Rust
+// side of your mod. This will generate shims around the unsafe ABI and generate
+// code to initialize the Rust side of Megaton's library.
 //
-// See the cxx docs (https://cxx.rs/) for further info
-#[cxx::bridge]
-mod ffi {
-    #[namespace = "mod_functions_cpp"] 
-    unsafe extern "C++" {
-        include!("my-mod/my_mod.h");
-        fn add_in_cpp();
-    }
-
-    #[namespace = "mod_functions_rs"]
-    extern "Rust" {
-        pub fn add_in_rust(left: u64, right: u64) -> u64;
-    }
-}
-
-// A "useful" support function defined in rust
-pub fn add_in_rust(left: u64, right: u64) -> u64 {
-    left + right
-}
-
-// This optional attribute provides an easy entry point into your rust code
-// without using cxx. If you prefer not to use FFI and most of your mod
-// logic lives in rust, you may want to call this from the C++ entry point
-// and use cxx to import C++ functions rather than export rust functions.
+// You can call this function anything
 #[megaton::main]
 fn my_mod_rust_main() {
     
@@ -114,65 +94,35 @@ fn my_mod_rust_main() {
 
 ## Add initial C++ Code
 
-At the moment, a C entry point is needed, even if most of the mod's code is
-in rust. The mod must contain the C symbol `megaton_main`, which the Megaton
-runtime library will call after initialization. To call the rust entry point,
-you will also need to define the symbol `__megaton_rs_main` and call it in
-your C code.
+Finally, you need to define `megaton_main` in the C++ side, which is the entry point
+of the whole mod.
 
 ```cpp
 // src/main.cpp
 
-// Include the megaton library
-#include <megaton/prelude.h>
+// TODO: figure out what header to put megaton::rust_main
+#include <megaton/what?.h>
 
-// Public header for the mod
-#include <my-mod/my_mod.h>
-
-// Header generated by cxx for importing rust functions into C++
-#include <lib.h>
-
-// Define the functions we are exporting to rust through the public header
-namespace mod_functions_cpp {
-  uint64_t add_in_cpp(uint64_t left, uint64_t right) {
-    return left + right;
-  }
-}
-
-// Declare the rust main function (needed if using #[megaton::main]
-extern "C" void __megaton_rs_main();
-
-// This is the main mod entry point which will be called by the
-// megaton runtime library after hooking/patching your code
+// This is the main mod entry point which will be called at runtime
+// when you mod initializes
 extern "C" void megaton_main() {
+    /* do your mod stuff here */
 
-    // You might just want to call the rust main function here
-    // Your rust main function might have a differnt name, but this
-    // symbol must be used on the C/C++ side. The #[megaton::main]
-    // attribute macro will generate this symbol if it is used
-    __megaton_rs_main();
-
-    // Alternativly, you can keep the bulk of your mod logic/init 
-    // code in C++ and call on rust function exported by cxx
-    // from the ffi module
-    // uint64_t probobly_four = mod_functions_rs::add_in_rust(2, 2);
+    // NOTE: If you use Rust, you must manually call megaton::rust_main(),
+    // which starts the initialization of the Rust module.
+    // This gives you full control over the initialization sequence.
+    megaton::rust_main();
 }
 ```
 
-```cpp
-// include/my-mod/my_mod.h
+Now run ```bash`megaton build``` and the mod should build the NSO to `target/megaton/none/my-mod/my-mod.nso`
 
-// cxx will handle type interop
-#include "rust/cxx.h"
-
-// Functions to export (see ffi module in lib.rs)
-namespace mod_functions_cpp {
-  uint64_t add_in_cpp(uint64_t left, uint64_t right);
-}
-```
-
-## Build
-
-At this point, you should be able to run `megaton build`. If you get a "Check
-failed" error, ensure that you have added all the symbol files from your game
-SDK.
+> [!NOTE]
+> Like most modern build systems such as Cargo, Megaton is able to automatically
+> determine what to build based on the config file and incremental-build information
+> from the compiler. Unlike a traditional C++ project with CMake, you will typically
+> not need a separate "configure" step.
+>
+> This also means in cases where a CMake project will require a manual re-configure,
+> such as adding a new file or source directory, Megaton-build will do that automatically.
+> It's considered a bug if you have to clean the output directory to produce a proper build.

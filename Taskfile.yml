@@ -30,12 +30,11 @@ tasks:
     - git clone https://github.com/Pistonight/mono-dev --depth 1
     - '{{.TASK_EXE}} install-2' # reinvoke with shared tasks available
   install-2:
-    interal: true
+    # note that CI jobs don't run this install. They only run the exact install
+    # needed for each job. This is to setup everything for local development
     cmds:
       - task: mega-cpp:install
-
-  # install-ci:
-  #   - task: docs:install
+      - task: docs:install
 
   install-cargo-extra-tools:
     aliases: [icets]

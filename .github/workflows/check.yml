@@ -28,7 +28,6 @@ jobs:
       - uses: Pistonight/mono-dev/actions/setup@main
         with:
           ecma-node: true
-          # tool-mdbook: true
           ccpp-cmake: true
       - uses: Swatinem/rust-cache@v2
       - run: task check-dkp
